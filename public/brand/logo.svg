@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400">
+<g transform="translate(35,135) scale(1.55)">
+<g fill="#F2B94B">
+  <path d="M78 10 C84 31 89 36 110 42 C89 48 84 53 78 74 C72 53 67 48 46 42 C67 36 72 31 78 10Z"/>
+  <path d="M18 104 L42 80 L62 98 L112 48 L126 62 L62 126 L42 108 L30 120 Z"/>
+  <path d="M101 43 L130 34 L121 63 Z"/>
+</g></g><text x="250" y="245" font-family="DejaVu Sans, Arial, sans-serif" font-size="132" font-weight="700" letter-spacing="-5" fill="#101D36">Прокачка</text>
+</svg>

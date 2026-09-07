@@ -1,0 +1,41 @@
+import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
+import { failure, ok } from "@/backend/http/api-response";
+import { isUuid } from "@/backend/http/security";
+import { findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
+
+export async function listUsers(request: Request) {
+  const currentUser = getRequestUser(request);
+  if (!currentUser) return failure("Сначала войдите в аккаунт.", 401);
+  const teamId = currentUser.role === "ceo" ? undefined : currentUser.teamId;
+  const result = await findUsers(teamId);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if (result.error) return failure("Не удалось загрузить участников.");
+  return ok({ users: result.data });
+}
+
+export async function upsertUser(request: Request) {
+  const currentUser = getRequestUser(request);
+  if (!hasRole(currentUser, ["ceo"])) return failure("Недостаточно прав.", currentUser ? 403 : 401);
+  try {
+    const body = await request.json();
+    if (!body.name?.trim() || !body.telegramId) return failure("Нужно имя и Telegram ID.", 400);
+    const result = await saveUser(body.name.trim(), String(body.telegramId));
+    if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if (result.error) return failure("Не удалось сохранить участника.");
+    return ok({ user: result.data }, 201);
+  } catch { return failure("Некорректные данные.", 400); }
+}
+export async function updateUserAccessController(request: Request, id: string) {
+  const currentUser = getRequestUser(request);
+  if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
+  if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
+  try {
+    const body = await request.json();
+    if (body.role !== "admin" && body.role !== "member") return failure("Можно назначить только участника или наставника.", 400);
+    if (body.teamId !== undefined && body.teamId !== null && body.teamId !== "" && !isUuid(body.teamId)) return failure("Некорректная команда.", 400);
+    const result = await updateUserAccess(id, { role: body.role, teamId: body.teamId });
+    if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if (result.error) return failure("Не удалось обновить доступ пользователя.");
+    return ok({ user: result.data });
+  } catch { return failure("Некорректные данные.", 400); }
+}
