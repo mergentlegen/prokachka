@@ -55,20 +55,20 @@ export async function attachTelegramSubmission(input: { telegramId: string; chat
   if (input.updateId !== undefined) {
     const duplicate = await supabase.from("submissions").select("*").eq("telegram_update_id", input.updateId).maybeSingle();
     if (duplicate.error) return { error: duplicate.error };
-    if (duplicate.data) return { data: duplicate.data };
+    if (duplicate.data) return { data: duplicate.data, duplicate: true as const };
   }
   const existing = await supabase.from("submissions").select("id").eq("user_id", user.data.id).eq("task_id", input.taskId).eq("status", "pending").order("submitted_at", { ascending: false }).limit(1).maybeSingle();
   if (existing.error) return { error: existing.error };
   const telegramFields = { telegram_chat_id: input.chatId, telegram_message_id: input.messageId, telegram_update_id: input.updateId ?? null, submitted_at: new Date().toISOString() };
   if (existing.data?.id) {
     const updated = await supabase.from("submissions").update(telegramFields).eq("id", existing.data.id).select().single();
-    return updated.error ? { error: updated.error } : { data: updated.data };
+    return updated.error ? { error: updated.error } : { data: updated.data, duplicate: false as const };
   }
   const created = await supabase.from("submissions").insert({ user_id: user.data.id, task_id: input.taskId, status: "pending", ...telegramFields, points: 0, comment: "" }).select().single();
-  if (!created.error) return { data: created.data };
+  if (!created.error) return { data: created.data, duplicate: false as const };
   if (created.error.code === "23505" && input.updateId !== undefined) {
     const duplicate = await supabase.from("submissions").select("*").eq("telegram_update_id", input.updateId).maybeSingle();
-    if (!duplicate.error && duplicate.data) return { data: duplicate.data };
+    if (!duplicate.error && duplicate.data) return { data: duplicate.data, duplicate: true as const };
   }
   return { error: created.error };
 }

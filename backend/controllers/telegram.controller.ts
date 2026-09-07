@@ -6,19 +6,12 @@ import { isUuid } from "@/backend/http/security";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { attachTelegramSubmission } from "@/backend/services/submissions.service";
 import { createTelegramLinkToken, linkTelegramAccount } from "@/backend/services/telegram-link.service";
+import { notifyMentorsAboutSubmission, sendTelegramMessage } from "@/backend/services/telegram-notifications.service";
 
 function botUsername() {
   return serverEnv.telegramBotUsername?.replace(/^@/, "");
 }
 
-async function sendTelegramMessage(chatId: string, text: string) {
-  if (!serverEnv.telegramBotToken) return;
-  await fetch("https://api.telegram.org/bot" + serverEnv.telegramBotToken + "/sendMessage", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  }).catch(() => undefined);
-}
 
 export async function createTelegramLink(request: Request) {
   const user = getRequestUser(request);
@@ -90,16 +83,27 @@ export async function receiveTelegramUpdate(request: Request) {
           await sendTelegramMessage(String(telegramChatId), "Не удалось принять работу. Проверьте, что Telegram привязан и срок задания не истёк.");
         } else if ("validationError" in result) {
           await sendTelegramMessage(String(telegramChatId), result.validationError || "Не удалось принять работу.");
-        } else {
+        } else if (!result.duplicate) {
           await supabase.from("telegram_contexts").delete().eq("telegram_id", String(telegramUserId));
-          await sendTelegramMessage(String(telegramChatId), "Работа получена и отправлена наставнику на проверку.");
+          const notification = await notifyMentorsAboutSubmission(String(result.data.id));
+          if ("error" in notification) {
+            console.error("Telegram mentor notification failed", notification.error);
+            await sendTelegramMessage(String(telegramChatId), "Работа сохранена, но уведомление наставнику не доставлено. Наставник всё равно увидит её в панели.");
+          } else if ("unavailable" in notification) {
+            await sendTelegramMessage(String(telegramChatId), "Работа сохранена, но база данных временно недоступна для уведомления наставника.");
+          } else if (notification.delivered > 0) {
+            await sendTelegramMessage(String(telegramChatId), "Работа получена и отправлена наставнику на проверку.");
+          } else {
+            await sendTelegramMessage(String(telegramChatId), "Работа сохранена. У наставника пока не привязан Telegram, поэтому уведомление не отправлено. Работа доступна в панели наставника.");
+          }
         }
       }
     }
 
     console.info("Telegram submission received", { telegramUserId, telegramChatId, telegramMessageId: message?.message_id, taskId: startTaskId || captionTaskId, mediaType: message?.photo ? "photo" : message?.video ? "video" : message?.document ? "document" : "unknown" });
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error("Telegram update processing failed", error);
     return failure("Некорректное обновление Telegram", 400);
   }
 }

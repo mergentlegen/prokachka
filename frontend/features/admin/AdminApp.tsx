@@ -50,6 +50,7 @@ export function AdminApp() {
   const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", maxPoints: "10", hasDeadline: false, deadline: "" });
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,7 +164,20 @@ export function AdminApp() {
     setModal({ type: "review", submission, status });
   }
 
-  function openDeleteModal(task: Task) {
+  useEffect(() => {
+    if (dataLoading || !authUser || authUser.role !== "admin" || deepLinkHandled) return;
+    const submissionId = new URLSearchParams(window.location.search).get("submission");
+    if (!submissionId) {
+      setDeepLinkHandled(true);
+      return;
+    }
+    const submission = store.submissions.find((item) => item.id === submissionId);
+    if (!submission) return;
+    setSection("review");
+    openReviewModal(submission, "accepted");
+    setDeepLinkHandled(true);
+  }, [authUser, dataLoading, deepLinkHandled, store.submissions, store.tasks]);
+   function openDeleteModal(task: Task) {
     setModal({ type: "delete", task });
   }
 
