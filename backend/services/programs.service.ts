@@ -41,3 +41,12 @@ export async function updateProgram(id: string, input: { title?: string; deadlin
   }
   return { data: result.data };
 }
+
+export async function deleteProgram(id: string, teamId?: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  let query = supabase.from("task_programs").delete().eq("id", id);
+  if (teamId) query = query.eq("team_id", teamId);
+  const result = await query;
+  return result.error ? { error: result.error } : { data: true };
+}

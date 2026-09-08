@@ -777,3 +777,11 @@ body:has(.login-shell) {
 .login-brand .brand-logo { width:190px; }
 .ceo-brand .brand-logo { width:130px; height:auto; }
 @media (max-width:560px) { .brand-logo { width:125px; } .login-brand .brand-logo { width:170px; } .ceo-brand .brand-logo { width:112px; } }
+.ceo-card-actions .button-danger,.ceo-user-row .button-danger { border-color:#efcaca; background:#fff2f2; color:#b34f55; }
+.ceo-card-actions .button-danger:hover,.ceo-user-row .button-danger:hover { border-color:#df9e9e; background:#ffe6e6; }
+.ceo-delete-user { flex:0 0 auto; padding:6px 9px; font-size:10px; }
+.confirm-modal { width:min(470px,100%); padding:32px; border-top-width:5px; }
+.confirm-modal-icon { display:grid; place-items:center; width:42px; height:42px; margin-bottom:18px; border:1px solid #f1caca; border-radius:13px; background:#fff2f2; color:#b34f55; font-size:21px; font-weight:800; }
+.confirm-modal h2 { margin-bottom:10px; }
+.confirm-modal .modal-description { max-width:390px; }
+@media (max-width:560px) { .confirm-modal { padding:26px 20px; } }

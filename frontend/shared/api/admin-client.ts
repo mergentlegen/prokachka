@@ -42,3 +42,4 @@ export async function createAdminProgram(input: ProgramCreateInput): Promise<{ p
 export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean }): Promise<TaskProgram> {
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
+export async function deleteAdminProgram(id: string) { await request<ApiResponse<Record<string, never>>>("/api/programs/" + id, { method: "DELETE" }); }
