@@ -3,7 +3,7 @@ import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { findAccountById } from "@/backend/services/auth.service";
 import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
-import { findTasks, insertTask, patchTask, removeTask } from "@/backend/services/tasks.service";
+import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from "@/backend/services/tasks.service";
 
 function parseDeadline(value: unknown) {
   if (value === undefined || value === null || value === "") return { value: null as string | null };
@@ -83,8 +83,9 @@ export async function deleteTask(request: Request, id: string) {
   const user = getRequestUser(request);
   if (!isUuid(id)) return failure("Некорректное задание.", 400);
   if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
-  const result = await removeTask(id, user.role === "admin" ? user.teamId : undefined);
+  if (user.role === "admin" && !user.teamId) return failure("За наставником не закреплена команда.", 403);
+  const result = await deleteTaskRecord(id, user.role === "admin" ? user.teamId : undefined);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
-  if (result.error) return failure("Не удалось деактивировать задание.");
+  if (result.error) return failure("Не удалось удалить задание.");
   return ok({});
 }

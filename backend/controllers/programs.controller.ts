@@ -1,7 +1,7 @@
 import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { createProgram, findPrograms, updateProgram } from "@/backend/services/programs.service";
+import { createProgram, deleteProgram, findPrograms, updateProgram } from "@/backend/services/programs.service";
 import { findProgramHistory } from "@/backend/services/program-history.service";
 
 function validText(value: unknown, max: number) { return typeof value === "string" && value.trim().length >= 2 && value.trim().length <= max; }
@@ -65,4 +65,15 @@ export async function patchProgram(request: Request, id: string) {
     if (result.error) return failure("Не удалось обновить программу.");
     return ok({ program: result.data });
   } catch { return failure("Некорректные данные.", 400); }
+}
+
+export async function deleteProgramController(request: Request, id: string) {
+  const user = getRequestUser(request);
+  if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (!isUuid(id)) return failure("Некорректная программа.", 400);
+  if (user.role === "admin" && !user.teamId) return failure("За наставником не закреплена команда.", 403);
+  const result = await deleteProgram(id, user.role === "admin" ? user.teamId : undefined);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if (result.error) return failure("Не удалось удалить программу.");
+  return ok({});
 }

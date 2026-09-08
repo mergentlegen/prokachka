@@ -35,3 +35,10 @@ export async function removeTeam(id: string) {
   const result = await supabase.from("teams").update({ is_active: false }).eq("id", id);
   return result.error ? { error: result.error } : { data: true };
 }
+
+export async function deleteTeam(id: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const result = await supabase.from("teams").delete().eq("id", id);
+  return result.error ? { error: result.error } : { data: true };
+}

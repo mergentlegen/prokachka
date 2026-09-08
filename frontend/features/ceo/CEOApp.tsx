@@ -4,13 +4,15 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
 import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
-import { createCeoTeam, loadCeoData, reviewCeoRequest, updateCeoTeam, updateCeoUser } from "@/frontend/shared/api/ceo-client";
+import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, reviewCeoRequest, updateCeoTeam, updateCeoUser } from "@/frontend/shared/api/ceo-client";
+import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { formatDate, formatDateTime } from "@/frontend/shared/lib/format";
 import type { AuthUser, Team, TeamJoinRequest, User, UserRole } from "@/shared/domain/types";
 
 type CeoSection = "overview" | "teams" | "requests" | "users";
 type TeamDraft = { id?: string; name: string; description: string; isActive: boolean };
 type UserDraft = { id: string; role: "admin" | "member"; teamId: string };
+type DeleteTarget = { type: "team"; item: Team } | { type: "user"; item: User } | null;
 
 const sectionLabels: Record<CeoSection, string> = { overview: "Обзор", teams: "Команды", requests: "Заявки", users: "Пользователи" };
 const roleLabels: Record<UserRole, string> = { ceo: "CEO", admin: "Наставник", member: "Участник" };
@@ -29,6 +31,7 @@ export function CEOApp() {
   const [teamDraft, setTeamDraft] = useState<TeamDraft | null>(null);
   const [userDraft, setUserDraft] = useState<UserDraft | null>(null);
   const [actionId, setActionId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   async function refresh(silent = false) {
     if (!silent) setDataLoading(true);
@@ -125,6 +128,25 @@ export function CEOApp() {
     }
   }
 
+  async function permanentlyDeleteTeam(team: Team) {
+    setActionId(`delete-team:${team.id}`);
+    try {
+      await deleteCeoTeam(team.id);
+      setTeams((current) => current.filter((item) => item.id !== team.id));
+      setUsers((current) => current.map((user) => user.teamId === team.id ? { ...user, teamId: undefined } : user));
+      setRequests((current) => current.filter((request) => request.teamId !== team.id));
+      setToast("Команда и её данные удалены.");
+    } catch {
+      setToast("Не удалось удалить команду.");
+    } finally {
+      setActionId("");
+    }
+  }
+
+  function requestDeleteTeam(team: Team) {
+    setDeleteTarget({ type: "team", item: team });
+  }
+
   async function saveUserAccess(event: FormEvent) {
     event.preventDefault();
     if (!userDraft) return;
@@ -139,6 +161,25 @@ export function CEOApp() {
     } finally {
       setActionId("");
     }
+  }
+
+  async function permanentlyDeleteUser(user: User) {
+    setActionId(`delete-user:${user.id}`);
+    try {
+      await deleteCeoUser(user.id);
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      setRequests((current) => current.filter((request) => request.userId !== user.id));
+      setUserDraft((current) => current?.id === user.id ? null : current);
+      setToast("Пользователь удалён.");
+    } catch {
+      setToast("Не удалось удалить пользователя.");
+    } finally {
+      setActionId("");
+    }
+  }
+
+  function requestDeleteUser(user: User) {
+    setDeleteTarget({ type: "user", item: user });
   }
 
   async function resolveRequest(request: TeamJoinRequest, status: "approved" | "rejected") {
@@ -173,15 +214,17 @@ export function CEOApp() {
         <div className="ceo-heading"><div><p className="eyebrow">Пульт руководителя</p><h1>{section === "overview" ? "Всё под контролем" : sectionLabels[section]}</h1><p className="ceo-subtitle">Управляйте командами, заявками и доступами из одного места.</p>{dataLoading && hasLoaded && <span className="ceo-sync">Синхронизация данных...</span>}</div>{section === "teams" && <button className="primary-button" onClick={() => setTeamDraft({ name: "", description: "", isActive: true })}>+ Создать команду</button>}</div>
         {dataLoading && !hasLoaded ? <div className="ceo-loading">Обновляем данные...</div> : <>
           {section === "overview" && <Overview activeTeams={activeTeams.length} users={users.length} mentors={mentors.length} pending={pendingRequests.length} requests={pendingRequests} teams={teams} onNavigate={setSection} onResolve={resolveRequest} actionId={actionId} />}
-          {section === "teams" && <TeamsView teams={teams} users={users} onEdit={(team) => setTeamDraft({ id: team.id, name: team.name, description: team.description, isActive: team.isActive })} onToggle={toggleTeam} actionId={actionId} />}
+          {section === "teams" && <TeamsView teams={teams} users={users} onEdit={(team) => setTeamDraft({ id: team.id, name: team.name, description: team.description, isActive: team.isActive })} onToggle={toggleTeam} onDelete={requestDeleteTeam} actionId={actionId} />}
           {section === "requests" && <RequestsView requests={requests} onResolve={resolveRequest} actionId={actionId} />}
-          {section === "users" && <UsersView users={users} teams={teams} onEdit={(user) => setUserDraft({ id: user.id, role: user.role === "admin" ? "admin" : "member", teamId: user.teamId || "" })} />}
+          {section === "users" && <UsersView users={users} teams={teams} onEdit={(user) => setUserDraft({ id: user.id, role: user.role === "admin" ? "admin" : "member", teamId: user.teamId || "" })} onDelete={requestDeleteUser} actionId={actionId} />}
         </>}
       </section>
     </div>
     <div className="ceo-mobile-nav">{(Object.keys(sectionLabels) as CeoSection[]).map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><span>{item === "overview" ? "⌂" : item === "teams" ? "◈" : item === "requests" ? "✉" : "♙"}</span>{sectionLabels[item]}{item === "requests" && pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>)}</div>
     {teamDraft && <TeamModal draft={teamDraft} setDraft={setTeamDraft} onSubmit={saveTeam} pending={actionId === "team"} onClose={() => setTeamDraft(null)} />}
     {userDraft && <UserModal draft={userDraft} setDraft={setUserDraft} users={users} teams={teams} onSubmit={saveUserAccess} pending={actionId === userDraft.id} onClose={() => setUserDraft(null)} />}
+    {deleteTarget?.type === "team" && <ConfirmModal title="Удалить команду?" description={<>Команда «{deleteTarget.item.name}», её задания, программы, объявления, заявки и рейтинги будут удалены без возможности восстановления.</>} confirmLabel="Удалить команду" busy={actionId === `delete-team:${deleteTarget.item.id}`} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteTeam(deleteTarget.item); }} />}
+    {deleteTarget?.type === "user" && <ConfirmModal title="Удалить пользователя?" description={<>Профиль «{deleteTarget.item.name}», отправленные работы, звёзды и история будут удалены без возможности восстановления.</>} confirmLabel="Удалить пользователя" busy={actionId === `delete-user:${deleteTarget.item.id}`} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteUser(deleteTarget.item); }} />}
     {toast && <div className="toast">{toast}</div>}
   </main>;
 }
@@ -193,9 +236,9 @@ function Overview({ activeTeams, users, mentors, pending, requests, teams, onNav
   </>;
 }
 
-function TeamsView({ teams, users, onEdit, onToggle, actionId }: { teams: Team[]; users: User[]; onEdit: (team: Team) => void; onToggle: (team: Team) => void; actionId: string }) {
+function TeamsView({ teams, users, onEdit, onToggle, onDelete, actionId }: { teams: Team[]; users: User[]; onEdit: (team: Team) => void; onToggle: (team: Team) => void; onDelete: (team: Team) => void; actionId: string }) {
   if (teams.length === 0) return <div className="ceo-panel"><CeoEmpty text="Пока нет команд. Создайте первую, чтобы участники могли подать заявку." /></div>;
-  return <div className="ceo-team-grid">{teams.map((team) => { const members = users.filter((user) => user.teamId === team.id); const mentors = members.filter((user) => user.role === "admin"); return <article className={`ceo-team-card ${!team.isActive ? "inactive" : ""}`} key={team.id}><div className="ceo-team-card-top"><span className="ceo-large-team-icon">◈</span><span className={`ceo-status ${team.isActive ? "on" : "off"}`}>{team.isActive ? "Активна" : "Отключена"}</span></div><h2>{team.name}</h2><p>{team.description || "Описание команды пока не добавлено."}</p><div className="ceo-team-stats"><span><b>{members.length}</b> пользователей</span><span><b>{mentors.length}</b> наставников</span></div><div className="ceo-card-actions"><button className="button button-edit" onClick={() => onEdit(team)}>Изменить</button><button className={"button " + (team.isActive ? "button-warning" : "button-success")} onClick={() => onToggle(team)} disabled={actionId === team.id}>{team.isActive ? "Отключить" : "Активировать"}</button></div><small className="ceo-created">Создана {formatDate(team.createdAt)}</small></article>; })}</div>;
+  return <div className="ceo-team-grid">{teams.map((team) => { const members = users.filter((user) => user.teamId === team.id); const mentors = members.filter((user) => user.role === "admin"); return <article className={`ceo-team-card ${!team.isActive ? "inactive" : ""}`} key={team.id}><div className="ceo-team-card-top"><span className="ceo-large-team-icon">◈</span><span className={`ceo-status ${team.isActive ? "on" : "off"}`}>{team.isActive ? "Активна" : "Отключена"}</span></div><h2>{team.name}</h2><p>{team.description || "Описание команды пока не добавлено."}</p><div className="ceo-team-stats"><span><b>{members.length}</b> пользователей</span><span><b>{mentors.length}</b> наставников</span></div><div className="ceo-card-actions"><button className="button button-edit" onClick={() => onEdit(team)}>Изменить</button><button className={"button " + (team.isActive ? "button-warning" : "button-success")} onClick={() => onToggle(team)} disabled={actionId === team.id}>{team.isActive ? "Отключить" : "Активировать"}</button><button className="button button-danger" onClick={() => onDelete(team)} disabled={actionId === `delete-team:${team.id}`}>Удалить</button></div><small className="ceo-created">Создана {formatDate(team.createdAt)}</small></article>; })}</div>;
 }
 
 function RequestsView({ requests, onResolve, actionId }: { requests: TeamJoinRequest[]; onResolve: (request: TeamJoinRequest, status: "approved" | "rejected") => void; actionId: string }) {
@@ -207,8 +250,8 @@ function RequestRow({ request, onResolve, actionId, showDate = false }: { reques
   return <div className="ceo-request-row"><div className="ceo-user-avatar">{initials(request.userName || "?")}</div><div className="ceo-request-main"><strong>{request.userName || "Пользователь"}</strong><span>хочет в команду <b>{request.teamName || "—"}</b></span>{showDate && <small>{formatDateTime(request.createdAt)}</small>}</div>{pending ? <div className="ceo-request-actions"><button className="button button-success" onClick={() => onResolve(request, "approved")} disabled={actionId === request.id}>Одобрить</button><button className="button button-danger" onClick={() => onResolve(request, "rejected")} disabled={actionId === request.id}>Отклонить</button></div> : <span className={`request-result ${request.status}`}>{request.status === "approved" ? "Одобрена" : "Отклонена"}</span>}</div>;
 }
 
-function UsersView({ users, teams, onEdit }: { users: User[]; teams: Team[]; onEdit: (user: User) => void }) {
-  return <div className="ceo-panel ceo-users-panel"><div className="ceo-panel-title"><div><p className="eyebrow">Глобальный доступ</p><h2>Пользователи и роли</h2></div><span className="ceo-count-label">{users.length} всего</span></div>{users.length === 0 ? <CeoEmpty text="Пользователи появятся после регистрации." /> : users.map((user) => <div className="ceo-user-row" key={user.id}><div className="ceo-user-avatar">{initials(user.name)}</div><div className="ceo-user-main"><strong>{user.name}</strong><span>{user.login || "логин не указан"}</span></div><span className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</span><span className="ceo-user-team">{teams.find((team) => team.id === user.teamId)?.name || "Без команды"}</span><button className="button button-edit ceo-edit-access" onClick={() => onEdit(user)}>Настроить</button></div>)}</div>;
+function UsersView({ users, teams, onEdit, onDelete, actionId }: { users: User[]; teams: Team[]; onEdit: (user: User) => void; onDelete: (user: User) => void; actionId: string }) {
+  return <div className="ceo-panel ceo-users-panel"><div className="ceo-panel-title"><div><p className="eyebrow">Глобальный доступ</p><h2>Пользователи и роли</h2></div><span className="ceo-count-label">{users.length} всего</span></div>{users.length === 0 ? <CeoEmpty text="Пользователи появятся после регистрации." /> : users.map((user) => <div className="ceo-user-row" key={user.id}><div className="ceo-user-avatar">{initials(user.name)}</div><div className="ceo-user-main"><strong>{user.name}</strong><span>{user.login || "логин не указан"}</span></div><span className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</span><span className="ceo-user-team">{teams.find((team) => team.id === user.teamId)?.name || "Без команды"}</span><button className="button button-edit ceo-edit-access" onClick={() => onEdit(user)}>Настроить</button><button className="button button-danger ceo-delete-user" onClick={() => onDelete(user)} disabled={actionId === `delete-user:${user.id}`}>Удалить</button></div>)}</div>;
 }
 
 function TeamModal({ draft, setDraft, onSubmit, pending, onClose }: { draft: TeamDraft; setDraft: (draft: TeamDraft | null) => void; onSubmit: (event: FormEvent) => void; pending: boolean; onClose: () => void }) {

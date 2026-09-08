@@ -45,10 +45,10 @@ export async function patchTask(id: string, input: TaskInput, teamId?: string) {
   return result.error ? { error: result.error } : { data: result.data };
 }
 
-export async function removeTask(id: string, teamId?: string) {
+export async function deleteTask(id: string, teamId?: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("tasks").update({ is_active: false }).eq("id", id);
+  let query = supabase.from("tasks").delete().eq("id", id);
   if (teamId) query = query.eq("team_id", teamId);
   const result = await query;
   return result.error ? { error: result.error } : { data: true };

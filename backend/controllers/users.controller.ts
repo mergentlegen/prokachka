@@ -1,7 +1,7 @@
 import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
+import { deleteUser, findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
 
 export async function listUsers(request: Request) {
   const currentUser = getRequestUser(request);
@@ -42,4 +42,14 @@ export async function updateUserAccessController(request: Request, id: string) {
     if (result.error) return failure("Не удалось обновить доступ пользователя.");
     return ok({ user: result.data });
   } catch { return failure("Некорректные данные.", 400); }
+}
+
+export async function deleteUserController(request: Request, id: string) {
+  const currentUser = getRequestUser(request);
+  if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
+  if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
+  const result = await deleteUser(id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if (result.error) return failure("Не удалось удалить пользователя.");
+  return ok({});
 }

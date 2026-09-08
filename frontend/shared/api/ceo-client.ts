@@ -26,9 +26,17 @@ export async function updateCeoTeam(id: string, input: { name?: string; descript
   return mapTeam(response.team);
 }
 
+export async function deleteCeoTeam(id: string) {
+  await request<ApiResponse<Record<string, never>>>(`/api/teams/${id}/permanent`, { method: "DELETE" });
+}
+
 export async function updateCeoUser(id: string, input: { role: "admin" | "member"; teamId: string | null }) {
   const response = await request<ApiResponse<{ user: ApiRow }>>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(input) });
   return mapUser(response.user);
+}
+
+export async function deleteCeoUser(id: string) {
+  await request<ApiResponse<Record<string, never>>>(`/api/users/${id}`, { method: "DELETE" });
 }
 
 export async function reviewCeoRequest(id: string, status: "approved" | "rejected") {

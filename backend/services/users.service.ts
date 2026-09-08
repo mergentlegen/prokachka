@@ -33,3 +33,10 @@ export async function updateUserAccess(id: string, input: { role?: "admin" | "me
   const result = await supabase.from("users").update(patch).eq("id", id).select("id,name,login,role,team_id,team_joined_at,created_at").single();
   return result.error ? { error: result.error } : { data: result.data };
 }
+
+export async function deleteUser(id: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const result = await supabase.from("users").delete().eq("id", id);
+  return result.error ? { error: result.error } : { data: true };
+}

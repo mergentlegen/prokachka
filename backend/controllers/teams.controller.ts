@@ -1,7 +1,7 @@
 import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { createTeam, findTeams, removeTeam, updateTeam } from "@/backend/services/teams.service";
+import { createTeam, deleteTeam, findTeams, removeTeam, updateTeam } from "@/backend/services/teams.service";
 
 export async function listTeams(request: Request) {
   const user = getRequestUser(request);
@@ -50,5 +50,15 @@ export async function deleteTeamController(request: Request, id: string) {
   const result = await removeTeam(id);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure("Не удалось деактивировать команду.");
+  return ok({});
+}
+
+export async function permanentlyDeleteTeamController(request: Request, id: string) {
+  const user = getRequestUser(request);
+  if (!isUuid(id)) return failure("Некорректная команда.", 400);
+  if (!hasRole(user, ["ceo"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  const result = await deleteTeam(id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if (result.error) return failure("Не удалось удалить команду.");
   return ok({});
 }
