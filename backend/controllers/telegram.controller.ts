@@ -68,16 +68,34 @@ export async function receiveTelegramUpdate(request: Request) {
 
     if (supabase && startTaskId && isUuid(startTaskId) && telegramUserId && telegramChatId && chatType === "private") {
       await supabase.from("telegram_contexts").upsert({ telegram_id: String(telegramUserId), task_id: startTaskId, expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() }, { onConflict: "telegram_id" });
-      await sendTelegramMessage(String(telegramChatId), "Задание выбрано. Теперь отправьте сюда фото или видео своей работы.");
+      await sendTelegramMessage(String(telegramChatId), "Задание выбрано. Теперь отправьте сюда текст, фото или видео своей работы.");
     }
 
-    if (supabase && media && telegramUserId && telegramChatId && chatType === "private") {
+    const isCommand = Boolean(linkToken || startTaskId);
+    const answerText = media
+      ? (typeof message?.caption === "string" ? message.caption : "")
+      : (!isCommand && typeof message?.text === "string" ? message.text : "");
+    const answerType = media
+      ? message?.photo ? "photo" : message?.video ? "video" : "document"
+      : answerText.trim() ? "text" : undefined;
+    const fileId = message?.photo?.at(-1)?.file_id || message?.video?.file_id || message?.document?.file_id;
+
+    if (supabase && answerType && telegramUserId && telegramChatId && chatType === "private") {
       const { data: context } = await supabase.from("telegram_contexts").select("task_id,expires_at").eq("telegram_id", String(telegramUserId)).maybeSingle();
       const contextExpired = context?.expires_at && new Date(String(context.expires_at)).getTime() <= Date.now();
       if (contextExpired) await supabase.from("telegram_contexts").delete().eq("telegram_id", String(telegramUserId));
       const taskId = contextExpired ? undefined : context?.task_id || captionTaskId;
       if (taskId && isUuid(taskId)) {
-        const result = await attachTelegramSubmission({ telegramId: String(telegramUserId), chatId: String(telegramChatId), messageId: String(message?.message_id), taskId, updateId });
+        const result = await attachTelegramSubmission({
+          telegramId: String(telegramUserId),
+          chatId: String(telegramChatId),
+          messageId: String(message?.message_id),
+          taskId,
+          updateId,
+          mediaType: answerType,
+          answerText,
+          telegramFileId: fileId ? String(fileId) : undefined,
+        });
         if ("error" in result) {
           console.error("Telegram submission persistence failed", result.error);
           await sendTelegramMessage(String(telegramChatId), "Не удалось принять работу. Проверьте, что Telegram привязан и срок задания не истёк.");
@@ -97,10 +115,12 @@ export async function receiveTelegramUpdate(request: Request) {
             await sendTelegramMessage(String(telegramChatId), "Работа сохранена. У наставника пока не привязан Telegram, поэтому уведомление не отправлено. Работа доступна в панели наставника.");
           }
         }
+      } else {
+        await sendTelegramMessage(String(telegramChatId), "Сначала выберите задание на сайте, затем отправьте ответ сюда.");
       }
     }
 
-    console.info("Telegram submission received", { telegramUserId, telegramChatId, telegramMessageId: message?.message_id, taskId: startTaskId || captionTaskId, mediaType: message?.photo ? "photo" : message?.video ? "video" : message?.document ? "document" : "unknown" });
+    console.info("Telegram submission received", { telegramUserId, telegramChatId, telegramMessageId: message?.message_id, taskId: startTaskId || captionTaskId, mediaType: answerType || "unknown" });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Telegram update processing failed", error);

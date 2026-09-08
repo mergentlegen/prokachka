@@ -61,6 +61,24 @@ export async function sendTelegramMessage(chatId: string, text: string): Promise
   return { ok: false, error: "Telegram delivery failed" };
 }
 
+/** Copies the participant's original Telegram message to a mentor chat. */
+export async function copyTelegramMessage(toChatId: string, fromChatId: string, messageId: string): Promise<DeliveryResult> {
+  if (!serverEnv.telegramBotToken) return { ok: false, error: "TELEGRAM_BOT_TOKEN is not configured" };
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/copyMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: toChatId, from_chat_id: fromChatId, message_id: Number(messageId) }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    const payload = await response.json().catch(() => ({})) as TelegramApiResponse;
+    if (response.ok && payload.ok) return { ok: true };
+    return { ok: false, error: payload.description || `HTTP ${response.status}` };
+  } catch (error) {
+    return { ok: false, error: errorText(error) };
+  }
+}
+
 /** Notifies every linked mentor of the participant's new submission. */
 export async function notifyMentorsAboutSubmission(submissionId: string) {
   const supabase = getSupabaseAdmin();
@@ -68,7 +86,7 @@ export async function notifyMentorsAboutSubmission(submissionId: string) {
 
   const submissionResult = await supabase
     .from("submissions")
-    .select("id,user_id,task_id,submitted_at")
+    .select("id,user_id,task_id,submitted_at,telegram_chat_id,telegram_message_id,media_type,answer_text")
     .eq("id", submissionId)
     .single();
   if (submissionResult.error || !submissionResult.data) {
@@ -102,19 +120,30 @@ export async function notifyMentorsAboutSubmission(submissionId: string) {
 
   const baseUrl = appUrl();
   const panelUrl = baseUrl ? `${baseUrl}/admin?submission=${encodeURIComponent(submissionId)}` : "";
+  const hasOriginalMessage = Boolean(submissionResult.data.telegram_chat_id && submissionResult.data.telegram_message_id);
   const text = [
     "📥 Новая работа на проверку",
     "",
     `Участник: ${String(userResult.data.name || "Без имени")}`,
     `Задание: ${String(taskResult.data.title || "Без названия")}`,
     `Получено: ${new Date(String(submissionResult.data.submitted_at)).toLocaleString("ru-RU", { timeZone: "Asia/Almaty" })}`,
+    hasOriginalMessage
+      ? "Ответ будет отправлен следующим сообщением без изменений"
+      : `Ответ: ${String(submissionResult.data.answer_text || "").slice(0, 2500)}`,
     panelUrl ? `\nОткрыть панель: ${panelUrl}` : "",
   ].filter(Boolean).join("\n");
 
   const deliveries = await Promise.all(
-    mentors.map(async (mentor) => sendTelegramMessage(String(mentor.telegram_id), text)),
+    mentors.map(async (mentor) => {
+      const mentorChatId = String(mentor.telegram_id);
+      const summary = await sendTelegramMessage(mentorChatId, text);
+      const copied = hasOriginalMessage
+        ? await copyTelegramMessage(mentorChatId, String(submissionResult.data.telegram_chat_id), String(submissionResult.data.telegram_message_id))
+        : { ok: true as const };
+      return { summary, copied };
+    }),
   );
-  const delivered = deliveries.filter((result) => result.ok).length;
+  const delivered = deliveries.filter((result) => result.summary.ok || result.copied.ok).length;
   const failed = deliveries.length - delivered;
   console.info("Telegram mentor notification completed", { submissionId, teamId, mentors: mentors.length, delivered, failed });
   return { delivered, failed, mentors: mentors.length };

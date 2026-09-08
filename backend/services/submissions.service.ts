@@ -2,11 +2,30 @@ import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client
 import { advanceProgramAfterAcceptance, revertProgramAfterRevision } from "@/backend/services/member-progress.service";
 
 type FindOptions = { userId?: string; teamId?: string };
+const submissionSelect = "id,user_id,task_id,status,media_type,answer_text,points,comment,submitted_at,reviewed_at,created_at";
+
+export async function findSubmissionMedia(id: string, teamId?: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+
+  const result = await supabase
+    .from("submissions")
+    .select("telegram_file_id,media_type,tasks(team_id)")
+    .eq("id", id)
+    .maybeSingle();
+  const task = Array.isArray(result.data?.tasks) ? result.data.tasks[0] : result.data?.tasks;
+  if (result.error || !result.data) return { notFound: true as const };
+  if (teamId && String(task?.team_id || "") !== teamId) return { forbidden: true as const };
+  if (!result.data.telegram_file_id || !["photo", "video", "document"].includes(String(result.data.media_type))) {
+    return { notFound: true as const };
+  }
+  return { data: { fileId: String(result.data.telegram_file_id), mediaType: String(result.data.media_type) } };
+}
 
 export async function findSubmissions(options: FindOptions = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("submissions").select("*, users(name,team_id), tasks(title,max_points,team_id)").order("submitted_at", { ascending: false });
+  let query = supabase.from("submissions").select(`${submissionSelect}, users(name,team_id), tasks(title,max_points,team_id)`).order("submitted_at", { ascending: false });
   if (options.userId) query = query.eq("user_id", options.userId);
   if (options.teamId) query = query.eq("tasks.team_id", options.teamId);
   const result = await query;
@@ -43,7 +62,16 @@ export async function insertSubmission(input: { userId: string; taskId: string; 
   return result.error ? { error: result.error } : { data: result.data };
 }
 
-export async function attachTelegramSubmission(input: { telegramId: string; chatId: string; messageId: string; taskId: string; updateId?: number }) {
+export async function attachTelegramSubmission(input: {
+  telegramId: string;
+  chatId: string;
+  messageId: string;
+  taskId: string;
+  updateId?: number;
+  mediaType: "text" | "photo" | "video" | "document";
+  answerText?: string;
+  telegramFileId?: string;
+}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const user = await supabase.from("users").select("id").eq("telegram_id", input.telegramId).maybeSingle();
@@ -59,7 +87,15 @@ export async function attachTelegramSubmission(input: { telegramId: string; chat
   }
   const existing = await supabase.from("submissions").select("id").eq("user_id", user.data.id).eq("task_id", input.taskId).eq("status", "pending").order("submitted_at", { ascending: false }).limit(1).maybeSingle();
   if (existing.error) return { error: existing.error };
-  const telegramFields = { telegram_chat_id: input.chatId, telegram_message_id: input.messageId, telegram_update_id: input.updateId ?? null, submitted_at: new Date().toISOString() };
+  const telegramFields = {
+    telegram_chat_id: input.chatId,
+    telegram_message_id: input.messageId,
+    telegram_update_id: input.updateId ?? null,
+    media_type: input.mediaType,
+    telegram_file_id: input.telegramFileId || null,
+    answer_text: (input.answerText || "").slice(0, 10000),
+    submitted_at: new Date().toISOString(),
+  };
   if (existing.data?.id) {
     const updated = await supabase.from("submissions").update(telegramFields).eq("id", existing.data.id).select().single();
     return updated.error ? { error: updated.error } : { data: updated.data, duplicate: false as const };

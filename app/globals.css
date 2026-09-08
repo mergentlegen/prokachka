@@ -281,6 +281,14 @@ h1,h2,h3 { font-family:'Manrope', sans-serif; letter-spacing:-.04em; }
   .admin-top-actions > .telegram-connect { order:2; }
 }
 
+.submission-row-with-answer { align-items:flex-start; }
+.submission-row-copy { min-width:0; flex:1; }
+.submission-answer-text { margin:8px 0 0; color:#53617a; font-size:11px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; }
+.submission-media-details { margin-top:8px; }
+.submission-media-details summary { width:max-content; max-width:100%; cursor:pointer; color:var(--blue); font-size:10px; }
+.submission-media-preview { display:block; max-width:min(320px, 100%); max-height:260px; margin-top:9px; border-radius:8px; background:#edf2f8; object-fit:contain; }
+.submission-file-link { display:inline-block; margin-top:9px; color:var(--blue); font-size:10px; }
+
 /* Team announcements */
 .member-announcements { margin-bottom:34px; }
 .member-announcements .section-heading { margin-bottom:15px; }

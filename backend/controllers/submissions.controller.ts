@@ -1,7 +1,8 @@
 import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { findSubmissions, insertSubmission, saveReview } from "@/backend/services/submissions.service";
+import { findSubmissionMedia, findSubmissions, insertSubmission, saveReview } from "@/backend/services/submissions.service";
+import { serverEnv } from "@/backend/config/env";
 
 export async function listSubmissions(request: Request) {
   const user = getRequestUser(request);
@@ -45,4 +46,50 @@ export async function reviewSubmission(request: Request, id: string) {
     if (result.error) return failure("Не удалось сохранить проверку.");
     return ok({ submission: result.data });
   } catch { return failure("Некорректные данные.", 400); }
+}
+
+export async function streamSubmissionMedia(request: Request, id: string) {
+  const user = getRequestUser(request);
+  if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (!isUuid(id)) return failure("Некорректная работа.", 400);
+  const result = await findSubmissionMedia(id, user.role === "admin" ? user.teamId : undefined);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("forbidden" in result) return failure("Работа относится к другой команде.", 403);
+  if ("notFound" in result) return failure("Файл ответа не найден.", 404);
+  if (!serverEnv.telegramBotToken) return failure("Telegram-бот не настроен.", 503);
+
+  try {
+    const fileInfo = await fetch(
+      `https://api.telegram.org/bot${serverEnv.telegramBotToken}/getFile?file_id=${encodeURIComponent(result.data.fileId)}`,
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    const filePayload = await fileInfo.json().catch(() => ({})) as { ok?: boolean; result?: { file_path?: string } };
+    const filePath = filePayload.result?.file_path;
+    if (!fileInfo.ok || !filePayload.ok || !filePath) return failure("Не удалось получить файл ответа.", 502);
+
+    const range = request.headers.get("range");
+    const fileResponse = await fetch(
+      `https://api.telegram.org/file/bot${serverEnv.telegramBotToken}/${filePath}`,
+      { headers: range ? { Range: range } : {}, signal: AbortSignal.timeout(20_000) },
+    );
+    if (!fileResponse.ok || !fileResponse.body) return failure("Не удалось загрузить файл ответа.", 502);
+
+    const headers = new Headers();
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("Content-Type", fileResponse.headers.get("content-type") || mediaContentType(result.data.mediaType));
+    for (const name of ["content-length", "content-range", "accept-ranges"]) {
+      const value = fileResponse.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+    return new Response(fileResponse.body, { status: fileResponse.status, headers });
+  } catch {
+    return failure("Не удалось загрузить файл ответа.", 502);
+  }
+}
+
+function mediaContentType(mediaType: string) {
+  if (mediaType === "photo") return "image/jpeg";
+  if (mediaType === "video") return "video/mp4";
+  return "application/octet-stream";
 }

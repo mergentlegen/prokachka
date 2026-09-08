@@ -461,6 +461,25 @@ function HistoryView({ store, programs, onReview }: { store: Store; programs: Pr
       return <div className="modal-backdrop" onMouseDown={() => setSelectedProgramId(null)}><div className="task-history-modal program-history-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedProgramId(null)} aria-label="Закрыть">×</button><p className="eyebrow">История программы</p><h2>{selectedProgram.title}</h2><p className="task-history-deadline">{selectedProgram.steps.length} шагов · у каждого шага свой персональный дедлайн {selectedProgram.deadlineHours} ч</p><div className="program-step-list">{selectedProgram.steps.map((step) => { const stepCounts = step.members.reduce((result, member) => { result[member.status] = (result[member.status] || 0) + 1; return result; }, {} as Record<string, number>); return <button type="button" className={"program-step-chip " + (selectedStep?.id === step.id ? "selected" : "")} key={step.id} onClick={() => setSelectedStepPosition(step.position)}><b>Шаг {step.position}</b><span>{step.title}</span><small>{step.deadlineHours} ч · до {step.maxPoints} баллов</small><em>{stepCounts.on_time || 0} успели · {stepCounts.active || 0} срок идёт · {stepCounts.late || 0} поздно · {stepCounts.missed || 0} пропустили · {stepCounts.locked || 0} не открыт</em></button>; })}</div><div className="program-member-list"><div className="program-step-heading"><strong>Участники: {selectedStep ? "шаг " + selectedStep.position : "—"}</strong><span>{counts.on_time || 0} успели · {counts.active || 0} срок идёт · {counts.late || 0} поздно · {counts.missed || 0} пропустили</span></div>{members.length === 0 ? <EmptyAdmin text="В команде пока нет участников." /> : members.map((member) => <div className="program-member-row" key={member.userId}><div className="rank-avatar">{initials(member.name)}</div><div className="program-member-main"><strong>{member.name}</strong><span>{member.status === "locked" ? "Откроется после выполнения предыдущего шага" : member.dueAt ? "Дедлайн шага до " + formatDateTime(member.dueAt) : "Статус шага"}</span></div><div className={"program-member-status " + programHistoryStatusClass(member.status)}><b>{programHistoryStatusText(member.status)}</b>{member.dueAt && member.status !== "locked" && <small>Срок до {formatDateTime(member.dueAt)}</small>}{member.submittedAt && <small>Отправлено {formatDateTime(member.submittedAt)}</small>}</div></div>)}</div></div></div>;
     })()}  </>;
 }
-function SubmissionRow({ submission, store }: { submission: Submission; store: Store }) { const user = store.users.find((item) => item.id === submission.userId); const task = store.tasks.find((item) => item.id === submission.taskId); return <div className="submission-row"><div className="rank-avatar">{user ? initials(user.name) : "?"}</div><div><strong>{user?.name || "Неизвестный участник"}</strong><span>{task?.title || "Удалённое задание"}</span></div><time>{formatDateTime(submission.submittedAt)}</time></div>; }
+function SubmissionRow({ submission, store }: { submission: Submission; store: Store }) {
+  const user = store.users.find((item) => item.id === submission.userId);
+  const task = store.tasks.find((item) => item.id === submission.taskId);
+  const answerLabel = submission.mediaType === "photo" ? "Фото" : submission.mediaType === "video" ? "Видео" : submission.mediaType === "document" ? "Файл" : submission.mediaType === "text" ? "Текст" : "Ответ";
+  return <div className="submission-row submission-row-with-answer">
+    <div className="rank-avatar">{user ? initials(user.name) : "?"}</div>
+    <div className="submission-row-copy">
+      <strong>{user?.name || "Неизвестный участник"}</strong>
+      <span>{task?.title || "Удалённое задание"}</span>
+      {submission.answerText && <p className="submission-answer-text">{submission.answerText}</p>}
+      {submission.mediaType && submission.mediaType !== "text" && <details className="submission-media-details">
+        <summary>Показать ответ: {answerLabel}</summary>
+        {submission.mediaType === "photo" && <img className="submission-media-preview" src={`/api/submissions/${submission.id}/media`} alt="Ответ участника" />}
+        {submission.mediaType === "video" && <video className="submission-media-preview" src={`/api/submissions/${submission.id}/media`} controls preload="metadata" />}
+        {submission.mediaType === "document" && <a className="submission-file-link" href={`/api/submissions/${submission.id}/media`} target="_blank" rel="noreferrer">Открыть файл ответа ↗</a>}
+      </details>}
+    </div>
+    <time>{formatDateTime(submission.submittedAt)}</time>
+  </div>;
+}
 function EmptyAdmin({ text }: { text: string }) { return <div className="empty-admin"><span>✓</span><p>{text}</p></div>; }
 

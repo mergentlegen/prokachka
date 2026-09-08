@@ -34,7 +34,8 @@ export type StarAward = {
 };
 export type Submission = {
   id: string; userId: string; taskId: string; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
-  mediaType?: "photo" | "video" | "document" | "demo"; points: number; comment: string; submittedAt: string; reviewedAt?: string;
+  mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
+  points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 export type RankEntry = { id: string; name: string; points: number };
 export type Store = {
