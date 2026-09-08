@@ -1,5 +1,5 @@
 import { failure, ok } from "@/backend/http/api-response";
-import { isProductionConfigSafe } from "@/backend/http/security";
+import { enforceRateLimit, isProductionConfigSafe } from "@/backend/http/security";
 import { serverEnv } from "@/backend/config/env";
 import {
   authenticateAccount,
@@ -62,6 +62,10 @@ export async function login(request: Request) {
     const body = await request.json();
     const validationError = validateLoginCredentials(body.email, body.password);
     if (validationError) return failure(validationError, 400);
+
+    const emailKey = body.email.trim().toLowerCase();
+    const emailBlocked = enforceRateLimit(`auth-login-email:${emailKey}`, 10, 60_000);
+    if (emailBlocked) return emailBlocked;
 
     const result = await authenticateAccount(body.email, body.password);
     if (result.error) return failure(result.error, 401);

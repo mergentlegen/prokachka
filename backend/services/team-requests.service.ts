@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client
 export async function findJoinRequests(options: { userId?: string; teamId?: string } = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("team_join_requests").select("*, users!team_join_requests_user_id_fkey(name,login,team_id), teams(name)").order("created_at", { ascending: false });
+  let query = supabase.from("team_join_requests").select("*, users!team_join_requests_user_id_fkey(name,team_id), teams(name)").order("created_at", { ascending: false });
   if (options.userId) query = query.eq("user_id", options.userId);
   if (options.teamId) query = query.eq("team_id", options.teamId);
   const result = await query;

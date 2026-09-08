@@ -9,6 +9,7 @@ function validText(value: unknown, max: number) { return typeof value === "strin
 export async function listPrograms(request: Request) {
   const user = getRequestUser(request);
   if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (user.role === "admin" && !user.teamId) return ok({ programs: [] });
   const result = await findPrograms(user.role === "admin" ? user.teamId : undefined);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure("Не удалось загрузить программы.");

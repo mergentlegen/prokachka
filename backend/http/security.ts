@@ -7,10 +7,19 @@ const mutationMethods = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 type SecurityOptions = { max?: number; windowMs?: number; maxBodyBytes?: number; skipOrigin?: boolean };
 
 function clientIp(request: Request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+
+  // Nginx appends the actual client address to X-Forwarded-For. Use the
+  // last hop so a client cannot choose the first value and bypass limits.
+  const forwarded = request.headers.get("x-forwarded-for")
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return forwarded?.at(-1) || "unknown";
 }
 
-function rateLimit(key: string, max: number, windowMs: number) {
+export function enforceRateLimit(key: string, max: number, windowMs: number) {
   const now = Date.now();
   const current = buckets.get(key);
   if (!current || current.resetAt <= now) {
@@ -47,7 +56,7 @@ export function enforceRequestSecurity(request: Request, bucket: string, options
     if (contentLength > maxBodyBytes) return failure("Запрос слишком большой.", 413);
     if (!skipOrigin && !sameOrigin(request)) return failure("Недопустимый источник запроса.", 403);
   }
-  return rateLimit(`${bucket}:${clientIp(request)}`, max, windowMs);
+  return enforceRateLimit(`${bucket}:${clientIp(request)}`, max, windowMs);
 }
 
 export function isUuid(value: unknown): value is string {

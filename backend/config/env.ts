@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 export const serverEnv = {
   ceoPassword: process.env.CEO_PASSWORD || process.env.ADMIN_PASSWORD || "",
   ceoLogin: process.env.CEO_LOGIN || process.env.ADMIN_LOGIN || "",
@@ -14,5 +16,8 @@ export const serverEnv = {
 
 export function isValidTelegramSecret(value: string | null) {
   if (process.env.NODE_ENV === "production" && !serverEnv.telegramWebhookSecret) return false;
-  return Boolean(serverEnv.telegramWebhookSecret) && value === serverEnv.telegramWebhookSecret;
+  if (!value || !serverEnv.telegramWebhookSecret) return false;
+  const provided = Buffer.from(value);
+  const expected = Buffer.from(serverEnv.telegramWebhookSecret);
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
 }

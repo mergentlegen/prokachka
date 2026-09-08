@@ -9,5 +9,6 @@ export async function GET(request: Request) {
   const body = await response.clone().json().catch(() => ({}));
   if (serverEnv.authDevMode) response.headers.append("Set-Cookie", sessionCookie("", 0));
   else if (body.session) response.headers.append("Set-Cookie", sessionCookie(body.session));
+  if (!serverEnv.authDevMode) delete body.session;
   return NextResponse.json(body, { status: response.status, headers: response.headers });
 }

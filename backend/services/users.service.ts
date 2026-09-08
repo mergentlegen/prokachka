@@ -1,10 +1,14 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 
-export async function findUsers(teamId?: string) {
+export async function findUsers(options: { teamId?: string; userId?: string; includeLogin?: boolean } = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("users").select("id,name,login,role,team_id,team_joined_at,created_at").order("created_at", { ascending: false });
-  if (teamId) query = query.eq("team_id", teamId);
+  const fields = options.includeLogin
+    ? "id,name,login,role,team_id,created_at"
+    : "id,name,role,team_id,created_at";
+  let query = supabase.from("users").select(fields).order("created_at", { ascending: false });
+  if (options.teamId) query = query.eq("team_id", options.teamId);
+  if (options.userId) query = query.eq("id", options.userId);
   const result = await query;
   return result.error ? { error: result.error } : { data: result.data };
 }

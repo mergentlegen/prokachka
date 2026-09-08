@@ -25,6 +25,7 @@ export async function listTasks(request: Request) {
     if (result.error) return failure("Не удалось загрузить задания.");
     return ok({ tasks: result.data });
   }
+  if (user.role === "admin" && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "admin" ? user.teamId : undefined);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure("Не удалось загрузить задания.");

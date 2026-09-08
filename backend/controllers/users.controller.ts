@@ -6,8 +6,12 @@ import { findUsers, saveUser, updateUserAccess } from "@/backend/services/users.
 export async function listUsers(request: Request) {
   const currentUser = getRequestUser(request);
   if (!currentUser) return failure("Сначала войдите в аккаунт.", 401);
-  const teamId = currentUser.role === "ceo" ? undefined : currentUser.teamId;
-  const result = await findUsers(teamId);
+  if (currentUser.role === "admin" && !currentUser.teamId) return ok({ users: [] });
+  const result = await findUsers({
+    teamId: currentUser.role === "ceo" ? undefined : currentUser.teamId,
+    userId: currentUser.role === "member" ? currentUser.id : undefined,
+    includeLogin: currentUser.role === "ceo" || currentUser.role === "member",
+  });
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure("Не удалось загрузить участников.");
   return ok({ users: result.data });
