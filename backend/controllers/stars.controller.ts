@@ -9,7 +9,7 @@ async function currentUser(request: Request) {
   const sessionUser = getRequestUser(request);
   if (!sessionUser) return null;
   if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || sessionUser;
+  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
 }
 
 function isValidComment(value: unknown) {
@@ -22,9 +22,9 @@ export async function listStars(request: Request) {
 
   if (user.role === "member") {
     if (!user.teamId) return ok({ awards: [] });
-    const result = await findStarAwards({ teamId: user.teamId, userId: user.id });
+    const result = await findStarAwards({ teamId: user.teamId, viewer: user });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
-    if (result.error) return failure("Не удалось загрузить звёзды.");
+    if ("error" in result) return failure("Не удалось загрузить звёзды.");
     return ok({ awards: result.data });
   }
 
@@ -32,22 +32,22 @@ export async function listStars(request: Request) {
     if (!user.teamId) return ok({ awards: [] });
     const result = await findStarAwards({ teamId: user.teamId });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
-    if (result.error) return failure("Не удалось загрузить звёзды.");
+    if ("error" in result) return failure("Не удалось загрузить звёзды.");
     return ok({ awards: result.data });
   }
 
   const result = await findStarAwards();
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
-  if (result.error) return failure("Не удалось загрузить звёзды.");
+  if ("error" in result) return failure("Не удалось загрузить звёзды.");
   return ok({ awards: result.data });
 }
 
 export async function createStarAward(request: Request) {
   const user = await currentUser(request);
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== "admin" && !(user.role === "member" && user.canReview))) {
     return failure("Только наставник может присваивать звёзды.", user ? 403 : 401);
   }
-  if (!user.teamId) return failure("Наставнику сначала нужно назначить команду.", 400);
+  if (!user.teamId) return failure("Сначала назначьте команду.", 400);
 
   try {
     const body = await request.json();
@@ -66,6 +66,12 @@ export async function createStarAward(request: Request) {
     const target = await supabase.from("users").select("id,team_id,role").eq("id", userId).maybeSingle();
     if (target.error || !target.data || target.data.team_id !== user.teamId || target.data.role !== "member") {
       return failure("Можно награждать только участников своей команды.", 403);
+    }
+    if (user.role === "member") {
+      const { findTeamNetwork, canReviewNetwork } = await import("@/backend/services/network.service");
+      const network = await findTeamNetwork(user.teamId);
+      if ("unavailable" in network) return failure("База данных не настроена.", 503);
+      if ("error" in network || !user.canReview || !canReviewNetwork(network.data, user.id, userId, user.role)) return failure("Этот участник не входит в вашу сеть.", 403);
     }
 
     const result = await insertStarAward({
@@ -86,11 +92,12 @@ export async function createStarAward(request: Request) {
 export async function deleteStarAward(request: Request, id: string) {
   const user = await currentUser(request);
   if (!isUuid(id)) return failure("Некорректная выдача звёзд.", 400);
-  if (!user || user.role !== "admin") return failure("Недостаточно прав.", user ? 403 : 401);
-  if (!user.teamId) return failure("Наставнику не назначена команда.", 400);
+  if (!user || (user.role !== "admin" && !(user.role === "member" && user.canReview))) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (!user.teamId) return failure("Сначала назначьте команду.", 400);
 
-  const result = await removeStarAward(id, user.teamId);
+  const result = await removeStarAward(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("forbidden" in result) return failure("У вас нет доступа к этой выдаче.", 403);
   if (result.error) return failure("Не удалось отменить выдачу звёзд.");
   return ok({});
 }

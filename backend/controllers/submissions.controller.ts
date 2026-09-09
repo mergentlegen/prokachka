@@ -1,22 +1,30 @@
-import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
+import { getRequestUser } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { findSubmissionMedia, findSubmissions, insertSubmission, saveReview } from "@/backend/services/submissions.service";
 import { serverEnv } from "@/backend/config/env";
+import { findAccountById } from "@/backend/services/auth.service";
+
+async function currentUser(request: Request) {
+  const sessionUser = getRequestUser(request);
+  if (!sessionUser) return null;
+  if (sessionUser.id === "ceo") return sessionUser;
+  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
+}
 
 export async function listSubmissions(request: Request) {
-  const user = getRequestUser(request);
+  const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
-  const options = user.role === "member" ? { userId: user.id } : user.role === "admin" ? { teamId: user.teamId } : {};
+  const options = user.role === "member" && !user.canReview ? { userId: user.id } : user.role === "admin" ? { teamId: user.teamId, viewer: user } : user.role === "member" ? { teamId: user.teamId, viewer: user } : {};
   if (user.role === "admin" && !user.teamId) return ok({ submissions: [] });
   const result = await findSubmissions(options);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
-  if (result.error) return failure("Не удалось загрузить работы.");
+  if ("error" in result) return failure("Не удалось загрузить работы.");
   return ok({ submissions: result.data });
 }
 
 export async function createSubmission(request: Request) {
-  const user = getRequestUser(request);
+  const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   if (user.role !== "member") return failure("Работу может отправить только участник.", 403);
   try {
@@ -31,8 +39,8 @@ export async function createSubmission(request: Request) {
 }
 
 export async function reviewSubmission(request: Request, id: string) {
-  const user = getRequestUser(request);
-  if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  const user = await currentUser(request);
+  if (!user || (user.role !== "ceo" && user.role !== "admin" && !user.canReview)) return failure("Недостаточно прав.", user ? 403 : 401);
   try {
     const body = await request.json();
     if (!isUuid(id)) return failure("Некорректная работа.", 400);
@@ -40,27 +48,32 @@ export async function reviewSubmission(request: Request, id: string) {
     if (!status) return failure("Неизвестный статус.", 400);
     if (typeof body.comment === "string" && body.comment.length > 4000) return failure("Комментарий слишком длинный.", 400);
     if (body.points !== undefined && (!Number.isFinite(Number(body.points)) || Number(body.points) < 0 || Number(body.points) > 100)) return failure("Некорректное количество баллов.", 400);
-    const result = await saveReview(id, { status, points: Math.max(0, Number(body.points) || 0), comment: typeof body.comment === "string" ? body.comment.trim() : "" }, user.role === "admin" ? user.teamId : undefined);
+    const result = await saveReview(id, { status, points: Math.max(0, Number(body.points) || 0), comment: typeof body.comment === "string" ? body.comment.trim() : "" }, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("Работа относится к другой команде.", 403);
-    if (result.error) return failure("Не удалось сохранить проверку.");
+    if ("error" in result) return failure("Не удалось сохранить проверку.");
     return ok({ submission: result.data });
   } catch { return failure("Некорректные данные.", 400); }
 }
 
 export async function streamSubmissionMedia(request: Request, id: string) {
-  const user = getRequestUser(request);
-  if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  const user = await currentUser(request);
+  if (!user || (user.role !== "ceo" && user.role !== "admin" && !user.canReview)) return failure("Недостаточно прав.", user ? 403 : 401);
   if (!isUuid(id)) return failure("Некорректная работа.", 400);
-  const result = await findSubmissionMedia(id, user.role === "admin" ? user.teamId : undefined);
+  const result = await findSubmissionMedia(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("Работа относится к другой команде.", 403);
   if ("notFound" in result) return failure("Файл ответа не найден.", 404);
+  if (!("data" in result)) return failure("Файл ответа не найден.", 404);
+  const media = result.data && typeof result.data === "object" && "fileId" in result.data && "mediaType" in result.data
+    ? result.data as { fileId: string; mediaType: string }
+    : null;
+  if (!media) return failure("Файл ответа не найден.", 404);
   if (!serverEnv.telegramBotToken) return failure("Telegram-бот не настроен.", 503);
 
   try {
     const fileInfo = await fetch(
-      `https://api.telegram.org/bot${serverEnv.telegramBotToken}/getFile?file_id=${encodeURIComponent(result.data.fileId)}`,
+      `https://api.telegram.org/bot${serverEnv.telegramBotToken}/getFile?file_id=${encodeURIComponent(media.fileId)}`,
       { signal: AbortSignal.timeout(8_000) },
     );
     const filePayload = await fileInfo.json().catch(() => ({})) as { ok?: boolean; result?: { file_path?: string } };
@@ -77,7 +90,7 @@ export async function streamSubmissionMedia(request: Request, id: string) {
     const headers = new Headers();
     headers.set("Cache-Control", "private, no-store");
     headers.set("X-Content-Type-Options", "nosniff");
-    headers.set("Content-Type", fileResponse.headers.get("content-type") || mediaContentType(result.data.mediaType));
+    headers.set("Content-Type", fileResponse.headers.get("content-type") || mediaContentType(media.mediaType));
     for (const name of ["content-length", "content-range", "accept-ranges"]) {
       const value = fileResponse.headers.get(name);
       if (value) headers.set(name, value);

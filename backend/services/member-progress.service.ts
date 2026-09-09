@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
 function addHours(value: string, hours: number) { return new Date(new Date(value).getTime() + hours * 60 * 60 * 1000).toISOString(); }
 
@@ -11,11 +12,15 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     supabase.from("member_program_progress").select("*").eq("user_id", userId),
   ]);
   if (tasksResult.error || programsResult.error || progressResult.error) return { error: tasksResult.error || programsResult.error || progressResult.error };
-  const programs = programsResult.data || [];
+  const network = await findTeamNetwork(teamId);
+  if ("unavailable" in network) return network;
+  if ("error" in network) return network;
+  const tasks = (tasksResult.data || []).filter((task) => isAudienceVisible(network.data, userId, task.audience_root_id));
+  const programs = (programsResult.data || []).filter((program) => isAudienceVisible(network.data, userId, program.audience_root_id));
   const existing = new Map((progressResult.data || []).map((row) => [String(row.program_id), row]));
   const missing = programs.filter((program) => !existing.has(String(program.id)));
   if (missing.length) {
-    const firstTasks = (tasksResult.data || []).filter((task) => task.publication_type === "sequential" && task.position === 1);
+    const firstTasks = tasks.filter((task) => task.publication_type === "sequential" && task.position === 1);
     const rows = missing.map((program) => {
       const first = firstTasks.find((task) => task.program_id === program.id);
       const startMs = Math.max(new Date(joinedAt || program.created_at).getTime(), new Date(program.created_at).getTime());
@@ -30,7 +35,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     }
   }
   const programIds = new Set(programs.map((program) => String(program.id)));
-  return { data: (tasksResult.data || []).filter((task) => {
+  return { data: tasks.filter((task) => {
     if (task.publication_type === "evergreen") return true;
     if (task.publication_type === "fixed") return !task.deadline_at || !joinedAt || new Date(task.deadline_at).getTime() >= new Date(joinedAt).getTime();
     if (!programIds.has(String(task.program_id))) return false;

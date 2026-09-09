@@ -12,11 +12,12 @@ import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
+import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import type { AuthUser, Store, Submission, SubmissionStatus, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory } from "@/frontend/shared/api/admin-client";
 
-type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars";
-type TaskDraft = { title: string; description: string; maxPoints: string; hasDeadline: boolean; deadline: string };
+type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars" | "network";
+type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 type ReviewDraft = { points: string; comment: string };
 type AdminModal =
   | { type: "task"; task?: Task }
@@ -36,6 +37,10 @@ function toLocalDateTime(value?: string | null) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+function hasMentorAccess(user?: AuthUser | null) {
+  return Boolean(user && (user.role === "admin" || user.canReview || user.canPublishTasks || user.canInviteMembers));
+}
+
 export function AdminApp() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -47,7 +52,7 @@ export function AdminApp() {
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState<AdminModal>(null);
   const [modalBusy, setModalBusy] = useState(false);
-  const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", maxPoints: "10", hasDeadline: false, deadline: "" });
+  const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "" });
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
@@ -59,7 +64,7 @@ export function AdminApp() {
         const nextUser = await refreshAuthSession();
         setAuthUser(nextUser);
         if (nextUser.role === "ceo") { window.location.href = "/ceo"; return; }
-        if (nextUser.role !== "admin") return;
+        if (!hasMentorAccess(nextUser)) return;
         const [data, teamRequests, history] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory()]);
         if (!cancelled) {
           setStore(data);
@@ -87,10 +92,10 @@ export function AdminApp() {
   }, [toast]);
 
   useAutoRefresh(async () => {
-    if (!authUser || authUser.role !== "admin") return;
+    if (!hasMentorAccess(authUser)) return;
     try {
       const currentUser = await refreshAuthSession();
-      if (currentUser.role !== "admin") return;
+      if (!hasMentorAccess(currentUser)) return;
       setAuthUser(currentUser);
       const [data, teamRequests, history] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory()]);
       setStore(data);
@@ -100,7 +105,7 @@ export function AdminApp() {
     } catch {
       // Фоновое обновление не должно прерывать работу наставника.
     }
-  }, { enabled: authUser?.role === "admin" && !dataLoading, intervalMs: 15000 });
+  }, { enabled: hasMentorAccess(authUser) && !dataLoading, intervalMs: 15000 });
 
   const pending = store.submissions.filter((submission) => submission.status === "pending");
   const pendingRequests = requests.filter((request) => request.status === "pending");
@@ -148,6 +153,7 @@ export function AdminApp() {
     setTaskDraft({
       title: task?.title || "",
       description: task?.description || "",
+      resourceUrl: task?.resourceUrl || "",
       maxPoints: String(task?.maxPoints || 10),
       hasDeadline: Boolean(task?.deadlineAt),
       deadline: toLocalDateTime(task?.deadlineAt),
@@ -165,7 +171,7 @@ export function AdminApp() {
   }
 
   useEffect(() => {
-    if (dataLoading || !authUser || authUser.role !== "admin" || deepLinkHandled) return;
+    if (dataLoading || !authUser || !hasMentorAccess(authUser) || deepLinkHandled) return;
     const submissionId = new URLSearchParams(window.location.search).get("submission");
     if (!submissionId) {
       setDeepLinkHandled(true);
@@ -254,8 +260,8 @@ export function AdminApp() {
     setModalBusy(true);
     try {
       const saved = modal.task
-        ? await updateAdminTask(modal.task.id, { title, description, maxPoints, deadlineAt })
-        : await createAdminTask({ title, description, maxPoints, deadlineAt });
+        ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt })
+        : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt });
       setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [saved, ...current.tasks] }));
       setModal(null);
       setToast("Задание сохранено.");
@@ -296,7 +302,7 @@ export function AdminApp() {
   async function hydrateAdmin(nextUser: AuthUser) {
     setAuthUser(nextUser);
     if (nextUser.role === "ceo") { window.location.href = "/ceo"; return; }
-    if (nextUser.role !== "admin") return;
+    if (!hasMentorAccess(nextUser)) return;
     setDataLoading(true);
     try {
       const [data, teamRequests, history] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory()]);
@@ -317,21 +323,29 @@ export function AdminApp() {
 
   if (authLoading || dataLoading) return <div className="auth-loading">Загрузка профиля...</div>;
   if (!authUser) return <AuthScreen onAuthenticated={handleAuthenticated} initialMode="login" />;
-  if (authUser.role !== "admin") return <AccessDenied onLogout={logout} />;
+  if (!hasMentorAccess(authUser)) return <AccessDenied onLogout={logout} />;
+
+  const canPublishContent = authUser.role === "admin" || Boolean(authUser.canPublishTasks);
+  const canReview = authUser.role === "admin" || Boolean(authUser.canReview);
+  const sections: Array<[AdminSection, string, string]> = [
+    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"],
+    ["announcements", "Объявления", "✦"], ["programs", "Программы", "▤"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
+  ];
 
   return <main className="admin-shell">
     <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
-        {([ ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"], ["announcements", "Объявления", "✦"], ["programs", "Программы", "▤"], ["stars", "Звёзды", "★"] ] as const).map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
-        <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>
+        {sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true).map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
+        {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
       </nav></aside>
-      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{section !== "requests" && <button className="text-button request-shortcut" onClick={() => setSection("requests")}>Заявки {pendingRequests.length > 0 && "(" + pendingRequests.length + ")"}</button>}</div></div>
+      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{authUser.role === "admin" && section !== "requests" && <button className="text-button request-shortcut" onClick={() => setSection("requests")}>Заявки {pendingRequests.length > 0 && "(" + pendingRequests.length + ")"}</button>}</div></div>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
         {section === "tasks" && <TasksView store={store} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
         {section === "history" && <HistoryView store={store} programs={programHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
+        {section === "network" && <NetworkPanel authUser={authUser} onError={setToast} />}
       </section>
     </div>
     {toast && <div className="toast">{toast}</div>}
@@ -348,6 +362,7 @@ function TaskEditorModal({ draft, editing, busy, onChange, onClose, onSubmit }: 
     <h2>{editing ? "Изменить задание" : "Создать задание"}</h2>
     <label>Название задания<input value={draft.title} onChange={(event) => onChange("title", event.target.value)} placeholder="Например, записать короткое видео" autoFocus /></label>
     <label>Описание<textarea value={draft.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Что нужно сделать участнику" rows={4} /></label>
+    <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
     <div className="form-two-columns">
       <label>Максимум баллов<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
       <label className="deadline-toggle"><span>Дедлайн</span><span className="switch-line"><input type="checkbox" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /><span>{draft.hasDeadline ? "Установлен" : "Без дедлайна"}</span></span></label>

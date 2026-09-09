@@ -5,8 +5,8 @@ import { createAdminProgram, deleteAdminProgram, updateAdminProgram } from "@/fr
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 
-type DraftTask = { title: string; description: string; maxPoints: string };
-const emptyTask = (): DraftTask => ({ title: "", description: "", maxPoints: "10" });
+type DraftTask = { title: string; description: string; resourceUrl: string; maxPoints: string };
+const emptyTask = (): DraftTask => ({ title: "", description: "", resourceUrl: "", maxPoints: "10" });
 
 export function ProgramsPanel({ programs, tasks, onChange, onError }: { programs: TaskProgram[]; tasks: Task[]; onChange: (programs: TaskProgram[], tasks: Task[]) => void; onError: (message: string) => void }) {
   const [title, setTitle] = useState("");
@@ -25,7 +25,7 @@ export function ProgramsPanel({ programs, tasks, onChange, onError }: { programs
     if (draftTasks.some((task) => task.title.trim().length < 2 || task.description.trim().length < 2 || !Number.isInteger(Number(task.maxPoints)))) { onError("Заполните все шаги программы."); return; }
     setBusy(true);
     try {
-      const created = await createAdminProgram({ title: cleanTitle, deadlineHours: hours, tasks: draftTasks.map((task) => ({ title: task.title.trim(), description: task.description.trim(), maxPoints: Number(task.maxPoints) })) });
+      const created = await createAdminProgram({ title: cleanTitle, deadlineHours: hours, tasks: draftTasks.map((task) => ({ title: task.title.trim(), description: task.description.trim(), resourceUrl: task.resourceUrl.trim() || null, maxPoints: Number(task.maxPoints) })) });
       onChange([created.program, ...programs], [...created.tasks, ...tasks]);
       setTitle(""); setDraftTasks([emptyTask()]); onError("Программа опубликована. Первый шаг уже доступен участникам.");
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось создать программу."); }
@@ -52,6 +52,10 @@ export function ProgramsPanel({ programs, tasks, onChange, onError }: { programs
 
   return <div className="programs-panel">
     <div className="admin-panel program-builder">
+      <div className="program-resource-editor">
+        <div className="program-resource-heading"><strong>Ссылки на материалы</strong><span>Добавьте видео или полезный ресурс для каждого шага</span></div>
+        {draftTasks.map((task, index) => <label key={index}>Шаг {index + 1}<input type="url" value={task.resourceUrl} onChange={(event) => updateTask(index, "resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>)}
+      </div>
       <div className="panel-title"><div><p className="eyebrow">Последовательное обучение</p><h2>Новая программа</h2></div><span className="program-rule">Шаги открываются по очереди</span></div>
       <div className="form-two-columns"><label>Название программы<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Например, Старт новичка" /></label><label>Срок на каждый шаг, часов<input type="number" min="1" max="720" value={deadlineHours} onChange={(event) => setDeadlineHours(event.target.value)} /></label></div>
       <div className="program-step-editor">{draftTasks.map((task, index) => <div className="program-step" key={index}><div className="program-step-head"><strong>Шаг {index + 1}</strong>{draftTasks.length > 1 && <button type="button" className="button button-danger button-small" onClick={() => setDraftTasks((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Удалить</button>}</div><label>Название шага<input value={task.title} onChange={(event) => updateTask(index, "title", event.target.value)} /></label><label>Описание<textarea rows={3} value={task.description} onChange={(event) => updateTask(index, "description", event.target.value)} /></label><label>Максимум баллов<input type="number" min="0" max="100" value={task.maxPoints} onChange={(event) => updateTask(index, "maxPoints", event.target.value)} /></label></div>)}</div>
