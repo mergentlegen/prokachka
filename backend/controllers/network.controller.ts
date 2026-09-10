@@ -14,7 +14,7 @@ async function currentUser(request: Request) {
 export async function listNetwork(request: Request) {
   const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
-  if (user.role !== "admin" && !user.canReview && !user.canPublishTasks && !user.canInviteMembers) return failure("Недостаточно прав.", 403);
+  if (!user.teamId || (user.role !== "admin" && user.role !== "member")) return failure("Недостаточно прав.", 403);
   const result = await getNetworkForViewer(user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("error" in result) return failure("Не удалось загрузить структуру сети.");
@@ -23,7 +23,7 @@ export async function listNetwork(request: Request) {
 
 export async function createInvitation(request: Request) {
   const user = await currentUser(request);
-  if (!user || (user.role !== "admin" && !user.canInviteMembers)) return failure("Недостаточно прав для приглашений.", user ? 403 : 401);
+  if (!user || (user.role !== "admin" && user.role !== "member")) return failure("Недостаточно прав для приглашений.", user ? 403 : 401);
   if (!user.teamId) return failure("Сначала нужно назначить команду.", 400);
   const result = await createTeamInvitation(user.teamId, user.id);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
@@ -39,14 +39,13 @@ export async function patchNetworkUser(request: Request, id: string) {
   try {
     const body = await request.json();
     if (body.parentUserId !== undefined && body.parentUserId !== null && body.parentUserId !== "" && !isUuid(body.parentUserId)) return failure("Некорректный руководитель.", 400);
-    for (const key of ["canReview", "canPublishTasks", "canInviteMembers"]) {
+    for (const key of ["canReview", "canPublishTasks"]) {
       if (body[key] !== undefined && typeof body[key] !== "boolean") return failure("Некорректное значение разрешения.", 400);
     }
     const result = await updateNetworkUser(user, id, {
       parentUserId: body.parentUserId === "" ? null : body.parentUserId,
       canReview: body.canReview,
       canPublishTasks: body.canPublishTasks,
-      canInviteMembers: body.canInviteMembers,
     });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("Пользователь не входит в вашу команду.", 403);

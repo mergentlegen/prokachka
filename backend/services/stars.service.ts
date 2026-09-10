@@ -30,6 +30,7 @@ export async function insertStarAward(input: {
 }) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
+  if (input.userId === input.mentorId) return { forbidden: true as const };
 
   const result = await supabase
     .from("star_awards")

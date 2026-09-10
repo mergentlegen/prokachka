@@ -18,12 +18,16 @@ create table if not exists public.team_invitation_links (
   team_id uuid not null references public.teams(id) on delete cascade,
   inviter_user_id uuid not null references public.users(id) on delete cascade,
   token_hash text not null unique,
-  expires_at timestamptz not null default (now() + interval '30 days'),
+  expires_at timestamptz,
   max_uses integer not null default 0 check (max_uses >= 0),
   used_count integer not null default 0 check (used_count >= 0),
   revoked_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.team_invitation_links alter column expires_at drop not null;
+alter table public.team_invitation_links alter column expires_at drop default;
+update public.team_invitation_links set expires_at = null where expires_at is not null;
 
 alter table public.team_join_requests add column if not exists invitation_id uuid references public.team_invitation_links(id) on delete set null;
 
@@ -77,7 +81,7 @@ as $$
 declare invitation public.team_invitation_links%rowtype;
 begin
   select * into invitation from public.team_invitation_links where id = p_invitation_id for update;
-  if not found or invitation.revoked_at is not null or invitation.expires_at <= now() then return false; end if;
+  if not found or invitation.revoked_at is not null or (invitation.expires_at is not null and invitation.expires_at <= now()) then return false; end if;
   if invitation.max_uses > 0 and invitation.used_count >= invitation.max_uses then return false; end if;
   update public.team_invitation_links set used_count = used_count + 1 where id = p_invitation_id;
   return true;
@@ -106,10 +110,10 @@ begin
     select * into inviter from public.users where id = join_request.invited_by_user_id for update;
     select * into invitation from public.team_invitation_links where id = join_request.invitation_id for update;
     if not found or invitation.team_id <> join_request.team_id or invitation.inviter_user_id <> join_request.invited_by_user_id
-      or invitation.revoked_at is not null or invitation.expires_at <= now()
+      or invitation.revoked_at is not null or (invitation.expires_at is not null and invitation.expires_at <= now())
       or (invitation.max_uses > 0 and invitation.used_count >= invitation.max_uses)
       or inviter.team_id is distinct from join_request.team_id
-      or (inviter.role <> 'admin' and not inviter.can_invite_members) then
+      or inviter.role not in ('admin', 'member') then
       return 'invalid_invitation';
     end if;
     update public.users set team_id = join_request.team_id, team_joined_at = now(), parent_user_id = join_request.invited_by_user_id where id = target_user.id;

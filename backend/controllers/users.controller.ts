@@ -10,7 +10,7 @@ export async function listUsers(request: Request) {
   const currentUser = sessionUser?.id === "ceo" ? sessionUser : sessionUser ? (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser) : null;
   if (!currentUser) return failure("Сначала войдите в аккаунт.", 401);
   if (currentUser.role === "admin" && !currentUser.teamId) return ok({ users: [] });
-  if (currentUser.role === "member" && (currentUser.canReview || currentUser.canPublishTasks || currentUser.canInviteMembers) && currentUser.teamId) {
+  if (currentUser.role === "member" && currentUser.teamId) {
     const network = await findTeamNetwork(currentUser.teamId);
     if ("unavailable" in network) return failure("База данных не настроена.", 503);
     if ("error" in network) return failure("Не удалось загрузить участников.");

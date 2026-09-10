@@ -140,6 +140,7 @@ export async function saveReview(id: string, input: { status: "accepted" | "revi
   const current = await supabase.from("submissions").select("id,user_id,task_id,status,users(team_id),tasks(team_id,max_points)").eq("id", id).single();
   const task = Array.isArray(current.data?.tasks) ? current.data.tasks[0] : current.data?.tasks;
   if (current.error || !current.data) return { forbidden: true as const };
+  if (viewer && String(current.data.user_id) === viewer.id) return { forbidden: true as const };
   if (viewer?.role !== "ceo" && (!viewer?.teamId || task?.team_id !== viewer.teamId)) return { forbidden: true as const };
   if (viewer?.role === "member") {
     const network = await findTeamNetwork(viewer.teamId || "");

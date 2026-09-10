@@ -6,20 +6,21 @@ import { createAdminStarAward, deleteAdminStarAward } from "@/frontend/shared/ap
 import type { StarAward, User } from "@/shared/domain/types";
 
 type Props = {
+  actorId: string;
   users: User[];
   awards: StarAward[];
   onChange: (awards: StarAward[]) => void;
   onError: (message: string) => void;
 };
 
-export function StarsPanel({ users, awards, onChange, onError }: Props) {
+export function StarsPanel({ actorId, users, awards, onChange, onError }: Props) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [stars, setStars] = useState(1);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StarAward | null>(null);
 
-  const members = users.filter((user) => user.role === "member");
+  const members = users.filter((user) => user.role === "member" && user.id !== actorId);
   const totals = useMemo(() => {
     const result = new Map<string, number>();
     awards.forEach((award) => result.set(award.userId, (result.get(award.userId) || 0) + award.stars));

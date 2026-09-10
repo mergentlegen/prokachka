@@ -56,6 +56,7 @@ export async function createStarAward(request: Request) {
     const comment = body.comment === undefined ? "" : body.comment;
 
     if (!isUuid(userId)) return failure("Некорректный участник.", 400);
+    if (String(userId) === user.id) return failure("Нельзя выдавать звёзды самому себе.", 403);
     if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
       return failure("Можно присвоить от 1 до 5 звёзд.", 400);
     }
@@ -82,6 +83,7 @@ export async function createStarAward(request: Request) {
       comment: comment.trim(),
     });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if ("forbidden" in result) return failure("Нельзя выдавать звёзды самому себе.", 403);
     if (result.error) return failure("Не удалось присвоить звёзды.");
     return ok({ award: result.data }, 201);
   } catch {

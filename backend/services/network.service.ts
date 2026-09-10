@@ -33,20 +33,22 @@ export async function findInvitationByToken(token: string) {
   if (!supabase) return { unavailable: true as const };
   const result = await supabase.from("team_invitation_links").select("id,team_id,inviter_user_id,expires_at,revoked_at,max_uses,used_count").eq("token_hash", invitationHash(token)).maybeSingle();
   if (result.error) return { error: result.error };
-  if (!result.data || result.data.revoked_at || new Date(String(result.data.expires_at)).getTime() <= Date.now() || (Number(result.data.max_uses) > 0 && Number(result.data.used_count) >= Number(result.data.max_uses))) {
+  if (!result.data || result.data.revoked_at || (result.data.expires_at && new Date(String(result.data.expires_at)).getTime() <= Date.now()) || (Number(result.data.max_uses) > 0 && Number(result.data.used_count) >= Number(result.data.max_uses))) {
     return { validationError: "Ссылка приглашения недействительна или уже исчерпала лимит." };
   }
-  const inviter = await supabase.from("users").select("id,team_id,role,can_invite_members").eq("id", result.data.inviter_user_id).maybeSingle();
+  const inviter = await supabase.from("users").select("id,team_id,role").eq("id", result.data.inviter_user_id).maybeSingle();
   const team = await supabase.from("teams").select("id,is_active").eq("id", result.data.team_id).maybeSingle();
-  if (inviter.error || !inviter.data || inviter.data.team_id !== result.data.team_id || (inviter.data.role !== "admin" && !inviter.data.can_invite_members) || team.error || !team.data?.is_active) return { validationError: "Автор приглашения или команда больше недоступны." };
+  if (inviter.error || !inviter.data || inviter.data.team_id !== result.data.team_id || !["admin", "member"].includes(String(inviter.data.role)) || team.error || !team.data?.is_active) return { validationError: "Автор приглашения или команда больше недоступны." };
   return { data: result.data };
 }
 
 export async function createTeamInvitation(teamId: string, inviterId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
+  const revoked = await supabase.from("team_invitation_links").update({ revoked_at: new Date().toISOString() }).eq("team_id", teamId).eq("inviter_user_id", inviterId).is("revoked_at", null);
+  if (revoked.error) return { error: revoked.error };
   const token = randomBytes(32).toString("base64url");
-  const result = await supabase.from("team_invitation_links").insert({ team_id: teamId, inviter_user_id: inviterId, token_hash: invitationHash(token), max_uses: 0 }).select("id,team_id,inviter_user_id,expires_at,max_uses,used_count,created_at").single();
+  const result = await supabase.from("team_invitation_links").insert({ team_id: teamId, inviter_user_id: inviterId, token_hash: invitationHash(token), expires_at: null, max_uses: 0 }).select("id,team_id,inviter_user_id,expires_at,max_uses,used_count,created_at").single();
   return result.error ? { error: result.error } : { data: { ...result.data, token } };
 }
 
@@ -75,7 +77,7 @@ export async function getNetworkForViewer(user: AuthUser) {
   return { data: result.data.filter((row) => allowed.has(String(row.id))).map(mapNetworkUser) };
 }
 
-export async function updateNetworkUser(actor: AuthUser, targetId: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean }) {
+export async function updateNetworkUser(actor: AuthUser, targetId: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean }) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   if (actor.role !== "admin" || !actor.teamId) return { forbidden: true as const };
@@ -94,7 +96,6 @@ export async function updateNetworkUser(actor: AuthUser, targetId: string, input
   if (input.parentUserId !== undefined) patch.parent_user_id = input.parentUserId || null;
   if (input.canReview !== undefined) patch.can_review = input.canReview;
   if (input.canPublishTasks !== undefined) patch.can_publish_tasks = input.canPublishTasks;
-  if (input.canInviteMembers !== undefined) patch.can_invite_members = input.canInviteMembers;
   if (!Object.keys(patch).length) return { validationError: "Нет изменений для сохранения." };
   const saved = await supabase.from("users").update(patch).eq("id", targetId).eq("team_id", actor.teamId).eq("role", "member").select(networkSelect).single();
   if (saved.error) return { error: saved.error };
@@ -153,6 +154,7 @@ export function visibleNetworkIds(rows: NetworkUserRow[], viewerId: string, role
 }
 
 export function canReviewNetwork(rows: NetworkUserRow[], reviewerId: string, targetUserId: string, role: string) {
+  if (reviewerId === targetUserId) return false;
   if (role === "ceo" || role === "admin") return true;
   return descendants(rows, reviewerId, false).has(targetUserId);
 }

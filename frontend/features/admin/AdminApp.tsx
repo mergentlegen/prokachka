@@ -38,7 +38,7 @@ function toLocalDateTime(value?: string | null) {
 }
 
 function hasMentorAccess(user?: AuthUser | null) {
-  return Boolean(user && (user.role === "admin" || user.canReview || user.canPublishTasks || user.canInviteMembers));
+  return Boolean(user && (user.role === "admin" || user.canReview || user.canPublishTasks));
 }
 
 export function AdminApp() {
@@ -333,7 +333,7 @@ export function AdminApp() {
   ];
 
   return <main className="admin-shell">
-    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
         {sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true).map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
@@ -343,7 +343,7 @@ export function AdminApp() {
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
         {section === "tasks" && <TasksView store={store} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} onError={setToast} />}
       </section>

@@ -15,7 +15,7 @@ async function currentUser(request: Request) {
 }
 
 function canMentor(user: Awaited<ReturnType<typeof currentUser>>) {
-  return Boolean(user && (user.role === "ceo" || user.role === "admin" || user.canReview || user.canPublishTasks || user.canInviteMembers));
+  return Boolean(user && (user.role === "ceo" || user.role === "admin" || user.canReview || user.canPublishTasks));
 }
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {

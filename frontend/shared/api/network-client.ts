@@ -9,12 +9,12 @@ export async function loadNetwork(): Promise<User[]> {
   return response.users.map(mapUser);
 }
 
-export async function createNetworkInvitation(): Promise<{ url: string; expiresAt: string }> {
-  const response = await request<ApiResponse<{ invitation: { url: string; expires_at: string } }>>("/api/network", { method: "POST", body: JSON.stringify({}) });
+export async function createNetworkInvitation(): Promise<{ url: string; expiresAt: string | null }> {
+  const response = await request<ApiResponse<{ invitation: { url: string; expires_at: string | null } }>>("/api/network", { method: "POST", body: JSON.stringify({}) });
   return { url: response.invitation.url, expiresAt: response.invitation.expires_at };
 }
 
-export async function updateNetworkUser(id: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean }): Promise<User> {
+export async function updateNetworkUser(id: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean }): Promise<User> {
   const response = await request<ApiResponse<{ user: ApiRow }>>(`/api/network/users/${id}`, { method: "PATCH", body: JSON.stringify(input) });
   return mapUser(response.user);
 }

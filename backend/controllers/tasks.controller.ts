@@ -28,7 +28,7 @@ export async function listTasks(request: Request) {
   const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   const memberView = new URL(request.url).searchParams.get("view") === "member";
-  if (user.role === "member" && (memberView || (!user.canReview && !user.canPublishTasks && !user.canInviteMembers))) {
+  if (user.role === "member" && (memberView || (!user.canReview && !user.canPublishTasks))) {
     const teamId = user.teamId;
     if (!teamId) return ok({ tasks: [] });
     const result = await getMemberTaskFeed(user.id, teamId, user.teamJoinedAt);
