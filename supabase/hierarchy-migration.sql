@@ -103,10 +103,20 @@ begin
 
   select * into target_user from public.users where id = join_request.user_id for update;
   if not found then return 'already_processed'; end if;
-  if target_user.team_id is not null then return 'already_joined'; end if;
+  if target_user.team_id is not null then
+    if target_user.team_id = join_request.team_id then
+      update public.team_join_requests set status = 'approved', reviewed_at = coalesce(reviewed_at, now()), reviewed_by = coalesce(reviewed_by, p_reviewer_id) where id = join_request.id;
+      return 'approved';
+    end if;
+    update public.team_join_requests set status = 'rejected', reviewed_at = coalesce(reviewed_at, now()), reviewed_by = coalesce(reviewed_by, p_reviewer_id) where id = join_request.id;
+    return 'already_joined_other_team';
+  end if;
 
   if join_request.invited_by_user_id is not null then
-    if join_request.invitation_id is null then return 'invalid_invitation'; end if;
+    if join_request.invitation_id is null then
+      update public.team_join_requests set status = 'rejected', reviewed_at = coalesce(reviewed_at, now()), reviewed_by = coalesce(reviewed_by, p_reviewer_id) where id = join_request.id;
+      return 'invalid_invitation';
+    end if;
     select * into inviter from public.users where id = join_request.invited_by_user_id for update;
     select * into invitation from public.team_invitation_links where id = join_request.invitation_id for update;
     if not found or invitation.team_id <> join_request.team_id or invitation.inviter_user_id <> join_request.invited_by_user_id
@@ -114,6 +124,7 @@ begin
       or (invitation.max_uses > 0 and invitation.used_count >= invitation.max_uses)
       or inviter.team_id is distinct from join_request.team_id
       or inviter.role not in ('admin', 'member') then
+      update public.team_join_requests set status = 'rejected', reviewed_at = coalesce(reviewed_at, now()), reviewed_by = coalesce(reviewed_by, p_reviewer_id) where id = join_request.id;
       return 'invalid_invitation';
     end if;
     update public.users set team_id = join_request.team_id, team_joined_at = now(), parent_user_id = join_request.invited_by_user_id where id = target_user.id;

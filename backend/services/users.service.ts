@@ -1,5 +1,18 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 
+async function syncPendingJoinRequests(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, userId: string, teamId: string | null) {
+  const pending = await supabase.from("team_join_requests").select("id,team_id").eq("user_id", userId).eq("status", "pending");
+  if (pending.error) return;
+  const reviewedAt = new Date().toISOString();
+  for (const request of pending.data || []) {
+    await supabase.from("team_join_requests").update({
+      status: teamId && String(request.team_id) === teamId ? "approved" : "rejected",
+      reviewed_at: reviewedAt,
+      reviewed_by: null,
+    }).eq("id", request.id).eq("status", "pending");
+  }
+}
+
 export async function findUsers(options: { teamId?: string; userId?: string; includeLogin?: boolean } = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
@@ -28,7 +41,7 @@ export async function updateUserAccess(id: string, input: { role?: "admin" | "me
     const current = await supabase.from("users").select("team_id,team_joined_at").eq("id", id).single();
     if (current.error || !current.data) return { error: current.error || new Error("User not found") };
     patch.team_id = input.teamId || null;
-    patch.team_joined_at = input.teamId ? (current.data.team_id === input.teamId ? current.data.team_joined_at : new Date().toISOString()) : null;
+    patch.team_joined_at = input.teamId ? (current.data.team_id === input.teamId && current.data.team_joined_at ? current.data.team_joined_at : new Date().toISOString()) : null;
     if (current.data.team_id !== input.teamId) patch.parent_user_id = null;
   }
   if (input.role === "admin") {
@@ -42,6 +55,7 @@ export async function updateUserAccess(id: string, input: { role?: "admin" | "me
     if (input.canInviteMembers !== undefined) patch.can_invite_members = input.canInviteMembers;
   }
   const result = await supabase.from("users").update(patch).eq("id", id).select("id,name,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at").single();
+  if (!result.error && result.data) await syncPendingJoinRequests(supabase, id, result.data.team_id ? String(result.data.team_id) : null);
   return result.error ? { error: result.error } : { data: result.data };
 }
 

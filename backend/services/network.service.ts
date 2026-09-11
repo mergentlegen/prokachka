@@ -62,7 +62,7 @@ export async function approveTeamJoinRequest(requestId: string, reviewerId?: str
   if (result.error) return { error: result.error };
   const status = String(result.data || "");
   if (status === "approved") return { approved: true as const };
-  if (status === "already_joined") return { validationError: "Пользователь уже состоит в команде." };
+  if (status === "already_joined_other_team") return { validationError: "Пользователь уже состоит в другой команде." };
   if (status === "invalid_invitation") return { validationError: "Ссылка приглашения недействительна или больше не доступна." };
   return { validationError: "Заявка уже обработана или больше недоступна." };
 }
