@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
-import type { FormEvent } from "react";
+import type { FormEvent, TouchEvent as ReactTouchEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { authFetch, clearDevSession, createTelegramLink, loadTelegramLinkStatus, refreshAuthSession } from "@/frontend/shared/api/client";
 import { formatDate, formatDateTime } from "@/frontend/shared/lib/format";
@@ -58,6 +58,7 @@ export function AdminApp() {
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +114,20 @@ export function AdminApp() {
 
   const pending = store.submissions.filter((submission) => submission.status === "pending");
   const pendingRequests = requests.filter((request) => request.status === "pending");
-  const ranking = useMemo(() => store.users.filter((user) => user.role === "member").map((user) => ({ ...user, points: store.submissions.filter((submission) => submission.userId === user.id && submission.status === "accepted").reduce((sum, submission) => sum + submission.points, 0) })).filter((user) => user.points > 0).sort((a, b) => b.points - a.points), [store]);
+  const ranking = useMemo(() => store.users.filter((user) => user.role === "member").map((user) => ({ ...user, points: store.submissions.filter((submission) => submission.userId === user.id && submission.status === "accepted").reduce((sum, submission) => sum + submission.points, 0) })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name)), [store]);
+
+  function handleTouchStart(event: ReactTouchEvent<HTMLElement>) {
+    const touch = event.touches[0];
+    touchStartX.current = touch && touch.clientX <= 28 ? touch.clientX : null;
+  }
+
+  function handleTouchEnd(event: ReactTouchEvent<HTMLElement>) {
+    if (touchStartX.current === null) return;
+    const touch = event.changedTouches[0];
+    const delta = touch ? touch.clientX - touchStartX.current : 0;
+    touchStartX.current = null;
+    if (delta >= 56) setMobileMenuOpen(true);
+  }
 
   async function logout() {
     clearDevSession();
@@ -338,14 +352,14 @@ export function AdminApp() {
   ];
   const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
-  return <main className="admin-shell">
-    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+  return <main className="admin-shell" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
         {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
         {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
       </nav></aside>
-      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{authUser.role === "admin" && section !== "requests" && <button className="text-button request-shortcut" onClick={() => setSection("requests")}>Заявки {pendingRequests.length > 0 && "(" + pendingRequests.length + ")"}</button>}</div></div>
+      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}</div></div>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
         {section === "tasks" && <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
@@ -414,10 +428,10 @@ function AccessDenied({ onLogout }: { onLogout: () => void }) { return <main cla
 function Dashboard({ store, pending, ranking, onNavigate }: { store: Store; pending: Submission[]; ranking: { id: string; name: string; points: number }[]; onNavigate: (section: AdminSection) => void }) { return <><div className="metric-grid"><Metric label="Участники" value={store.users.length} note="в команде" icon="♙" /><Metric label="Активные задания" value={store.tasks.filter((task) => task.isActive && !isTaskExpired(task)).length} note={"из " + store.tasks.length + " всего"} icon="☷" /><Metric label="На проверке" value={pending.length} note="ждут внимания" icon="◷" /><Metric label="Принято работ" value={store.submissions.filter((submission) => submission.status === "accepted").length} note="за всё время" icon="✓" /></div><div className="dashboard-grid"><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Сейчас</p><h2>Нужна проверка</h2></div><button className="text-button" onClick={() => onNavigate("review")}>Все работы →</button></div>{pending.length === 0 ? <EmptyAdmin text="Все работы проверены. Так держать!" /> : pending.slice(0, 3).map((submission) => <SubmissionRow key={submission.id} submission={submission} store={store} />)}</div><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Лидеры рейтинга</h2></div><button className="text-button" onClick={() => onNavigate("history")}>История →</button></div>{ranking.slice(0, 4).map((member, index) => <div className="leader-row" key={member.id}><span>{index + 1}</span><div className="rank-avatar">{initials(member.name)}</div><strong>{member.name}</strong><b>{member.points}</b></div>)}</div></div></>; }
 function Metric({ label, value, note, icon }: { label: string; value: number; note: string; icon: string }) { return <div className="metric-card"><span className="metric-icon">{icon}</span><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></div>; }
 function TaskKindSwitch({ value, onChange }: { value: "regular" | "programs"; onChange: (value: "regular" | "programs") => void }) {
-  return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Обычные задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button></div>;
+  return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button></div>;
 }
 function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" | "publications"; onChange: (value: "regular" | "programs" | "publications") => void }) {
-  return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Обычные задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button><button className={value === "publications" ? "active" : ""} onClick={() => onChange("publications")}>Публикации</button></div>;
+  return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button><button className={value === "publications" ? "active" : ""} onClick={() => onChange("publications")}>Публикации</button></div>;
 }
 function TasksView({ store, actorId, canManageAll, onToggle, onEdit, onRemove }: { store: Store; actorId: string; canManageAll: boolean; onToggle: (id: string) => void; onEdit: (task?: Task) => void; onRemove: (task: Task) => void }) {
   const [kind, setKind] = useState<"regular" | "programs">("regular");
