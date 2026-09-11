@@ -57,6 +57,7 @@ export function AdminApp() {
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -335,12 +336,13 @@ export function AdminApp() {
     ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"],
     ["announcements", "Объявления", "✦"], ["programs", "Программы", "▤"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
   ];
+  const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
   return <main className="admin-shell">
-    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
-        {sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true).map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
+        {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
         {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
       </nav></aside>
       <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{authUser.role === "admin" && section !== "requests" && <button className="text-button request-shortcut" onClick={() => setSection("requests")}>Заявки {pendingRequests.length > 0 && "(" + pendingRequests.length + ")"}</button>}</div></div>
@@ -352,6 +354,15 @@ export function AdminApp() {
         {section === "network" && <NetworkPanel authUser={authUser} onError={setToast} />}
       </section>
     </div>
+    <div className={`admin-mobile-backdrop ${mobileMenuOpen ? "is-open" : ""}`} aria-hidden={!mobileMenuOpen} onMouseDown={() => setMobileMenuOpen(false)} />
+    <aside className={`admin-mobile-drawer ${mobileMenuOpen ? "is-open" : ""}`} aria-label="Навигация панели наставника" aria-hidden={!mobileMenuOpen}>
+      <div className="admin-mobile-drawer-header"><div><p className="eyebrow">Управление</p><strong>Панель наставника</strong></div><button type="button" className="admin-mobile-drawer-close" aria-label="Закрыть меню" onClick={() => setMobileMenuOpen(false)}>×</button></div>
+      <nav className="admin-mobile-drawer-nav">
+        <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
+        {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
+        {authUser.role === "admin" && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
+      </nav>
+    </aside>
     {toast && <div className="toast">{toast}</div>}
     {modal?.type === "task" && <TaskEditorModal draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
