@@ -40,7 +40,8 @@ export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }
     setPending(true);
     setError("");
     try {
-      setRequest(await submitTeamJoinRequest(selectedTeam));
+      const inviteToken = new URLSearchParams(window.location.search).get("invite") || undefined;
+      setRequest(await submitTeamJoinRequest(selectedTeam, inviteToken));
     } catch {
       setError("Не удалось отправить заявку. Попробуйте ещё раз.");
     } finally {

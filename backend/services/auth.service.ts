@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { serverEnv } from "@/backend/config/env";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { findInvitationByToken } from "@/backend/services/network.service";
 import type { AuthUser } from "@/shared/domain/types";
 
 type StoredAccount = { user: AuthUser; passwordHash: string };
@@ -46,6 +47,10 @@ export function publicUser(row: Record<string, unknown>): AuthUser {
     role: row.role === "ceo" ? "ceo" : row.role === "admin" ? "admin" : "member",
     teamId: row.team_id ? String(row.team_id) : undefined,
     teamJoinedAt: row.team_joined_at ? String(row.team_joined_at) : undefined,
+    parentUserId: row.parent_user_id ? String(row.parent_user_id) : undefined,
+    canReview: Boolean(row.can_review),
+    canPublishTasks: Boolean(row.can_publish_tasks),
+    canInviteMembers: Boolean(row.can_invite_members),
   };
 }
 
@@ -54,7 +59,7 @@ export async function findAccountById(id: string) {
   if (!supabase || !/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data, error } = await supabase
     .from("users")
-    .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at")
+    .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
     .eq("id", id)
     .maybeSingle();
   return error || !data ? null : publicUser(data);
@@ -122,6 +127,7 @@ export async function registerAccount(
   lastName: string,
   email: string,
   password: string,
+  inviteToken?: string,
 ) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedFirstName = firstName.trim();
@@ -131,6 +137,14 @@ export async function registerAccount(
   const supabase = getSupabaseAdmin();
 
   if (supabase) {
+    let invitation: { id: string; team_id: string; inviter_user_id: string } | undefined;
+    if (inviteToken) {
+      const invitationResult = await findInvitationByToken(inviteToken);
+      if ("unavailable" in invitationResult) return { error: "База данных не настроена." };
+      if ("error" in invitationResult) return { error: "Не удалось проверить ссылку приглашения." };
+      if ("validationError" in invitationResult) return { validationError: invitationResult.validationError };
+      invitation = invitationResult.data as typeof invitation;
+    }
     const { data, error } = await supabase
       .from("users")
       .insert({
@@ -142,7 +156,7 @@ export async function registerAccount(
         password_hash: passwordHash,
         role: "member",
       })
-      .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at")
+      .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
       .single();
 
     if (error) {
@@ -152,6 +166,14 @@ export async function registerAccount(
             ? "Пользователь с таким email уже зарегистрирован."
             : "Не удалось создать аккаунт.",
       };
+    }
+
+    if (invitation) {
+      const request = await supabase.from("team_join_requests").insert({ user_id: data.id, team_id: invitation.team_id, invited_by_user_id: invitation.inviter_user_id, invitation_id: invitation.id }).select().single();
+      if (request.error) {
+        await supabase.from("users").delete().eq("id", data.id);
+        return { error: "Не удалось создать заявку по ссылке приглашения." };
+      }
     }
 
     return { user: publicUser(data) };
@@ -197,7 +219,7 @@ export async function authenticateAccount(email: string, password: string) {
 
     const byEmail = await supabase
       .from("users")
-      .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,password_hash")
+      .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -207,7 +229,7 @@ export async function authenticateAccount(email: string, password: string) {
     if (!data && !error) {
       const legacy = await supabase
         .from("users")
-        .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,password_hash")
+        .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
         .eq("login", normalizedEmail)
         .maybeSingle();
       data = legacy.data as Record<string, unknown> | null;

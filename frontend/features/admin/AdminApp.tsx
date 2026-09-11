@@ -6,17 +6,18 @@ import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { authFetch, clearDevSession, createTelegramLink, loadTelegramLinkStatus, refreshAuthSession } from "@/frontend/shared/api/client";
 import { formatDate, formatDateTime } from "@/frontend/shared/lib/format";
-import { createAdminTask, deleteAdminTask, loadAdminData, loadAdminProgramHistory, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
+import { createAdminTask, deleteAdminTask, loadAdminData, loadAdminProgramHistory, loadAdminPublicationHistory, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { loadTeamRequests, reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
+import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import type { AuthUser, Store, Submission, SubmissionStatus, Task, TeamJoinRequest, User } from "@/shared/domain/types";
-import type { ProgramHistory } from "@/frontend/shared/api/admin-client";
+import type { ProgramHistory, PublicationHistoryItem } from "@/frontend/shared/api/admin-client";
 
-type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars";
-type TaskDraft = { title: string; description: string; maxPoints: string; hasDeadline: boolean; deadline: string };
+type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars" | "network";
+type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 type ReviewDraft = { points: string; comment: string };
 type AdminModal =
   | { type: "task"; task?: Task }
@@ -36,21 +37,27 @@ function toLocalDateTime(value?: string | null) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+function hasMentorAccess(user?: AuthUser | null) {
+  return Boolean(user && (user.role === "admin" || user.canReview || user.canPublishTasks));
+}
+
 export function AdminApp() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [store, setStore] = useState<Store>({ users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] });
   const [requests, setRequests] = useState<TeamJoinRequest[]>([]);
   const [programHistory, setProgramHistory] = useState<ProgramHistory[]>([]);
+  const [publicationHistory, setPublicationHistory] = useState<PublicationHistoryItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState<AdminModal>(null);
   const [modalBusy, setModalBusy] = useState(false);
-  const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", maxPoints: "10", hasDeadline: false, deadline: "" });
+  const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "" });
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,12 +66,13 @@ export function AdminApp() {
         const nextUser = await refreshAuthSession();
         setAuthUser(nextUser);
         if (nextUser.role === "ceo") { window.location.href = "/ceo"; return; }
-        if (nextUser.role !== "admin") return;
-        const [data, teamRequests, history] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory()]);
+        if (!hasMentorAccess(nextUser)) return;
+        const [data, teamRequests, history, publications] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory(), loadAdminPublicationHistory()]);
         if (!cancelled) {
           setStore(data);
           setRequests(teamRequests);
       setProgramHistory(history);
+          setPublicationHistory(publications);
 
         }
       } catch {
@@ -87,20 +95,21 @@ export function AdminApp() {
   }, [toast]);
 
   useAutoRefresh(async () => {
-    if (!authUser || authUser.role !== "admin") return;
+    if (!hasMentorAccess(authUser)) return;
     try {
       const currentUser = await refreshAuthSession();
-      if (currentUser.role !== "admin") return;
+      if (!hasMentorAccess(currentUser)) return;
       setAuthUser(currentUser);
-      const [data, teamRequests, history] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory()]);
+      const [data, teamRequests, history, publications] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory(), loadAdminPublicationHistory()]);
       setStore(data);
       setRequests(teamRequests);
       setProgramHistory(history);
+      setPublicationHistory(publications);
 
     } catch {
       // Фоновое обновление не должно прерывать работу наставника.
     }
-  }, { enabled: authUser?.role === "admin" && !dataLoading, intervalMs: 15000 });
+  }, { enabled: hasMentorAccess(authUser) && !dataLoading, intervalMs: 15000 });
 
   const pending = store.submissions.filter((submission) => submission.status === "pending");
   const pendingRequests = requests.filter((request) => request.status === "pending");
@@ -148,6 +157,7 @@ export function AdminApp() {
     setTaskDraft({
       title: task?.title || "",
       description: task?.description || "",
+      resourceUrl: task?.resourceUrl || "",
       maxPoints: String(task?.maxPoints || 10),
       hasDeadline: Boolean(task?.deadlineAt),
       deadline: toLocalDateTime(task?.deadlineAt),
@@ -165,7 +175,7 @@ export function AdminApp() {
   }
 
   useEffect(() => {
-    if (dataLoading || !authUser || authUser.role !== "admin" || deepLinkHandled) return;
+    if (dataLoading || !authUser || !hasMentorAccess(authUser) || deepLinkHandled) return;
     const submissionId = new URLSearchParams(window.location.search).get("submission");
     if (!submissionId) {
       setDeepLinkHandled(true);
@@ -199,7 +209,7 @@ export function AdminApp() {
         comment: reviewDraft.comment.trim(),
       });
       setStore((current) => ({ ...current, submissions: current.submissions.map((item) => item.id === updated.id ? updated : item) }));
-      try { setProgramHistory(await loadAdminProgramHistory()); } catch { /* polling обновит историю позже */ }
+      try { setProgramHistory(await loadAdminProgramHistory()); setPublicationHistory(await loadAdminPublicationHistory()); } catch { /* polling обновит историю позже */ }
       setModal(null);
       setToast(modal.status === "accepted" ? "Работа принята, рейтинг обновлён." : "Работа возвращена на доработку.");
     } catch {
@@ -213,7 +223,7 @@ export function AdminApp() {
     try {
       const updated = await reviewTeamJoinRequest(teamRequest.id, status);
       setRequests((current) => current.map((item) => item.id === updated.id ? updated : item));
-      try { setStore(await loadAdminData()); setProgramHistory(await loadAdminProgramHistory()); } catch { /* обновление списка участников не меняет результат заявки */ }
+      try { setStore(await loadAdminData()); setProgramHistory(await loadAdminProgramHistory()); setPublicationHistory(await loadAdminPublicationHistory()); } catch { /* обновление списка участников не меняет результат заявки */ }
       setToast(status === "approved" ? "Участник принят в команду." : "Заявка отклонена.");
     } catch {
       setToast("Не удалось обработать заявку.");
@@ -254,8 +264,8 @@ export function AdminApp() {
     setModalBusy(true);
     try {
       const saved = modal.task
-        ? await updateAdminTask(modal.task.id, { title, description, maxPoints, deadlineAt })
-        : await createAdminTask({ title, description, maxPoints, deadlineAt });
+        ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt })
+        : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt });
       setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [saved, ...current.tasks] }));
       setModal(null);
       setToast("Задание сохранено.");
@@ -296,13 +306,14 @@ export function AdminApp() {
   async function hydrateAdmin(nextUser: AuthUser) {
     setAuthUser(nextUser);
     if (nextUser.role === "ceo") { window.location.href = "/ceo"; return; }
-    if (nextUser.role !== "admin") return;
+    if (!hasMentorAccess(nextUser)) return;
     setDataLoading(true);
     try {
-      const [data, teamRequests, history] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory()]);
+      const [data, teamRequests, history, publications] = await Promise.all([loadAdminData(), loadTeamRequests(), loadAdminProgramHistory(), loadAdminPublicationHistory()]);
       setStore(data);
       setRequests(teamRequests);
       setProgramHistory(history);
+      setPublicationHistory(publications);
 
     } catch {
       setToast("Не удалось загрузить данные панели.");
@@ -317,23 +328,41 @@ export function AdminApp() {
 
   if (authLoading || dataLoading) return <div className="auth-loading">Загрузка профиля...</div>;
   if (!authUser) return <AuthScreen onAuthenticated={handleAuthenticated} initialMode="login" />;
-  if (authUser.role !== "admin") return <AccessDenied onLogout={logout} />;
+  if (!hasMentorAccess(authUser)) return <AccessDenied onLogout={logout} />;
+
+  const canPublishContent = authUser.role === "admin" || Boolean(authUser.canPublishTasks);
+  const canReview = authUser.role === "admin" || Boolean(authUser.canReview);
+  const sections: Array<[AdminSection, string, string]> = [
+    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"],
+    ["announcements", "Объявления", "✦"], ["programs", "Программы", "▤"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
+  ];
+  const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
   return <main className="admin-shell">
-    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+    <header className="admin-topbar"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
-        {([ ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"], ["announcements", "Объявления", "✦"], ["programs", "Программы", "▤"], ["stars", "Звёзды", "★"] ] as const).map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
-        <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>
+        {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
+        {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
       </nav></aside>
-      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{section !== "requests" && <button className="text-button request-shortcut" onClick={() => setSection("requests")}>Заявки {pendingRequests.length > 0 && "(" + pendingRequests.length + ")"}</button>}</div></div>
+      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{authUser.role === "admin" && section !== "requests" && <button className="text-button request-shortcut" onClick={() => setSection("requests")}>Заявки {pendingRequests.length > 0 && "(" + pendingRequests.length + ")"}</button>}</div></div>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
-        {section === "tasks" && <TasksView store={store} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />}
+        {section === "tasks" && <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
+        {section === "network" && <NetworkPanel authUser={authUser} onError={setToast} />}
       </section>
     </div>
+    <div className={`admin-mobile-backdrop ${mobileMenuOpen ? "is-open" : ""}`} aria-hidden={!mobileMenuOpen} onMouseDown={() => setMobileMenuOpen(false)} />
+    <aside className={`admin-mobile-drawer ${mobileMenuOpen ? "is-open" : ""}`} aria-label="Навигация панели наставника" aria-hidden={!mobileMenuOpen}>
+      <div className="admin-mobile-drawer-header"><div><p className="eyebrow">Управление</p><strong>Панель наставника</strong></div><button type="button" className="admin-mobile-drawer-close" aria-label="Закрыть меню" onClick={() => setMobileMenuOpen(false)}>×</button></div>
+      <nav className="admin-mobile-drawer-nav">
+        <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
+        {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
+        {authUser.role === "admin" && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
+      </nav>
+    </aside>
     {toast && <div className="toast">{toast}</div>}
     {modal?.type === "task" && <TaskEditorModal draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
@@ -348,6 +377,7 @@ function TaskEditorModal({ draft, editing, busy, onChange, onClose, onSubmit }: 
     <h2>{editing ? "Изменить задание" : "Создать задание"}</h2>
     <label>Название задания<input value={draft.title} onChange={(event) => onChange("title", event.target.value)} placeholder="Например, записать короткое видео" autoFocus /></label>
     <label>Описание<textarea value={draft.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Что нужно сделать участнику" rows={4} /></label>
+    <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
     <div className="form-two-columns">
       <label>Максимум баллов<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
       <label className="deadline-toggle"><span>Дедлайн</span><span className="switch-line"><input type="checkbox" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /><span>{draft.hasDeadline ? "Установлен" : "Без дедлайна"}</span></span></label>
@@ -386,13 +416,17 @@ function Metric({ label, value, note, icon }: { label: string; value: number; no
 function TaskKindSwitch({ value, onChange }: { value: "regular" | "programs"; onChange: (value: "regular" | "programs") => void }) {
   return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Обычные задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button></div>;
 }
-function TasksView({ store, onToggle, onEdit, onRemove }: { store: Store; onToggle: (id: string) => void; onEdit: (task?: Task) => void; onRemove: (task: Task) => void }) {
+function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" | "publications"; onChange: (value: "regular" | "programs" | "publications") => void }) {
+  return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Обычные задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button><button className={value === "publications" ? "active" : ""} onClick={() => onChange("publications")}>Публикации</button></div>;
+}
+function TasksView({ store, actorId, canManageAll, onToggle, onEdit, onRemove }: { store: Store; actorId: string; canManageAll: boolean; onToggle: (id: string) => void; onEdit: (task?: Task) => void; onRemove: (task: Task) => void }) {
   const [kind, setKind] = useState<"regular" | "programs">("regular");
   const tasks = [...store.tasks].filter((task) => kind === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return <><TaskKindSwitch value={kind} onChange={setKind} /><div className="admin-panel table-panel">{tasks.length === 0 ? <EmptyAdmin text={kind === "programs" ? "Программ пока нет." : "Обычных заданий пока нет."} /> : tasks.map((task) => {
     const status = !task.isActive ? "inactive" : isTaskExpired(task) ? "expired" : "active";
     const taskMeta = task.publicationType === "sequential" ? "Программа · шаг " + (task.position || "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";
-    return <div className="task-admin-row" key={task.id}><div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div><strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta} · {store.submissions.filter((submission) => submission.taskId === task.id).length} отправлений</span></div></div><span className={"admin-status " + status}>{status === "active" ? "Активно" : status === "expired" ? "Просрочено" : "Скрыто"}</span><span className="task-max">до {task.maxPoints} баллов</span><div className="row-actions"><button className="button button-edit" onClick={() => onEdit(task)}>Изменить</button><button className={"button " + (task.isActive ? "button-warning" : "button-success")} onClick={() => onToggle(task.id)}>{task.isActive ? "Скрыть" : "Активировать"}</button><button className="button button-danger" onClick={() => onRemove(task)}>Удалить</button></div></div>;
+    const canManage = canManageAll || task.publisherId === actorId;
+    return <div className="task-admin-row" key={task.id}><div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div><strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta} · {store.submissions.filter((submission) => submission.taskId === task.id).length} отправлений</span></div></div><span className={"admin-status " + status}>{status === "active" ? "Активно" : status === "expired" ? "Просрочено" : "Скрыто"}</span><span className="task-max">до {task.maxPoints} баллов</span>{canManage && <div className="row-actions"><button className="button button-edit" onClick={() => onEdit(task)}>Изменить</button><button className={"button " + (task.isActive ? "button-warning" : "button-success")} onClick={() => onToggle(task.id)}>{task.isActive ? "Скрыть" : "Активировать"}</button><button className="button button-danger" onClick={() => onRemove(task)}>Удалить</button></div>}</div>;
   })}</div></>;
 }
 function ReviewView({ store, submissions, onReview }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) { return <div className="admin-panel table-panel">{submissions.length === 0 ? <EmptyAdmin text="Нет работ, ожидающих проверки." /> : submissions.map((submission) => <div className="review-row" key={submission.id}><SubmissionRow submission={submission} store={store} /><div className="review-actions"><a className="telegram-button" href="https://t.me" target="_blank" rel="noreferrer">Открыть в Telegram ↗</a><div><button className="button button-success" onClick={() => onReview(submission, "accepted")}>Принять</button><button className="button button-warning" onClick={() => onReview(submission, "revision")}>На доработку</button></div></div></div>)}</div>; }
@@ -432,24 +466,32 @@ function programHistoryStatusClass(status: ProgramHistory["members"][number]["st
   return status === "on_time" || status === "completed" ? "success" : status === "active" ? "active" : status === "late" ? "warning" : status === "locked" ? "muted" : "danger";
 }
 
-function HistoryView({ store, programs, onReview }: { store: Store; programs: ProgramHistory[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) {
-  const [kind, setKind] = useState<"regular" | "programs">("regular");
+function PublicationHistoryList({ items }: { items: PublicationHistoryItem[] }) {
+  const typeLabel = (type: PublicationHistoryItem["type"]) => type === "task" ? "Задание" : type === "program" ? "Программа" : "Объявление";
+  return <div className="admin-panel table-panel publication-history-list">{items.length === 0 ? <EmptyAdmin text="История публикаций пока пуста." /> : items.map((item) => <div className="publication-history-row" key={item.type + ":" + item.id}><div className="publication-history-icon">{item.type === "announcement" ? "!" : item.type === "program" ? "↗" : "✓"}</div><div className="publication-history-copy"><strong>{item.title}</strong><span>{typeLabel(item.type)} · опубликовал: <b>{item.authorName}</b> · {formatDateTime(item.createdAt)}</span></div><span className={"admin-status " + (item.isActive ? "active" : "inactive")}>{item.isActive ? "Активно" : "Скрыто"}</span></div>)}</div>;
+}
+
+function HistoryView({ store, programs, publications, onReview }: { store: Store; programs: ProgramHistory[]; publications: PublicationHistoryItem[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) {
+  const [kind, setKind] = useState<"regular" | "programs" | "publications">("regular");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [selectedStepPosition, setSelectedStepPosition] = useState(1);
-  const tasks = [...store.tasks].filter((task) => task.publicationType !== "sequential").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const publicationTaskIds = new Set(publications.filter((item) => item.type === "task").map((item) => item.id));
+  const publicationProgramIds = new Set(publications.filter((item) => item.type === "program").map((item) => item.id));
+  const tasks = [...store.tasks].filter((task) => task.publicationType !== "sequential" && publicationTaskIds.has(task.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const visiblePrograms = programs.filter((program) => publicationProgramIds.has(program.id));
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
   const selectedResults = selectedTask ? taskParticipantResults(selectedTask, store) : [];
-  const selectedProgram = programs.find((program) => program.id === selectedProgramId);
+  const selectedProgram = visiblePrograms.find((program) => program.id === selectedProgramId);
   return <>
-    <TaskKindSwitch value={kind} onChange={setKind} />
-    {kind === "regular" ? <div className="admin-panel table-panel history-task-list">{tasks.length === 0 ? <EmptyAdmin text="История обычных заданий пока пуста." /> : tasks.map((task) => {
+    <HistoryKindSwitch value={kind} onChange={setKind} />
+    {kind === "publications" ? <PublicationHistoryList items={publications} /> : kind === "regular" ? <div className="admin-panel table-panel history-task-list">{tasks.length === 0 ? <EmptyAdmin text="История обычных заданий пока пуста." /> : tasks.map((task) => {
       const results = taskParticipantResults(task, store);
       const completed = results.filter((result) => result.status === "accepted").length;
       const revisions = results.filter((result) => result.status === "revision").length;
       const overdue = results.filter((result) => result.status === "overdue").length;
       return <button type="button" className="history-task-row" key={task.id} onClick={() => setSelectedTaskId(task.id)}><div><strong>{task.title}</strong><span>{task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна"}</span></div><div className="history-task-summary"><span className="summary-completed">{completed} выполнено</span><span className="summary-revision">{revisions} доработка</span><span className="summary-overdue">{overdue} просрочено</span></div><b>→</b></button>;
-    })}</div> : <div className="program-history-list">{programs.length === 0 ? <div className="admin-panel"><EmptyAdmin text="История программ пока пуста." /></div> : programs.map((program) => {
+    })}</div> : <div className="program-history-list">{visiblePrograms.length === 0 ? <div className="admin-panel"><EmptyAdmin text="История программ пока пуста." /></div> : visiblePrograms.map((program) => {
       const counts = program.members.reduce((result, member) => { result[member.status] = (result[member.status] || 0) + 1; return result; }, {} as Record<string, number>);
       return <button type="button" className="program-history-row" key={program.id} onClick={() => { setSelectedProgramId(program.id); setSelectedStepPosition(1); }}><div className="program-history-main"><span className={"program-history-dot " + (program.isActive ? "active" : "muted")} /><div><strong>{program.title}</strong><span>{program.steps.length} шагов · {program.deadlineHours} ч на каждый шаг · опубликовано {formatDate(program.createdAt)}</span></div></div><div className="program-history-summary"><span className="summary-completed">{counts.on_time || 0} успели</span><span className="summary-active">{counts.active || 0} ещё успевают</span><span className="summary-warning">{counts.late || 0} с опозданием</span><span className="summary-overdue">{counts.missed || 0} пропустили</span><span className="summary-completed">{counts.completed || 0} завершили</span></div><b>→</b></button>;
     })}</div>}

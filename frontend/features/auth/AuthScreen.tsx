@@ -32,10 +32,11 @@ export function AuthScreen({
     setPending(true);
 
     try {
+      const inviteToken = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") || undefined : undefined;
       const payload =
         mode === "login"
           ? { email, password }
-          : { firstName, lastName, email, password, passwordConfirmation };
+          : { firstName, lastName, email, password, passwordConfirmation, inviteToken };
 
       const response = await fetch("/api/auth/" + (mode === "login" ? "login" : "register"), {
         method: "POST",

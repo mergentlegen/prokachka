@@ -32,12 +32,18 @@ export async function register(request: Request) {
       return failure("Пароли не совпадают.", 400);
     }
 
+    const inviteToken = body.inviteToken === undefined ? undefined : String(body.inviteToken);
+    if (inviteToken && (inviteToken.length < 20 || inviteToken.length > 128 || !/^[A-Za-z0-9_-]+$/.test(inviteToken))) {
+      return failure("Некорректная ссылка приглашения.", 400);
+    }
     const result = await registerAccount(
       body.firstName,
       body.lastName,
       body.email,
       body.password,
+      inviteToken,
     );
+    if ("validationError" in result) return failure(result.validationError || "Некорректная ссылка приглашения.", 400);
     if (result.error) return failure(result.error, 409);
 
     return ok(

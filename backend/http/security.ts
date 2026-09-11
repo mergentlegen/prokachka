@@ -63,6 +63,25 @@ export function isUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+type ExternalUrlResult = { value: string | null | undefined } | { error: string };
+
+export function parseExternalUrl(value: unknown): ExternalUrlResult {
+  if (value === undefined) return { value: undefined as undefined };
+  if (value === null || value === "") return { value: null as string | null };
+  if (typeof value !== "string" || value.trim().length > 2000) {
+    return { error: "Ссылка должна быть не длиннее 2000 символов." };
+  }
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return { error: "Разрешены только ссылки http:// или https://." };
+    }
+    return { value: url.toString() };
+  } catch {
+    return { error: "Укажите корректную ссылку, начинающуюся с http:// или https://." };
+  }
+}
+
 export function isProductionConfigSafe() {
   const authSecret = process.env.AUTH_SECRET;
   return process.env.NODE_ENV !== "production" || Boolean(authSecret && authSecret.length >= 32);

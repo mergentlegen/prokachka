@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
 export type ProgramHistoryStatus = "on_time" | "active" | "late" | "missed" | "completed" | "locked";
 export type ProgramHistoryStepMember = {
@@ -33,6 +34,8 @@ export type ProgramHistory = {
   title: string;
   deadlineHours: number;
   isActive: boolean;
+  publisherId?: string;
+  publisherName?: string;
   createdAt: string;
   steps: ProgramHistoryStep[];
   members: ProgramHistoryMember[];
@@ -55,7 +58,7 @@ function latestAcceptedSubmission(rows: Array<Record<string, unknown>>, userId: 
     .sort((a, b) => String(b.reviewed_at || b.submitted_at).localeCompare(String(a.reviewed_at || a.submitted_at)))[0];
 }
 
-export async function findProgramHistory(teamId: string) {
+export async function findProgramHistory(teamId: string, viewer?: { id: string; role: string }) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
 
@@ -77,10 +80,22 @@ export async function findProgramHistory(teamId: string) {
   ]);
   if (progressResult.error || submissionsResult.error) return { error: progressResult.error || submissionsResult.error };
 
+  const network = viewer?.role === "member" ? await findTeamNetwork(teamId) : null;
+  if (network && "unavailable" in network) return network;
+  if (network && "error" in network) return network;
+  const visibleUsers = network && "data" in network
+    ? new Set(network.data.filter((row) => String(row.role) === "member" && descendants(network.data, viewer?.id || "", true).has(String(row.id))).map((row) => String(row.id)))
+    : null;
+  const visibleAuthors = network && "data" in network ? descendants(network.data, viewer?.id || "", true) : null;
+  const visiblePrograms = visibleUsers && network && "data" in network
+    ? programs.filter((program) => program.publisher_id ? visibleAuthors?.has(String(program.publisher_id)) : isAudienceVisible(network.data, viewer?.id || "", program.audience_root_id))
+    : programs;
+  const authorNames = network && "data" in network ? new Map(network.data.map((row) => [String(row.id), String(row.name || "")])) : new Map<string, string>();
+
   const progress = progressResult.data || [];
   const submissions = submissionsResult.data || [];
   return {
-    data: programs.map((program): ProgramHistory => {
+    data: visiblePrograms.map((program): ProgramHistory => {
       const programId = String(program.id);
       const programTasks = tasks.filter((task) => String(task.program_id) === programId).sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
       const deadlineHours = Number(program.deadline_hours || 72);
@@ -93,7 +108,8 @@ export async function findProgramHistory(teamId: string) {
         members: [],
       }));
 
-      const stepMembers = steps.map((step, stepIndex) => users.map((user): ProgramHistoryStepMember => {
+      const programUsers = visibleUsers ? users.filter((user) => visibleUsers.has(String(user.id))) : users;
+      const stepMembers = steps.map((step, stepIndex) => programUsers.map((user): ProgramHistoryStepMember => {
         const userId = String(user.id);
         const start = maxDate(String(user.team_joined_at || program.created_at), String(program.created_at));
         const previousTask = programTasks[stepIndex - 1];
@@ -111,7 +127,7 @@ export async function findProgramHistory(teamId: string) {
       }));
       steps.forEach((step, index) => { step.members = stepMembers[index]; });
 
-      const members = users.map((user): ProgramHistoryMember => {
+      const members = programUsers.map((user): ProgramHistoryMember => {
         const userId = String(user.id);
         const memberProgress = progress.find((row) => String(row.user_id) === userId && String(row.program_id) === programId);
         if (memberProgress?.status === "completed") return { userId, name: String(user.name || ""), status: "completed" };
@@ -126,6 +142,8 @@ export async function findProgramHistory(teamId: string) {
       });
       return {
         id: programId, teamId: String(program.team_id), title: String(program.title || ""), deadlineHours, isActive: Boolean(program.is_active),
+        publisherId: program.publisher_id ? String(program.publisher_id) : undefined,
+        publisherName: program.publisher_id ? authorNames.get(String(program.publisher_id)) : undefined,
         createdAt: String(program.created_at), steps, members,
       };
     }),

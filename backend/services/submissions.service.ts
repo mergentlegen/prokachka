@@ -1,21 +1,30 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { advanceProgramAfterAcceptance, revertProgramAfterRevision } from "@/backend/services/member-progress.service";
+import { canReviewNetwork, descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
-type FindOptions = { userId?: string; teamId?: string };
+type SubmissionViewer = { id: string; role: string; teamId?: string; canReview?: boolean };
+type FindOptions = { userId?: string; teamId?: string; viewer?: SubmissionViewer };
 const submissionSelect = "id,user_id,task_id,status,media_type,answer_text,points,comment,submitted_at,reviewed_at,created_at";
 
-export async function findSubmissionMedia(id: string, teamId?: string) {
+export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
 
   const result = await supabase
     .from("submissions")
-    .select("telegram_file_id,media_type,tasks(team_id)")
+    .select("telegram_file_id,media_type,users(id,team_id),tasks(team_id)")
     .eq("id", id)
     .maybeSingle();
   const task = Array.isArray(result.data?.tasks) ? result.data.tasks[0] : result.data?.tasks;
   if (result.error || !result.data) return { notFound: true as const };
-  if (teamId && String(task?.team_id || "") !== teamId) return { forbidden: true as const };
+  if (viewer?.role !== "ceo" && (!viewer?.teamId || String(task?.team_id || "") !== viewer.teamId)) return { forbidden: true as const };
+  const submitter = Array.isArray(result.data.users) ? result.data.users[0] : result.data.users;
+  if (viewer?.role === "member") {
+    const network = await findTeamNetwork(viewer.teamId || "");
+    if ("unavailable" in network) return { unavailable: true as const };
+    if ("error" in network) return { error: network.error };
+    if (!viewer.canReview || !descendants(network.data, viewer.id, false).has(String(submitter?.id || ""))) return { forbidden: true as const };
+  }
   if (!result.data.telegram_file_id || !["photo", "video", "document"].includes(String(result.data.media_type))) {
     return { notFound: true as const };
   }
@@ -25,11 +34,22 @@ export async function findSubmissionMedia(id: string, teamId?: string) {
 export async function findSubmissions(options: FindOptions = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("submissions").select(`${submissionSelect}, users(name,team_id), tasks(title,max_points,team_id)`).order("submitted_at", { ascending: false });
+  let query = supabase.from("submissions").select(`${submissionSelect}, users(id,name,team_id), tasks(title,max_points,team_id)`).order("submitted_at", { ascending: false });
   if (options.userId) query = query.eq("user_id", options.userId);
   if (options.teamId) query = query.eq("tasks.team_id", options.teamId);
   const result = await query;
-  return result.error ? { error: result.error } : { data: result.data };
+  if (result.error) return { error: result.error };
+  if (options.viewer?.role === "member") {
+    const network = await findTeamNetwork(options.viewer.teamId || "");
+    if ("unavailable" in network) return { unavailable: true as const };
+    if ("error" in network) return { error: network.error };
+    const allowed = descendants(network.data, options.viewer.id, false);
+    return { data: (result.data || []).filter((row) => {
+      const submitter = Array.isArray(row.users) ? row.users[0] : row.users;
+      return options.viewer?.canReview === true && allowed.has(String(submitter?.id || ""));
+    }) };
+  }
+  return { data: result.data };
 }
 
 async function validateSubmissionTarget(userId: string, taskId: string) {
@@ -37,10 +57,14 @@ async function validateSubmissionTarget(userId: string, taskId: string) {
   if (!supabase) return { unavailable: true as const };
   const [user, task] = await Promise.all([
     supabase.from("users").select("team_id,team_joined_at").eq("id", userId).single(),
-    supabase.from("tasks").select("team_id,is_active,deadline_at,publication_type,program_id").eq("id", taskId).single(),
+    supabase.from("tasks").select("team_id,is_active,deadline_at,publication_type,program_id,audience_root_id").eq("id", taskId).single(),
   ]);
   if (user.error || task.error || !task.data.is_active) return { validationError: "Задание недоступно." };
   if (!user.data.team_id || user.data.team_id !== task.data.team_id) return { validationError: "Пользователь не состоит в этой команде." };
+  const network = await findTeamNetwork(String(task.data.team_id));
+  if ("unavailable" in network) return { unavailable: true as const };
+  if ("error" in network) return { error: network.error };
+  if (!isAudienceVisible(network.data, userId, task.data.audience_root_id)) return { validationError: "Задание недоступно для этого участника." };
   const taskRow = task.data;
   if (taskRow.publication_type === "sequential") {
     const progress = await supabase.from("member_program_progress").select("current_task_id,status").eq("user_id", userId).eq("program_id", taskRow.program_id).maybeSingle();
@@ -55,6 +79,7 @@ export async function insertSubmission(input: { userId: string; taskId: string; 
   const target = await validateSubmissionTarget(input.userId, input.taskId);
   if ("unavailable" in target) return { unavailable: true as const };
   if ("validationError" in target) return { validationError: target.validationError };
+  if ("error" in target) return { error: target.error };
   const result = await target.supabase.from("submissions").insert({
     user_id: input.userId, task_id: input.taskId, status: "pending", telegram_chat_id: input.telegramChatId || null,
     telegram_message_id: input.telegramMessageId || null, points: 0, comment: "",
@@ -109,12 +134,20 @@ export async function attachTelegramSubmission(input: {
   return { error: created.error };
 }
 
-export async function saveReview(id: string, input: { status: "accepted" | "revision"; points: number; comment: string }, teamId?: string) {
+export async function saveReview(id: string, input: { status: "accepted" | "revision"; points: number; comment: string }, viewer?: SubmissionViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const current = await supabase.from("submissions").select("id,user_id,task_id,status,tasks(team_id,max_points)").eq("id", id).single();
+  const current = await supabase.from("submissions").select("id,user_id,task_id,status,users(team_id),tasks(team_id,max_points)").eq("id", id).single();
   const task = Array.isArray(current.data?.tasks) ? current.data.tasks[0] : current.data?.tasks;
-  if (current.error || !current.data || (teamId && task?.team_id !== teamId)) return { forbidden: true as const };
+  if (current.error || !current.data) return { forbidden: true as const };
+  if (viewer && String(current.data.user_id) === viewer.id) return { forbidden: true as const };
+  if (viewer?.role !== "ceo" && (!viewer?.teamId || task?.team_id !== viewer.teamId)) return { forbidden: true as const };
+  if (viewer?.role === "member") {
+    const network = await findTeamNetwork(viewer.teamId || "");
+    if ("unavailable" in network) return network;
+    if ("error" in network) return network;
+    if (!viewer.canReview || !canReviewNetwork(network.data, viewer.id, String(current.data.user_id), viewer.role)) return { forbidden: true as const };
+  }
   const points = Math.min(Math.max(0, Math.round(input.points)), Number(task?.max_points ?? 100));
   const reviewedAt = new Date().toISOString();
   const result = await supabase.from("submissions").update({ status: input.status, points: input.status === "accepted" ? points : 0, comment: input.comment.trim(), reviewed_at: reviewedAt }).eq("id", id).select().single();

@@ -9,25 +9,27 @@ export type Team = {
 };
 export type TeamJoinRequest = {
   id: string; userId: string; teamId: string; status: TeamRequestStatus; createdAt: string; reviewedAt?: string; userName?: string; teamName?: string;
+  invitedByUserId?: string;
 };
 export type User = {
-  id: string; name: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string; createdAt: string;
+  id: string; name: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string;
+  parentUserId?: string; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean; createdAt: string;
 };
-export type AuthUser = Pick<User, "id" | "name" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt">;
+export type AuthUser = Pick<User, "id" | "name" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
 
 export type TaskProgram = {
-  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; createdAt: string; updatedAt: string;
+  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; createdAt: string; updatedAt: string;
 };
 export type MemberProgramProgress = {
   id: string; userId: string; programId: string; currentTaskId?: string; unlockedAt: string; dueAt: string; status: ProgramStatus; completedAt?: string;
 };
 export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; teamId?: string;
-  publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string;
-  createdAt: string; updatedAt: string;
+  publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
+  publisherId?: string; createdAt: string; updatedAt: string;
 };
 export type Announcement = {
-  id: string; teamId: string; authorId?: string; title: string; content: string; isActive: boolean; createdAt: string; updatedAt: string;
+  id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; createdAt: string; updatedAt: string;
 };
 export type StarAward = {
   id: string; userId: string; teamId: string; mentorId?: string; stars: number; comment: string; createdAt: string;

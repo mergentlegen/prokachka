@@ -5,15 +5,17 @@ import { formatDateTime } from "@/frontend/shared/lib/format";
 import { createAdminAnnouncement, deleteAdminAnnouncement, updateAdminAnnouncement } from "@/frontend/shared/api/admin-client";
 import type { Announcement } from "@/shared/domain/types";
 
-type Draft = { title: string; content: string };
+type Draft = { title: string; content: string; resourceUrl: string };
 type Props = {
   announcements: Announcement[];
+  actorId: string;
+  canManageAll: boolean;
   onChange: (announcements: Announcement[]) => void;
   onError: (message: string) => void;
 };
 
-export function AnnouncementsPanel({ announcements, onChange, onError }: Props) {
-  const [draft, setDraft] = useState<Draft>({ title: "", content: "" });
+export function AnnouncementsPanel({ announcements, actorId, canManageAll, onChange, onError }: Props) {
+  const [draft, setDraft] = useState<Draft>({ title: "", content: "", resourceUrl: "" });
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
@@ -21,13 +23,13 @@ export function AnnouncementsPanel({ announcements, onChange, onError }: Props) 
 
   function openCreate() {
     setEditing(null);
-    setDraft({ title: "", content: "" });
+    setDraft({ title: "", content: "", resourceUrl: "" });
     setEditorOpen(true);
   }
 
   function openEdit(announcement: Announcement) {
     setEditing(announcement);
-    setDraft({ title: announcement.title, content: announcement.content });
+    setDraft({ title: announcement.title, content: announcement.content, resourceUrl: announcement.resourceUrl || "" });
     setEditorOpen(true);
   }
 
@@ -44,15 +46,15 @@ export function AnnouncementsPanel({ announcements, onChange, onError }: Props) 
     setBusy(true);
     try {
       if (editing) {
-        const updated = await updateAdminAnnouncement(editing.id, { title, content });
+        const updated = await updateAdminAnnouncement(editing.id, { title, content, resourceUrl: draft.resourceUrl.trim() || null });
         onChange(announcements.map((item) => (item.id === updated.id ? updated : item)));
       } else {
-        const created = await createAdminAnnouncement({ title, content });
+        const created = await createAdminAnnouncement({ title, content, resourceUrl: draft.resourceUrl.trim() || null });
         onChange([created, ...announcements]);
       }
       setEditorOpen(false);
       setEditing(null);
-      setDraft({ title: "", content: "" });
+      setDraft({ title: "", content: "", resourceUrl: "" });
       onError("");
     } catch (error) {
       onError(error instanceof Error ? error.message : "Не удалось сохранить объявление.");
@@ -102,8 +104,9 @@ export function AnnouncementsPanel({ announcements, onChange, onError }: Props) 
         {announcements.length === 0 ? (
           <div className="empty-admin"><span>✦</span><p>Пока нет объявлений. Создай первое для команды.</p></div>
         ) : (
-          announcements.map((announcement) => (
-            <article className="announcement-admin-row" key={announcement.id}>
+          announcements.map((announcement) => {
+            const canManage = canManageAll || announcement.authorId === actorId;
+            return <article className="announcement-admin-row" key={announcement.id}>
               <div className="announcement-admin-copy">
                 <div className="announcement-admin-meta">
                   <span className={announcement.isActive ? "announcement-live" : "announcement-hidden"}>
@@ -113,22 +116,26 @@ export function AnnouncementsPanel({ announcements, onChange, onError }: Props) 
                 </div>
                 <h3>{announcement.title}</h3>
                 <p>{announcement.content}</p>
+                {announcement.resourceUrl && <a className="admin-resource-link" href={announcement.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть ссылку ↗</a>}
               </div>
-              <div className="announcement-admin-actions">
+              {canManage && <div className="announcement-admin-actions">
                 <button className="button button-edit" onClick={() => openEdit(announcement)}>Изменить</button>
                 <button className="button button-warning" onClick={() => void toggle(announcement)}>
                   {announcement.isActive ? "Скрыть" : "Опубликовать"}
                 </button>
                 <button className="button button-danger" onClick={() => setDeleteTarget(announcement)}>Удалить</button>
-              </div>
+              </div>}
             </article>
-          ))
+          })
         )}
       </div>
 
       {editorOpen && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeEditor(); }}>
           <div className="editor-modal admin-form-modal announcement-editor" onMouseDown={(event) => event.stopPropagation()}>
+            <label>Ссылка на материал <span className="field-hint">необязательно</span>
+              <input type="url" value={draft.resourceUrl} onChange={(event) => setDraft({ ...draft, resourceUrl: event.target.value })} placeholder="https://zoom.us/..." />
+            </label>
             <button className="modal-close" onClick={closeEditor} aria-label="Закрыть">×</button>
             <p className="eyebrow">{editing ? "Редактирование" : "Новое объявление"}</p>
             <h2>{editing ? "Изменить объявление" : "Объявление для команды"}</h2>

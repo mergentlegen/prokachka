@@ -5,7 +5,8 @@ type ApiResponse<T> = { ok: boolean; message?: string } & T;
 export type ProgramHistoryStatus = "on_time" | "active" | "late" | "missed" | "completed" | "locked";
 export type ProgramHistoryStepMember = { userId: string; name: string; status: Exclude<ProgramHistoryStatus, "completed">; dueAt?: string; submittedAt?: string; points?: number };
 export type ProgramHistoryMember = { userId: string; name: string; status: ProgramHistoryStatus; currentStep?: number; currentTaskTitle?: string; dueAt?: string; submittedAt?: string; points?: number };
-export type ProgramHistory = { id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; createdAt: string; steps: Array<{ id: string; title: string; position: number; maxPoints: number; deadlineHours: number; members: ProgramHistoryStepMember[] }>; members: ProgramHistoryMember[] };
+export type ProgramHistory = { id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; publisherName?: string; createdAt: string; steps: Array<{ id: string; title: string; position: number; maxPoints: number; deadlineHours: number; members: ProgramHistoryStepMember[] }>; members: ProgramHistoryMember[] };
+export type PublicationHistoryItem = { id: string; type: "task" | "program" | "announcement"; title: string; authorId?: string; authorName: string; teamId: string; isActive: boolean; createdAt: string; updatedAt: string; deadlineAt?: string; stepCount?: number };
 
 export async function loadAdminData(): Promise<Store> {
   const [tasksResponse, usersResponse, submissionsResponse, announcementsResponse, starsResponse, programsResponse] = await Promise.all([
@@ -19,22 +20,30 @@ export async function loadAdminProgramHistory(): Promise<ProgramHistory[]> {
   const response = await request<ApiResponse<{ programs: ProgramHistory[] }>>("/api/programs/history");
   return response.programs || [];
 }
-export async function createAdminTask(input: Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt">): Promise<Task> {
+export async function loadAdminPublicationHistory(): Promise<PublicationHistoryItem[]> {
+  const response = await request<ApiResponse<{ history: PublicationHistoryItem[] }>>("/api/publication-history");
+  return response.history || [];
+}
+type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };
+type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive">, "resourceUrl"> & { resourceUrl?: string | null }>;
+export async function createAdminTask(input: AdminTaskInput): Promise<Task> {
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks", { method: "POST", body: JSON.stringify(input) }); return mapTask(response.task);
 }
-export async function updateAdminTask(id: string, input: Partial<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "isActive">>): Promise<Task> {
+export async function updateAdminTask(id: string, input: AdminTaskPatch): Promise<Task> {
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapTask(response.task);
 }
 export async function deleteAdminTask(id: string) { await request<ApiResponse<Record<string, never>>>("/api/tasks/" + id, { method: "DELETE" }); }
 export async function reviewAdminSubmission(id: string, input: { status: "accepted" | "revision"; points: number; comment: string }): Promise<Submission> {
   const response = await request<ApiResponse<{ submission: ApiRow }>>("/api/submissions/" + id + "/review", { method: "PATCH", body: JSON.stringify(input) }); return mapSubmission(response.submission);
 }
-export async function createAdminAnnouncement(input: Pick<Announcement, "title" | "content">): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements", { method: "POST", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
-export async function updateAdminAnnouncement(id: string, input: Partial<Pick<Announcement, "title" | "content" | "isActive">>): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
+type AdminAnnouncementInput = Omit<Pick<Announcement, "title" | "content" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };
+type AdminAnnouncementPatch = Partial<Omit<Pick<Announcement, "title" | "content" | "resourceUrl" | "isActive">, "resourceUrl"> & { resourceUrl?: string | null }>;
+export async function createAdminAnnouncement(input: AdminAnnouncementInput): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements", { method: "POST", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
+export async function updateAdminAnnouncement(id: string, input: AdminAnnouncementPatch): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function deleteAdminAnnouncement(id: string) { await request<ApiResponse<Record<string, never>>>("/api/announcements/" + id, { method: "DELETE" }); }
 export async function createAdminStarAward(input: { userId: string; stars: number; comment: string }): Promise<StarAward> { const response = await request<ApiResponse<{ award: ApiRow }>>("/api/stars", { method: "POST", body: JSON.stringify(input) }); return mapStarAward(response.award); }
 export async function deleteAdminStarAward(id: string) { await request<ApiResponse<Record<string, never>>>("/api/stars/" + id, { method: "DELETE" }); }
-export type ProgramCreateInput = { title: string; deadlineHours: number; tasks: Array<{ title: string; description: string; maxPoints: number }> };
+export type ProgramCreateInput = { title: string; deadlineHours: number; tasks: Array<{ title: string; description: string; maxPoints: number; resourceUrl?: string | null }> };
 export async function createAdminProgram(input: ProgramCreateInput): Promise<{ program: TaskProgram; tasks: Task[] }> {
   const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[] }>>("/api/programs", { method: "POST", body: JSON.stringify(input) });
   return { program: mapProgram(response.program), tasks: response.tasks.map(mapTask) };
