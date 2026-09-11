@@ -8,11 +8,13 @@ import type { Announcement } from "@/shared/domain/types";
 type Draft = { title: string; content: string; resourceUrl: string };
 type Props = {
   announcements: Announcement[];
+  actorId: string;
+  canManageAll: boolean;
   onChange: (announcements: Announcement[]) => void;
   onError: (message: string) => void;
 };
 
-export function AnnouncementsPanel({ announcements, onChange, onError }: Props) {
+export function AnnouncementsPanel({ announcements, actorId, canManageAll, onChange, onError }: Props) {
   const [draft, setDraft] = useState<Draft>({ title: "", content: "", resourceUrl: "" });
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -102,8 +104,9 @@ export function AnnouncementsPanel({ announcements, onChange, onError }: Props) 
         {announcements.length === 0 ? (
           <div className="empty-admin"><span>✦</span><p>Пока нет объявлений. Создай первое для команды.</p></div>
         ) : (
-          announcements.map((announcement) => (
-            <article className="announcement-admin-row" key={announcement.id}>
+          announcements.map((announcement) => {
+            const canManage = canManageAll || announcement.authorId === actorId;
+            return <article className="announcement-admin-row" key={announcement.id}>
               <div className="announcement-admin-copy">
                 <div className="announcement-admin-meta">
                   <span className={announcement.isActive ? "announcement-live" : "announcement-hidden"}>
@@ -115,15 +118,15 @@ export function AnnouncementsPanel({ announcements, onChange, onError }: Props) 
                 <p>{announcement.content}</p>
                 {announcement.resourceUrl && <a className="admin-resource-link" href={announcement.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть ссылку ↗</a>}
               </div>
-              <div className="announcement-admin-actions">
+              {canManage && <div className="announcement-admin-actions">
                 <button className="button button-edit" onClick={() => openEdit(announcement)}>Изменить</button>
                 <button className="button button-warning" onClick={() => void toggle(announcement)}>
                   {announcement.isActive ? "Скрыть" : "Опубликовать"}
                 </button>
                 <button className="button button-danger" onClick={() => setDeleteTarget(announcement)}>Удалить</button>
-              </div>
+              </div>}
             </article>
-          ))
+          })
         )}
       </div>
 

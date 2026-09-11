@@ -34,6 +34,8 @@ export type ProgramHistory = {
   title: string;
   deadlineHours: number;
   isActive: boolean;
+  publisherId?: string;
+  publisherName?: string;
   createdAt: string;
   steps: ProgramHistoryStep[];
   members: ProgramHistoryMember[];
@@ -84,9 +86,11 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
   const visibleUsers = network && "data" in network
     ? new Set(network.data.filter((row) => String(row.role) === "member" && descendants(network.data, viewer?.id || "", true).has(String(row.id))).map((row) => String(row.id)))
     : null;
+  const visibleAuthors = network && "data" in network ? descendants(network.data, viewer?.id || "", true) : null;
   const visiblePrograms = visibleUsers && network && "data" in network
-    ? programs.filter((program) => isAudienceVisible(network.data, viewer?.id || "", program.audience_root_id))
+    ? programs.filter((program) => program.publisher_id ? visibleAuthors?.has(String(program.publisher_id)) : isAudienceVisible(network.data, viewer?.id || "", program.audience_root_id))
     : programs;
+  const authorNames = network && "data" in network ? new Map(network.data.map((row) => [String(row.id), String(row.name || "")])) : new Map<string, string>();
 
   const progress = progressResult.data || [];
   const submissions = submissionsResult.data || [];
@@ -138,6 +142,8 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
       });
       return {
         id: programId, teamId: String(program.team_id), title: String(program.title || ""), deadlineHours, isActive: Boolean(program.is_active),
+        publisherId: program.publisher_id ? String(program.publisher_id) : undefined,
+        publisherName: program.publisher_id ? authorNames.get(String(program.publisher_id)) : undefined,
         createdAt: String(program.created_at), steps, members,
       };
     }),

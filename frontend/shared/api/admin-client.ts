@@ -5,7 +5,8 @@ type ApiResponse<T> = { ok: boolean; message?: string } & T;
 export type ProgramHistoryStatus = "on_time" | "active" | "late" | "missed" | "completed" | "locked";
 export type ProgramHistoryStepMember = { userId: string; name: string; status: Exclude<ProgramHistoryStatus, "completed">; dueAt?: string; submittedAt?: string; points?: number };
 export type ProgramHistoryMember = { userId: string; name: string; status: ProgramHistoryStatus; currentStep?: number; currentTaskTitle?: string; dueAt?: string; submittedAt?: string; points?: number };
-export type ProgramHistory = { id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; createdAt: string; steps: Array<{ id: string; title: string; position: number; maxPoints: number; deadlineHours: number; members: ProgramHistoryStepMember[] }>; members: ProgramHistoryMember[] };
+export type ProgramHistory = { id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; publisherName?: string; createdAt: string; steps: Array<{ id: string; title: string; position: number; maxPoints: number; deadlineHours: number; members: ProgramHistoryStepMember[] }>; members: ProgramHistoryMember[] };
+export type PublicationHistoryItem = { id: string; type: "task" | "program" | "announcement"; title: string; authorId?: string; authorName: string; teamId: string; isActive: boolean; createdAt: string; updatedAt: string; deadlineAt?: string; stepCount?: number };
 
 export async function loadAdminData(): Promise<Store> {
   const [tasksResponse, usersResponse, submissionsResponse, announcementsResponse, starsResponse, programsResponse] = await Promise.all([
@@ -18,6 +19,10 @@ export async function loadAdminData(): Promise<Store> {
 export async function loadAdminProgramHistory(): Promise<ProgramHistory[]> {
   const response = await request<ApiResponse<{ programs: ProgramHistory[] }>>("/api/programs/history");
   return response.programs || [];
+}
+export async function loadAdminPublicationHistory(): Promise<PublicationHistoryItem[]> {
+  const response = await request<ApiResponse<{ history: PublicationHistoryItem[] }>>("/api/publication-history");
+  return response.history || [];
 }
 type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };
 type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive">, "resourceUrl"> & { resourceUrl?: string | null }>;

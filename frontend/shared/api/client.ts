@@ -41,10 +41,11 @@ export function mapTask(row: ApiRow): Task {
     deadlineHours: row.deadline_hours ? Number(row.deadline_hours) : undefined, unlockedAt: row.unlocked_at ? String(row.unlocked_at) : undefined,
     resourceUrl: row.resource_url ? String(row.resource_url) : undefined,
     dueAt: row.due_at ? String(row.due_at) : undefined, createdAt: String(row.created_at || new Date().toISOString()),
+    publisherId: row.publisher_id ? String(row.publisher_id) : undefined,
     updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
 }
 export function mapProgram(row: ApiRow): TaskProgram {
-  return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
+  return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), publisherId: row.publisher_id ? String(row.publisher_id) : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
 }
 export function mapProgress(row: ApiRow): MemberProgramProgress {
   return { id: String(row.id), userId: String(row.user_id), programId: String(row.program_id), currentTaskId: row.current_task_id ? String(row.current_task_id) : undefined, unlockedAt: String(row.unlocked_at), dueAt: String(row.due_at), status: row.status === "completed" ? "completed" : "active", completedAt: row.completed_at ? String(row.completed_at) : undefined };

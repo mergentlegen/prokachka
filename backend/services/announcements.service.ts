@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import { findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
 type AnnouncementViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
 
@@ -30,7 +30,8 @@ export async function findAnnouncements(options: { teamId?: string; includeInact
   const network = await findTeamNetwork(options.teamId);
   if ("unavailable" in network) return { unavailable: true as const };
   if ("error" in network) return { error: network.error };
-  return { data: (result.data || []).filter((announcement) => isAudienceVisible(network.data, options.viewer?.id || "", announcement.audience_root_id)) };
+  const allowedAuthors = descendants(network.data, options.viewer?.id || "", true);
+  return { data: (result.data || []).filter((announcement) => isAudienceVisible(network.data, options.viewer?.id || "", announcement.audience_root_id) || (announcement.author_id && allowedAuthors.has(String(announcement.author_id)))) };
 }
 
 export async function insertAnnouncement(input: {

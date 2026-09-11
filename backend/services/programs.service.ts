@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import { findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
 type ProgramTaskInput = { title: string; description: string; maxPoints: number; resourceUrl?: string | null };
 type ProgramViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
@@ -16,7 +16,8 @@ export async function findPrograms(teamId?: string, viewer?: ProgramViewer) {
   const network = await findTeamNetwork(teamId);
   if ("unavailable" in network) return { unavailable: true as const };
   if ("error" in network) return { error: network.error };
-  return { data: (result.data || []).filter((program) => isAudienceVisible(network.data, viewer.id, program.audience_root_id)) };
+  const allowedAuthors = descendants(network.data, viewer.id, true);
+  return { data: (result.data || []).filter((program) => isAudienceVisible(network.data, viewer.id, program.audience_root_id) || (program.publisher_id && allowedAuthors.has(String(program.publisher_id)))) };
 }
 export async function createProgram(input: ProgramInput) {
   const supabase = getSupabaseAdmin();

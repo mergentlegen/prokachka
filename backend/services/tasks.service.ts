@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import { findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
 type TaskViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
 
@@ -20,7 +20,8 @@ export async function findTasks(teamId?: string, viewer?: TaskViewer) {
   const network = await findTeamNetwork(teamId);
   if ("unavailable" in network) return { unavailable: true as const };
   if ("error" in network) return { error: network.error };
-  return { data: (result.data || []).filter((task) => isAudienceVisible(network.data, viewer.id, task.audience_root_id)) };
+  const allowedAuthors = descendants(network.data, viewer.id, true);
+  return { data: (result.data || []).filter((task) => isAudienceVisible(network.data, viewer.id, task.audience_root_id) || (task.publisher_id && allowedAuthors.has(String(task.publisher_id)))) };
 }
 
 export async function insertTask(input: Required<Pick<TaskInput, "title" | "description">> & TaskInput) {
