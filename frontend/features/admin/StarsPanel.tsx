@@ -26,6 +26,8 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
     awards.forEach((award) => result.set(award.userId, (result.get(award.userId) || 0) + award.stars));
     return result;
   }, [awards]);
+  const totalStars = awards.reduce((sum, award) => sum + award.stars, 0);
+  const awardedMembers = members.filter((user) => (totals.get(user.id) || 0) > 0).length;
 
   function openAward(user: User) {
     setSelectedUser(user);
@@ -68,17 +70,24 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   }
 
   return (
-    <>
+    <div className="stars-admin-page">
       <div className="stars-admin-intro">
         <div>
           <p className="eyebrow">Мотивация команды</p>
           <h2>Награждение звёздами</h2>
           <p>Выдавай участникам от одной до пяти звёзд за прогресс, инициативу или отличный результат.</p>
         </div>
-        <div className="stars-total-badge">★ <strong>{awards.reduce((sum, award) => sum + award.stars, 0)}</strong><span>выдано</span></div>
+        <div className="stars-total-badge">★ <strong>{totalStars}</strong><span>выдано</span></div>
+      </div>
+
+      <div className="stars-summary-grid">
+        <div className="stars-summary-card"><span>★</span><div><strong>{totalStars}</strong><small>Всего звёзд</small></div></div>
+        <div className="stars-summary-card"><span>♙</span><div><strong>{awardedMembers}</strong><small>Получили награду</small></div></div>
+        <div className="stars-summary-card"><span>◷</span><div><strong>{awards.length}</strong><small>Выдач за всё время</small></div></div>
       </div>
 
       <div className="admin-panel stars-member-list">
+        <div className="stars-member-heading"><div><p className="eyebrow">Команда</p><h3>Выбери участника</h3></div><span>Награда появится в его профиле</span></div>
         {members.length === 0 ? (
           <div className="empty-admin"><span>★</span><p>В команде пока нет участников.</p></div>
         ) : (
@@ -147,6 +156,6 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

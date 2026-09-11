@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import type { AuthUser } from "@/shared/domain/types";
 
@@ -28,6 +28,12 @@ function invitationHash(token: string) {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
+function stableInvitationToken(teamId: string, inviterId: string) {
+  const secret = process.env.AUTH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) return null;
+  return createHmac("sha256", secret).update(`team-invitation:${teamId}:${inviterId}`, "utf8").digest("base64url");
+}
+
 export async function findInvitationByToken(token: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
@@ -45,9 +51,22 @@ export async function findInvitationByToken(token: string) {
 export async function createTeamInvitation(teamId: string, inviterId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const revoked = await supabase.from("team_invitation_links").update({ revoked_at: new Date().toISOString() }).eq("team_id", teamId).eq("inviter_user_id", inviterId).is("revoked_at", null);
-  if (revoked.error) return { error: revoked.error };
-  const token = randomBytes(32).toString("base64url");
+  const token = stableInvitationToken(teamId, inviterId);
+  if (!token) return { error: new Error("AUTH_SECRET is required for permanent invitations") };
+
+  const existing = await supabase.from("team_invitation_links").select("id,team_id,inviter_user_id,token_hash,expires_at,max_uses,used_count,created_at").eq("team_id", teamId).eq("inviter_user_id", inviterId).is("revoked_at", null).order("created_at", { ascending: false }).limit(1);
+  if (existing.error) return { error: existing.error };
+  const current = existing.data?.[0];
+  if (current && current.token_hash === invitationHash(token)) {
+    const { token_hash: _tokenHash, ...invitation } = current;
+    return { data: { ...invitation, token } };
+  }
+
+  if (current) {
+    const revoked = await supabase.from("team_invitation_links").update({ revoked_at: new Date().toISOString() }).eq("team_id", teamId).eq("inviter_user_id", inviterId).is("revoked_at", null);
+    if (revoked.error) return { error: revoked.error };
+  }
+
   const result = await supabase.from("team_invitation_links").insert({ team_id: teamId, inviter_user_id: inviterId, token_hash: invitationHash(token), expires_at: null, max_uses: 0 }).select("id,team_id,inviter_user_id,expires_at,max_uses,used_count,created_at").single();
   return result.error ? { error: result.error } : { data: { ...result.data, token } };
 }
