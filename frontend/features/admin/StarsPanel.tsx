@@ -19,6 +19,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StarAward | null>(null);
+  const [query, setQuery] = useState("");
 
   const members = users.filter((user) => user.role === "member" && user.id !== actorId);
   const totals = useMemo(() => {
@@ -28,6 +29,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   }, [awards]);
   const totalStars = awards.reduce((sum, award) => sum + award.stars, 0);
   const awardedMembers = members.filter((user) => (totals.get(user.id) || 0) > 0).length;
+  const visibleMembers = members.filter((user) => user.name.toLocaleLowerCase("ru").includes(query.trim().toLocaleLowerCase("ru")));
 
   function openAward(user: User) {
     setSelectedUser(user);
@@ -40,7 +42,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   }
 
   async function awardStars() {
-    if (!selectedUser) return;
+    if (!selectedUser || busy) return;
     setBusy(true);
     try {
       const award = await createAdminStarAward({ userId: selectedUser.id, stars, comment: comment.trim() });
@@ -55,7 +57,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   }
 
   async function revokeAward() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || busy) return;
     setBusy(true);
     try {
       await deleteAdminStarAward(deleteTarget.id);
@@ -77,7 +79,6 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
           <h2>Награждение звёздами</h2>
           <p>Выдавай участникам от одной до пяти звёзд за прогресс, инициативу или отличный результат.</p>
         </div>
-        <div className="stars-total-badge">★ <strong>{totalStars}</strong><span>выдано</span></div>
       </div>
 
       <div className="stars-summary-grid">
@@ -88,14 +89,15 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
 
       <div className="admin-panel stars-member-list">
         <div className="stars-member-heading"><div><p className="eyebrow">Команда</p><h3>Выбери участника</h3></div><span>Награда появится в его профиле</span></div>
-        {members.length === 0 ? (
-          <div className="empty-admin"><span>★</span><p>В команде пока нет участников.</p></div>
+        <label className="stars-search">Найти участника<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Имя участника" /></label>
+        {visibleMembers.length === 0 ? (
+          <div className="empty-admin"><span>★</span><p>{members.length ? "Участники не найдены." : "Нет участников, которых вы можете наградить."}</p></div>
         ) : (
-          members.map((user) => (
+          visibleMembers.map((user) => (
             <div className="stars-member-row" key={user.id}>
               <div className="rank-avatar">{user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</div>
               <div className="stars-member-copy"><strong>{user.name}</strong><span>{totals.get(user.id) || 0} звёзд</span></div>
-              <div className="stars-display" aria-label={(totals.get(user.id) || 0) + " звёзд"}>{"★".repeat(Math.min(totals.get(user.id) || 0, 10)) || "—"}</div>
+              <div className="stars-display" aria-label={(totals.get(user.id) || 0) + " звёзд"}>★ {totals.get(user.id) || 0}</div>
               <button className="button button-primary" onClick={() => openAward(user)}>+ Выдать</button>
             </div>
           ))

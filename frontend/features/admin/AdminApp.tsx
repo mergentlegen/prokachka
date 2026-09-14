@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
 import type { FormEvent, TouchEvent as ReactTouchEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
@@ -13,6 +13,8 @@ import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
+import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
+import { isMenuSwipe } from "@/frontend/shared/lib/menu-swipe";
 import type { AuthUser, Store, Submission, SubmissionStatus, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/frontend/shared/api/admin-client";
 
@@ -58,7 +60,10 @@ export function AdminApp() {
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const touchStartX = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [section]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,15 +123,17 @@ export function AdminApp() {
 
   function handleTouchStart(event: ReactTouchEvent<HTMLElement>) {
     const touch = event.touches[0];
-    touchStartX.current = touch && touch.clientX <= 28 ? touch.clientX : null;
+    const interactive = event.target instanceof Element && event.target.closest("input, textarea, select, button, a, [role='slider'], [contenteditable='true'], .modal-backdrop");
+    touchStart.current = !mobileMenuOpen && !interactive && event.touches.length === 1 && touch.clientX <= 28 && window.matchMedia("(max-width: 850px)").matches
+      ? { x: touch.clientX, y: touch.clientY, time: event.timeStamp } : null;
   }
 
   function handleTouchEnd(event: ReactTouchEvent<HTMLElement>) {
-    if (touchStartX.current === null) return;
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || event.touches.length) return;
     const touch = event.changedTouches[0];
-    const delta = touch ? touch.clientX - touchStartX.current : 0;
-    touchStartX.current = null;
-    if (delta >= 56) setMobileMenuOpen(true);
+    if (touch && isMenuSwipe(start, { x: touch.clientX, y: touch.clientY, time: event.timeStamp })) setMobileMenuOpen(true);
   }
 
   async function logout() {
@@ -352,8 +359,8 @@ export function AdminApp() {
   ];
   const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
-  return <main className="admin-shell" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+  return <main className="admin-shell" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStart.current = null; }}>
+    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
         {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
@@ -368,16 +375,15 @@ export function AdminApp() {
         {section === "network" && <NetworkPanel authUser={authUser} onError={setToast} />}
       </section>
     </div>
-    <div className={`admin-mobile-backdrop ${mobileMenuOpen ? "is-open" : ""}`} aria-hidden={!mobileMenuOpen} onMouseDown={() => setMobileMenuOpen(false)} />
-    <aside className={`admin-mobile-drawer ${mobileMenuOpen ? "is-open" : ""}`} aria-label="Навигация панели наставника" aria-hidden={!mobileMenuOpen}>
-      <div className="admin-mobile-drawer-header"><div><p className="eyebrow">Управление</p><strong>Панель наставника</strong></div><button type="button" className="admin-mobile-drawer-close" aria-label="Закрыть меню" onClick={() => setMobileMenuOpen(false)}>×</button></div>
+    <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
       <nav className="admin-mobile-drawer-nav">
         <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
         {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && pending.length > 0 && <b>{pending.length}</b>}</button>)}
         {authUser.role === "admin" && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>}
       </nav>
-    </aside>
-    {toast && <div className="toast">{toast}</div>}
+      <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
+    </MobileDrawer>
+    {toast && <div className="toast" role="status">{toast}</div>}
     {modal?.type === "task" && <TaskEditorModal draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}

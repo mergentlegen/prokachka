@@ -1,0 +1,26 @@
+.tree { min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.toolbar button { min-height: 44px; border: 0; background: transparent; color: var(--blue); font-size: 12px; font-weight: 700; }
+.list { margin: 0; padding: 0; list-style: none; }
+.row { min-width: 0; padding: 16px 18px 16px calc(12px + var(--tree-indent)); border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.person { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.person > :global(.rank-avatar) { flex: 0 0 32px; width: 32px; height: 32px; margin-top: 6px; }
+.toggle, .leaf { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 9px; background: #f4f7fd; color: var(--blue); font-size: 24px; }
+.leaf { background: transparent; color: #abb5c6; font-size: 18px; }
+.copy { flex: 1; min-width: 0; padding-top: 4px; }
+.copy strong { display: block; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.copy em { display: inline-block; margin-left: 8px; color: var(--blue); font-size: 11px; font-style: normal; }
+.copy small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.meta span { padding: 3px 7px; border-radius: 5px; background: #f2f5fa; color: #65758f; font-size: 11px; }
+.settings { margin-top: 10px; margin-left: 52px; }
+.settings summary { width: fit-content; min-height: 44px; padding: 12px 0; color: var(--blue); font-size: 12px; font-weight: 700; cursor: pointer; }
+.settings > div { display: grid; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfe; }
+@media (max-width: 560px) {
+  .row { padding: 14px 12px 14px calc(4px + var(--tree-indent)); }
+  .person { gap: 6px; }
+  .person > :global(.rank-avatar) { display: none; }
+  .settings { margin-left: 8px; }
+  .toolbar { padding: 10px 12px; }
+}
