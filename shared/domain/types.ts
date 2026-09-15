@@ -35,7 +35,7 @@ export type StarAward = {
   id: string; userId: string; teamId: string; mentorId?: string; stars: number; comment: string; createdAt: string;
 };
 export type Submission = {
-  id: string; userId: string; taskId: string; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
+  id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
   mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };

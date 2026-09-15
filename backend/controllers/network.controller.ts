@@ -3,6 +3,7 @@ import { getRequestUser } from "@/backend/http/auth-guard";
 import { isUuid } from "@/backend/http/security";
 import { findAccountById } from "@/backend/services/auth.service";
 import { createTeamInvitation, getNetworkForViewer, updateNetworkUser } from "@/backend/services/network.service";
+import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 
 async function currentUser(request: Request) {
   const sessionUser = getRequestUser(request);
@@ -51,6 +52,7 @@ export async function patchNetworkUser(request: Request, id: string) {
     if ("forbidden" in result) return failure("Пользователь не входит в вашу команду.", 403);
     if ("validationError" in result) return failure(result.validationError || "Некорректные данные.", 400);
     if ("error" in result) return failure("Не удалось сохранить структуру сети.");
+    scheduleTelegramDelivery();
     return ok({ user: result.data });
   } catch {
     return failure("Некорректные данные.", 400);

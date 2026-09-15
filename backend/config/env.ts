@@ -8,6 +8,7 @@ export const serverEnv = {
   telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME,
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+  telegramDeliverySecret: process.env.TELEGRAM_DELIVERY_SECRET,
   appUrl: process.env.NEXT_PUBLIC_APP_URL,
   authDevMode: process.env.AUTH_DEV_MODE === "true",
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,

@@ -128,7 +128,7 @@ export function MemberApp() {
   }, { enabled: Boolean(user), intervalMs: 15000 });
 
   const ranking = ratingType === "stars" ? starRanking : teamRanking;
-  const currentRank = user ? ranking.findIndex((member) => member.id === user.id) + 1 : 0;
+  const currentRank = user ? teamRanking.findIndex((member) => member.id === user.id) + 1 : 0;
   const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -171,17 +171,13 @@ export function MemberApp() {
       setToast("Срок отправки этого задания уже истёк.");
       return;
     }
-    setToast("Отправляем работу...");
+    setToast("Открываем Telegram...");
     try {
-      const submission = await createMemberSubmission(user.id, taskId);
-      setStore((current) => ({
-        ...current,
-        submissions: [submission, ...current.submissions.filter((item) => !(item.userId === user.id && item.taskId === taskId && item.status !== "accepted"))],
-      }));
-      window.location.assign(`/api/telegram/start?taskId=${encodeURIComponent(taskId)}`);
+      const url = await createMemberSubmission(taskId);
+      window.location.assign(url);
       setToast("Отправьте боту текст, фото или видео.");
-    } catch {
-      setToast("Не удалось отправить работу. Попробуйте ещё раз.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Не удалось отправить работу. Попробуйте ещё раз.");
     }
   }
 
@@ -278,8 +274,8 @@ function ProfileModal({ user, store, rank, points, stars, telegramBusy, onLinkTe
   const submissions = store.submissions.filter((submission) => submission.userId === user.id);
   const submittedTaskIds = new Set(submissions.map((submission) => submission.taskId));
   const history: HistoryItem[] = [
-    ...submissions.map((submission) => ({ id: submission.id, title: store.tasks.find((task) => task.id === submission.taskId)?.title || "Задание", date: submission.submittedAt, status: submission.status as MemberStatus, points: submission.points, comment: submission.comment })),
+    ...submissions.map((submission) => ({ id: submission.id, title: submission.taskTitle || store.tasks.find((task) => task.id === submission.taskId)?.title || "Задание", date: submission.submittedAt, status: submission.status as MemberStatus, points: submission.points, comment: submission.comment })),
     ...store.tasks.filter((task) => isExpired(task) && !submittedTaskIds.has(task.id)).map((task) => ({ id: `missed-${task.id}`, title: task.title, date: task.dueAt || task.deadlineAt || task.createdAt, status: "missed" as const, points: 0, comment: task.isActive && task.publicationType === "sequential" ? "Можно отправить с опозданием." : "Срок сдачи истёк, отправить работу больше нельзя." })),
   ].sort((a, b) => b.date.localeCompare(a.date));
-  return <ModalSheet title="Мой профиль" onClose={onClose}><div className="profile-content"><div className="profile-header"><div className="profile-avatar">{initials(user.name)}</div><div><h2>{user.name}</h2><span>Участник команды</span></div></div><div className="profile-stats"><div><strong>{points}</strong><span>баллов</span></div><div><strong>{rank || "—"}</strong><span>место</span></div><div><strong>{submissions.filter((item) => item.status === "accepted").length}</strong><span>выполнено</span></div><div><strong>{stars}</strong><span>звёзд</span></div></div><TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={onLinkTelegram} onRefresh={onRefreshTelegram} />{user.teamId && <div className="profile-invite-card"><div><strong>Твоя ссылка в команду</strong><small>Бессрочная ссылка. Вступление подтверждает наставник.</small></div>{inviteUrl ? <div className="profile-invite-controls"><input aria-label="Твоя ссылка приглашения" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /><button type="button" className="button button-edit" onClick={() => { void onCopyInvite(inviteUrl); }}>Копировать</button></div> : <button type="button" className="button button-primary" disabled={inviteBusy} onClick={onCreateInvite}>{inviteBusy ? "Создаём..." : "Получить ссылку"}</button>}</div>}<div className="profile-account-actions"><button type="button" className="button button-danger" onClick={onLogout}>Выйти из аккаунта</button></div><details className="profile-history"><summary>История заданий <span>{history.length}</span></summary><div className="history-list">{history.length === 0 ? <EmptyState text="Ты ещё ничего не отправлял." /> : history.map((item) => <div className="history-row" key={item.id}><div><strong>{item.title}</strong><span>{formatDate(item.date)}</span>{item.comment && <small>{item.comment}</small>}</div><div className={`history-status status-${item.status}`}>{statusLabel(item.status)}{item.status === "accepted" && ` +${item.points}`}</div></div>)}</div></details></div></ModalSheet>;
+  return <ModalSheet title="Мой профиль" onClose={onClose}><div className="profile-content"><div className="profile-header"><div className="profile-avatar">{initials(user.name)}</div><div><h2>{user.name}</h2><span>Участник команды</span></div></div><div className="profile-stats"><div><strong>{points}</strong><span>баллов</span></div><div><strong>{rank || "—"}</strong><span>место</span></div><div><strong>{new Set(submissions.filter((item) => item.status === "accepted").map((item) => item.taskId)).size}</strong><span>выполнено</span></div><div><strong>{stars}</strong><span>звёзд</span></div></div><TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={onLinkTelegram} onRefresh={onRefreshTelegram} />{user.teamId && <div className="profile-invite-card"><div><strong>Твоя ссылка в команду</strong><small>Бессрочная ссылка. Вступление подтверждает наставник.</small></div>{inviteUrl ? <div className="profile-invite-controls"><input aria-label="Твоя ссылка приглашения" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /><button type="button" className="button button-edit" onClick={() => { void onCopyInvite(inviteUrl); }}>Копировать</button></div> : <button type="button" className="button button-primary" disabled={inviteBusy} onClick={onCreateInvite}>{inviteBusy ? "Создаём..." : "Получить ссылку"}</button>}</div>}<div className="profile-account-actions"><button type="button" className="button button-danger" onClick={onLogout}>Выйти из аккаунта</button></div><details className="profile-history"><summary>История заданий <span>{history.length}</span></summary><div className="history-list">{history.length === 0 ? <EmptyState text="Ты ещё ничего не отправлял." /> : history.map((item) => <div className="history-row" key={item.id}><div><strong>{item.title}</strong><span>{formatDate(item.date)}</span>{item.comment && <small>{item.comment}</small>}</div><div className={`history-status status-${item.status}`}>{statusLabel(item.status)}{item.status === "accepted" && ` +${item.points}`}</div></div>)}</div></details></div></ModalSheet>;
 }

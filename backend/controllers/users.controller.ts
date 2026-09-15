@@ -4,6 +4,7 @@ import { isUuid } from "@/backend/http/security";
 import { deleteUser, findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
 import { findAccountById } from "@/backend/services/auth.service";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
+import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 
 export async function listUsers(request: Request) {
   const sessionUser = getRequestUser(request);
@@ -50,6 +51,7 @@ export async function updateUserAccessController(request: Request, id: string) {
     const result = await updateUserAccess(id, { role: body.role, teamId: body.teamId });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure("Не удалось обновить доступ пользователя.");
+    scheduleTelegramDelivery();
     return ok({ user: result.data });
   } catch { return failure("Некорректные данные.", 400); }
 }

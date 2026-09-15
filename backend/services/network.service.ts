@@ -20,8 +20,14 @@ const networkSelect = "id,name,login,role,team_id,parent_user_id,can_review,can_
 export async function findTeamNetwork(teamId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await supabase.from("users").select(networkSelect).eq("team_id", teamId).order("created_at", { ascending: true });
-  return result.error ? { error: result.error } : { data: (result.data || []) as NetworkUserRow[] };
+  const rows: NetworkUserRow[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const result = await supabase.from("users").select(networkSelect).eq("team_id", teamId)
+      .order("id", { ascending: true }).range(offset, offset + 499);
+    if (result.error) return { error: result.error };
+    rows.push(...(result.data || []) as NetworkUserRow[]);
+    if ((result.data || []).length < 500) return { data: rows };
+  }
 }
 
 function invitationHash(token: string) {
@@ -133,12 +139,14 @@ export function descendants(rows: NetworkUserRow[], rootId: string, includeRoot 
     children.set(String(row.parent_user_id), list);
   }
   const result = new Set<string>();
+  const visited = new Set<string>([rootId]);
   const queue = [rootId];
   if (includeRoot) result.add(rootId);
-  while (queue.length) {
-    const current = queue.shift() as string;
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
     for (const child of children.get(current) || []) {
-      if (result.has(child)) continue;
+      if (visited.has(child)) continue;
+      visited.add(child);
       result.add(child);
       queue.push(child);
     }

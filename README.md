@@ -112,6 +112,8 @@ npm start        # запуск production-сервера
 
 ## Production
 
+Обновление безопасности Telegram, миграция и обязательный таймер повторной доставки: [инструкция](docs/telegram-backend-deploy.md).
+
 Перед публикацией:
 
 1. Установите `AUTH_DEV_MODE=false`.

@@ -178,7 +178,7 @@ export function AdminApp() {
   function openReviewModal(submission: Submission, status: "accepted" | "revision") {
     const task = store.tasks.find((item) => item.id === submission.taskId);
     setReviewDraft({
-      points: String(submission.points || (status === "accepted" ? task?.maxPoints || 0 : 0)),
+      points: String(submission.points || (status === "accepted" ? (task?.maxPoints ?? submission.taskMaxPoints ?? 0) : 0)),
       comment: submission.comment || "",
     });
     setModal({ type: "review", submission, status });
@@ -208,7 +208,7 @@ export function AdminApp() {
   async function submitReview() {
     if (!modal || modal.type !== "review") return;
     const task = store.tasks.find((item) => item.id === modal.submission.taskId);
-    const maxPoints = task?.maxPoints ?? 0;
+    const maxPoints = task?.maxPoints ?? modal.submission.taskMaxPoints ?? 0;
     const parsedPoints = Number(reviewDraft.points);
     const points = Math.min(Math.max(Number.isFinite(parsedPoints) ? parsedPoints : 0, 0), maxPoints);
     setModalBusy(true);
@@ -217,13 +217,14 @@ export function AdminApp() {
         status: modal.status,
         points,
         comment: reviewDraft.comment.trim(),
+        expectedVersion: modal.submission.reviewVersion ?? 0,
       });
       setStore((current) => ({ ...current, submissions: current.submissions.map((item) => item.id === updated.id ? updated : item) }));
       try { setProgramHistory(await loadAdminProgramHistory()); setPublicationHistory(await loadAdminPublicationHistory()); } catch { /* polling обновит историю позже */ }
       setModal(null);
       setToast(modal.status === "accepted" ? "Работа принята, рейтинг обновлён." : "Работа возвращена на доработку.");
-    } catch {
-      setToast("Произошла ошибка при проверке.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Произошла ошибка при проверке.");
     } finally {
       setModalBusy(false);
     }
@@ -374,7 +375,7 @@ export function AdminApp() {
     </MobileDrawer>
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     {modal?.type === "task" && <TaskEditorModal draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
-    {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
+    {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}
   </main>;
 }
@@ -440,7 +441,7 @@ function TasksView({ store, actorId, canManageAll, onToggle, onEdit, onRemove }:
 }
 function ReviewView({ store, submissions, onReview }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) {
   return <div className="submission-review-list">{submissions.length === 0 ? <div className="admin-panel"><EmptyAdmin text="Нет работ, ожидающих проверки." /></div> : submissions.map((submission) =>
-    <SubmissionCard key={submission.id} submission={submission} name={store.users.find((user) => user.id === submission.userId)?.name || "Неизвестный участник"} taskTitle={store.tasks.find((task) => task.id === submission.taskId)?.title || "Удалённое задание"} onReview={onReview} />
+    <SubmissionCard key={submission.id} submission={submission} name={store.users.find((user) => user.id === submission.userId)?.name || "Неизвестный участник"} taskTitle={submission.taskTitle || store.tasks.find((task) => task.id === submission.taskId)?.title || "Удалённое задание"} onReview={onReview} />
   )}</div>;
 }
 function RequestsView({ requests, onReview }: { requests: TeamJoinRequest[]; onReview: (teamRequest: TeamJoinRequest, status: "approved" | "rejected") => void }) {
@@ -519,7 +520,7 @@ function HistoryView({ store, programs, publications, onReview }: { store: Store
 function SubmissionRow({ submission, store }: { submission: Submission; store: Store }) {
   const user = store.users.find((item) => item.id === submission.userId);
   const task = store.tasks.find((item) => item.id === submission.taskId);
-  return <SubmissionSummary submission={submission} name={user?.name || "Неизвестный участник"} taskTitle={task?.title || "Удалённое задание"} />;
+  return <SubmissionSummary submission={submission} name={user?.name || "Неизвестный участник"} taskTitle={submission.taskTitle || task?.title || "Удалённое задание"} />;
 }
 function EmptyAdmin({ text }: { text: string }) { return <div className="empty-admin"><span>✓</span><p>{text}</p></div>; }
 

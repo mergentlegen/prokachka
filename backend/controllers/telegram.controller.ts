@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { failure, ok } from "@/backend/http/api-response";
 import { getRequestUser } from "@/backend/http/auth-guard";
 import { isValidTelegramSecret, serverEnv } from "@/backend/config/env";
-import { isUuid } from "@/backend/http/security";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import { attachTelegramSubmission } from "@/backend/services/submissions.service";
+import { attachTelegramSubmission, beginTelegramSubmission } from "@/backend/services/telegram-submission.service";
 import { createTelegramLinkToken, linkTelegramAccount } from "@/backend/services/telegram-link.service";
-import { notifyMentorsAboutSubmission, sendTelegramMessage } from "@/backend/services/telegram-notifications.service";
+import { scheduleTelegramDelivery, sendTelegramMessage } from "@/backend/services/telegram-notifications.service";
 
 function botUsername() {
   return serverEnv.telegramBotUsername?.replace(/^@/, "");
@@ -37,93 +36,73 @@ export async function telegramLinkStatus(request: Request) {
   return ok({ linked: Boolean(result.data.telegram_id), telegramId: result.data.telegram_id ? String(result.data.telegram_id) : undefined });
 }
 
+/** Old task-only deep links cannot prove which website account selected the task. */
 export function startTelegram(request: Request) {
-  const taskId = new URL(request.url).searchParams.get("taskId");
-  if (!taskId || !isUuid(taskId) || !botUsername()) return failure("Telegram-бот пока не настроен. Добавьте TELEGRAM_BOT_USERNAME в .env.local.", 503);
-  return NextResponse.redirect("https://t.me/" + botUsername() + "?start=task_" + encodeURIComponent(taskId));
+  if (!getRequestUser(request)) return failure("Сначала войдите в аккаунт.", 401);
+  return failure("Обновите страницу сайта и нажмите «Отправить работу» ещё раз.", 410);
 }
 
 export async function receiveTelegramUpdate(request: Request) {
   if (!isValidTelegramSecret(request.headers.get("x-telegram-bot-api-secret-token"))) return failure("Доступ запрещён", 401);
+  let update;
+  try { update = await request.json(); } catch { return failure("Некорректное обновление Telegram", 400); }
+  const message = update?.message;
+  if (!message || message.chat?.type !== "private" || message.from?.is_bot) return NextResponse.json({ ok: true });
+  const validId = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+  if (!validId(message.from?.id) || !validId(message.chat?.id) || message.from.id !== message.chat.id
+    || !validId(message.message_id) || !Number.isSafeInteger(update.update_id) || update.update_id < 0) return failure("Некорректное обновление Telegram", 400);
+  const telegramId = String(message.from.id);
+  const messageId = message.message_id as number;
+  const text = typeof message.text === "string" ? message.text : "";
+  const payload = text.match(/^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{1,64})\s*$/)?.[1];
   try {
-    const update = await request.json();
-    const message = update?.message;
-    const chatType = message?.chat?.type;
-    const media = message?.photo?.at(-1) || message?.video || message?.document;
-    const startText = typeof message?.text === "string" ? message.text : "";
-    const linkToken = startText.match(/^\/start(?:@[^\s]+)?\s+link_([A-Za-z0-9_-]+)/)?.[1];
-    const startTaskId = startText.match(/^\/start(?:@[^\s]+)?\s+task_([a-zA-Z0-9_-]+)/)?.[1];
-    const captionTaskId = typeof message?.caption === "string" ? message.caption.match(/task_([a-zA-Z0-9_-]+)/)?.[1] : undefined;
-    const telegramUserId = message?.from?.id;
-    const telegramChatId = message?.chat?.id;
-    const updateId = typeof update?.update_id === "number" && Number.isSafeInteger(update.update_id) ? update.update_id : undefined;
-    const supabase = getSupabaseAdmin();
-
-    if (linkToken && telegramUserId && telegramChatId && chatType === "private") {
-      const result = await linkTelegramAccount(linkToken, String(telegramUserId));
-      const linkMessage = "error" in result ? (typeof result.error === "string" ? result.error : "Не удалось привязать Telegram. Создайте новую ссылку на сайте.") : "Готово! Telegram привязан к вашему аккаунту. Теперь можно отправлять работы с сайта.";
-      await sendTelegramMessage(String(telegramChatId), linkMessage);
+    if (text.startsWith("/")) {
+      if (payload?.startsWith("link_")) {
+        // Account switches, including failed ones, must not reuse an earlier selected task.
+        const cleared = await beginTelegramSubmission("", telegramId, messageId);
+        if ("error" in cleared || "unavailable" in cleared) return failure("Временно недоступно.", 503);
+        const linked = await linkTelegramAccount(payload.slice(5), telegramId);
+        if ("unavailable" in linked || ("error" in linked && typeof linked.error !== "string")) return failure("Не удалось проверить привязку.", 503);
+        await sendTelegramMessage(telegramId, "error" in linked ? String(linked.error) : "Telegram привязан к вашему аккаунту. Выберите задание на сайте, чтобы отправить ответ.");
+        scheduleTelegramDelivery();
+      } else {
+        const selected = await beginTelegramSubmission(payload?.startsWith("submit_") ? payload.slice(7) : "", telegramId, messageId);
+        if ("unavailable" in selected || "error" in selected) return failure("Не удалось выбрать задание.", 503);
+        if (!selected.duplicate) await sendTelegramMessage(telegramId, selected.ready
+          ? "Задание выбрано. Отправьте ответ одним сообщением: текст, фото, видео или файл. Пояснение к файлу добавьте в подпись."
+          : payload ? selected.validationError || "Откройте задание на сайте ещё раз."
+          : "Выберите задание в своём аккаунте на сайте и нажмите «Отправить работу». После этого отправьте сюда ответ.");
+      }
       return NextResponse.json({ ok: true });
     }
-
-    if (supabase && startTaskId && isUuid(startTaskId) && telegramUserId && telegramChatId && chatType === "private") {
-      await supabase.from("telegram_contexts").upsert({ telegram_id: String(telegramUserId), task_id: startTaskId, expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() }, { onConflict: "telegram_id" });
-      await sendTelegramMessage(String(telegramChatId), "Задание выбрано. Теперь отправьте сюда текст, фото или видео своей работы.");
+    if (message.media_group_id) {
+      await sendTelegramMessage(telegramId, "Альбом пока не поддерживается. Отправьте одно фото, видео или файл с пояснением в подписи.");
+      return NextResponse.json({ ok: true });
     }
-
-    const isCommand = Boolean(linkToken || startTaskId);
-    const answerText = media
-      ? (typeof message?.caption === "string" ? message.caption : "")
-      : (!isCommand && typeof message?.text === "string" ? message.text : "");
-    const answerType = media
-      ? message?.photo ? "photo" : message?.video ? "video" : "document"
-      : answerText.trim() ? "text" : undefined;
-    const fileId = message?.photo?.at(-1)?.file_id || message?.video?.file_id || message?.document?.file_id;
-
-    if (supabase && answerType && telegramUserId && telegramChatId && chatType === "private") {
-      const { data: context } = await supabase.from("telegram_contexts").select("task_id,expires_at").eq("telegram_id", String(telegramUserId)).maybeSingle();
-      const contextExpired = context?.expires_at && new Date(String(context.expires_at)).getTime() <= Date.now();
-      if (contextExpired) await supabase.from("telegram_contexts").delete().eq("telegram_id", String(telegramUserId));
-      const taskId = contextExpired ? undefined : context?.task_id || captionTaskId;
-      if (taskId && isUuid(taskId)) {
-        const result = await attachTelegramSubmission({
-          telegramId: String(telegramUserId),
-          chatId: String(telegramChatId),
-          messageId: String(message?.message_id),
-          taskId,
-          updateId,
-          mediaType: answerType,
-          answerText,
-          telegramFileId: fileId ? String(fileId) : undefined,
-        });
-        if ("error" in result) {
-          console.error("Telegram submission persistence failed", result.error);
-          await sendTelegramMessage(String(telegramChatId), "Не удалось принять работу. Проверьте, что Telegram привязан и срок задания не истёк.");
-        } else if ("validationError" in result) {
-          await sendTelegramMessage(String(telegramChatId), result.validationError || "Не удалось принять работу.");
-        } else if (!result.duplicate) {
-          await supabase.from("telegram_contexts").delete().eq("telegram_id", String(telegramUserId));
-          const notification = await notifyMentorsAboutSubmission(String(result.data.id));
-          if ("error" in notification) {
-            console.error("Telegram mentor notification failed", notification.error);
-            await sendTelegramMessage(String(telegramChatId), "Работа сохранена, но уведомление наставнику не доставлено. Наставник всё равно увидит её в панели.");
-          } else if ("unavailable" in notification) {
-            await sendTelegramMessage(String(telegramChatId), "Работа сохранена, но база данных временно недоступна для уведомления наставника.");
-          } else if (notification.delivered > 0) {
-            await sendTelegramMessage(String(telegramChatId), "Работа получена и отправлена наставнику на проверку.");
-          } else {
-            await sendTelegramMessage(String(telegramChatId), "Работа сохранена. У наставника пока не привязан Telegram, поэтому уведомление не отправлено. Работа доступна в панели наставника.");
-          }
-        }
-      } else {
-        await sendTelegramMessage(String(telegramChatId), "Сначала выберите задание на сайте, затем отправьте ответ сюда.");
-      }
+    const photo = Array.isArray(message.photo) ? message.photo.at(-1) : undefined;
+    const media = photo || message.video || message.document;
+    const mediaType = media ? photo ? "photo" : message.video ? "video" : "document" : "text";
+    const answerText = media ? (typeof message.caption === "string" ? message.caption : "") : text;
+    if (!media && !answerText.trim()) {
+      await sendTelegramMessage(telegramId, "Отправьте текст, фото, видео или документ.");
+      return NextResponse.json({ ok: true });
     }
-
-    console.info("Telegram submission received", { telegramUserId, telegramChatId, telegramMessageId: message?.message_id, taskId: startTaskId || captionTaskId, mediaType: answerType || "unknown" });
+    const result = await attachTelegramSubmission({
+      telegramId, chatId: telegramId, messageId, updateId: update.update_id,
+      mediaType, answerText, telegramFileId: typeof media?.file_id === "string" ? media.file_id : undefined,
+    });
+    if ("unavailable" in result || "error" in result) return failure("Не удалось сохранить ответ. Telegram повторит доставку.", 503);
+    if (result.validationError) {
+      await sendTelegramMessage(telegramId, result.validationError);
+    } else if (result.data) {
+      scheduleTelegramDelivery();
+      if (!result.duplicate) await sendTelegramMessage(telegramId, "Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.");
+    } else {
+      return failure("Не удалось подтвердить сохранение ответа.", 503);
+    }
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Telegram update processing failed", error);
-    return failure("Некорректное обновление Telegram", 400);
+  } catch {
+    console.error("Telegram update processing failed", { updateId: update.update_id });
+    return failure("Обработка временно недоступна.", 503);
   }
 }

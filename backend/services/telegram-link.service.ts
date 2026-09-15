@@ -25,16 +25,10 @@ export async function linkTelegramAccount(token: string, telegramId: string) {
   if (!supabase) return { unavailable: true as const };
   if (!/^[A-Za-z0-9_-]{20,80}$/.test(token) || !/^\d{1,30}$/.test(telegramId)) return { error: "Ссылка привязки недействительна." };
 
-  const link = await supabase.from("telegram_link_tokens").select("token,user_id,expires_at,used_at").eq("token", token).maybeSingle();
-  if (link.error || !link.data || link.data.used_at || new Date(String(link.data.expires_at)).getTime() <= Date.now()) return { error: "Ссылка привязки устарела. Создайте новую на сайте." };
-
-  const existing = await supabase.from("users").select("id").eq("telegram_id", telegramId).maybeSingle();
-  if (existing.error) return { error: existing.error };
-  if (existing.data && String(existing.data.id) !== String(link.data.user_id)) return { error: "Этот Telegram уже привязан к другому аккаунту." };
-
-  const updated = await supabase.from("users").update({ telegram_id: telegramId }).eq("id", link.data.user_id).select("id").single();
-  if (updated.error) return { error: updated.error.code === "23505" ? "Этот Telegram уже привязан к другому аккаунту." : updated.error };
-
-  await supabase.from("telegram_link_tokens").update({ used_at: new Date().toISOString() }).eq("token", token).is("used_at", null);
-  return { userId: String(link.data.user_id) };
+  const result = await supabase.rpc("tg_link_account", { p_token: token, p_telegram_id: telegramId });
+  if (result.error) return { error: result.error.code === "23505" ? "Этот Telegram уже привязан к другому аккаунту." : result.error };
+  const data = result.data as { validationError?: string; userId?: string };
+  if (data.validationError) return { error: data.validationError };
+  if (!data.userId) return { error: "Не удалось подтвердить привязку Telegram." };
+  return { userId: data.userId };
 }

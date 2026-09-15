@@ -33,7 +33,7 @@ export async function updateAdminTask(id: string, input: AdminTaskPatch): Promis
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapTask(response.task);
 }
 export async function deleteAdminTask(id: string) { await request<ApiResponse<Record<string, never>>>("/api/tasks/" + id, { method: "DELETE" }); }
-export async function reviewAdminSubmission(id: string, input: { status: "accepted" | "revision"; points: number; comment: string }): Promise<Submission> {
+export async function reviewAdminSubmission(id: string, input: { status: "accepted" | "revision"; points: number; comment: string; expectedVersion: number }): Promise<Submission> {
   const response = await request<ApiResponse<{ submission: ApiRow }>>("/api/submissions/" + id + "/review", { method: "PATCH", body: JSON.stringify(input) }); return mapSubmission(response.submission);
 }
 type AdminAnnouncementInput = Omit<Pick<Announcement, "title" | "content" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { serverEnv } from "@/backend/config/env";
 
@@ -14,7 +15,8 @@ function appUrl() {
 }
 
 function errorText(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return serverEnv.telegramBotToken ? message.replaceAll(serverEnv.telegramBotToken, "[redacted]") : message;
 }
 
 /** Sends a Telegram message and exposes delivery errors to the server log. */
@@ -79,72 +81,117 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
   }
 }
 
-/** Notifies every linked mentor of the participant's new submission. */
-export async function notifyMentorsAboutSubmission(submissionId: string) {
+type NotificationJob = {
+  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission";
+  payload: { canReview?: boolean; canPublishTasks?: boolean }; summary_sent: boolean; attempts: number; lock_token: string;
+};
+
+export function scheduleTelegramDelivery() {
+  after(async () => {
+    try { await deliverTelegramNotifications(); }
+    catch { console.error("Telegram notification worker failed; queued jobs will be retried"); }
+  });
+}
+
+/** A persisted queue is shared by webhook, role changes and the periodic delivery endpoint. */
+export async function deliverTelegramNotifications() {
   const supabase = getSupabaseAdmin();
-  if (!supabase) return { unavailable: true as const };
-
-  const submissionResult = await supabase
-    .from("submissions")
-    .select("id,user_id,task_id,submitted_at,telegram_chat_id,telegram_message_id,media_type,answer_text")
-    .eq("id", submissionId)
-    .single();
-  if (submissionResult.error || !submissionResult.data) {
-    return { error: submissionResult.error || new Error("Submission not found") };
+  if (!supabase || !serverEnv.telegramBotToken) return { unavailable: true as const };
+  let delivered = 0;
+  let failed = 0;
+  const started = Date.now();
+  for (let count = 0; count < 10 && Date.now() - started < 20_000; count++) {
+    const claimed = await supabase.rpc("tg_claim_notification");
+    if (claimed.error) throw new Error("Cannot claim Telegram notification");
+    const job = claimed.data?.[0] as NotificationJob | undefined;
+    if (!job) break;
+    const save = async (patch: Record<string, unknown>) => {
+      const result = await supabase.from("telegram_notification_jobs").update(patch).eq("id", job.id).eq("lock_token", job.lock_token);
+      if (result.error) throw new Error("Cannot update Telegram notification");
+    };
+    try {
+      const recipient = await supabase.from("users").select("id,role,team_id,telegram_id,can_review,can_publish_tasks").eq("id", job.recipient_id).maybeSingle();
+      if (recipient.error || !recipient.data?.telegram_id) throw new Error("Recipient unavailable");
+      const user = recipient.data;
+      const chatId = String(user.telegram_id);
+      let delivery: DeliveryResult;
+      if (job.kind === "permissions") {
+        const review = job.payload.canReview && (user.role === "admin" || user.can_review);
+        const publish = job.payload.canPublishTasks && (user.role === "admin" || user.can_publish_tasks);
+        if (!user.team_id || (!review && !publish)) {
+          await save({ cancelled_at: new Date().toISOString(), locked_until: null });
+          continue;
+        }
+        delivery = await sendTelegramMessage(chatId, [
+          "Вам выданы новые возможности:",
+          review ? "✓ Проверять работы участников своей ветки на всех уровнях." : "",
+          publish ? "✓ Публиковать задания." : "",
+          review ? "Новые и ожидающие проверки работы вашей ветки будут приходить сюда." : "",
+          appUrl() ? "Панель наставника: " + appUrl() + "/admin" : "",
+        ].filter(Boolean).join("\n"));
+      } else {
+        const allowed = await supabase.rpc("tg_can_review", { p_reviewer: user.id, p_submission: job.submission_id });
+        if (allowed.error) throw new Error("Cannot verify recipient access");
+        const submission = await supabase.from("submissions")
+          .select("id,status,telegram_chat_id,telegram_message_id,telegram_file_id,media_type,answer_text,users(name),tasks(title)")
+          .eq("id", job.submission_id).maybeSingle();
+        if (submission.error) throw new Error("Cannot load submission");
+        if (!allowed.data || !submission.data || submission.data.status !== "pending") {
+          await save({ cancelled_at: new Date().toISOString(), locked_until: null });
+          continue;
+        }
+        const answer = submission.data;
+        const participant = Array.isArray(answer.users) ? answer.users[0] : answer.users;
+        const task = Array.isArray(answer.tasks) ? answer.tasks[0] : answer.tasks;
+        const panelUrl = appUrl() ? appUrl() + "/admin?submission=" + encodeURIComponent(String(job.submission_id)) : "";
+        if (!job.summary_sent) {
+          const summary = await sendTelegramMessage(chatId, [
+            "📥 Работа на проверку", "Участник: " + String(participant?.name || "Участник").slice(0, 200),
+            "Задание: " + String(task?.title || "Задание").slice(0, 200),
+            panelUrl ? "Открыть в панели: " + panelUrl : "",
+          ].filter(Boolean).join("\n"));
+          if (!summary.ok) throw new Error(summary.error);
+          await save({ summary_sent: true });
+        }
+        // Re-check after sending the summary; no answer should follow a revoked permission.
+        const recheck = await supabase.rpc("tg_can_review", { p_reviewer: user.id, p_submission: job.submission_id });
+        if (recheck.error) throw new Error("Cannot verify recipient access");
+        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        delivery = answer.telegram_chat_id && answer.telegram_message_id
+          ? await copyTelegramMessage(chatId, String(answer.telegram_chat_id), String(answer.telegram_message_id))
+          : { ok: false, error: "Original message unavailable" };
+        if (!delivery.ok && answer.media_type === "text" && answer.answer_text) {
+          delivery = { ok: true };
+          const content = String(answer.answer_text);
+          for (let offset = 0; offset < content.length; offset += 3500) {
+            delivery = await sendTelegramMessage(chatId, content.slice(offset, offset + 3500));
+            if (!delivery.ok) break;
+          }
+        }
+        if (!delivery.ok && answer.telegram_file_id && ["photo", "video", "document"].includes(String(answer.media_type))) {
+          const type = String(answer.media_type);
+          const method = type === "photo" ? "sendPhoto" : type === "video" ? "sendVideo" : "sendDocument";
+          const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/${method}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, [type]: answer.telegram_file_id, caption: String(answer.answer_text || "").slice(0, 1024) }),
+            signal: AbortSignal.timeout(8_000),
+          });
+          const payload = await response.json() as TelegramApiResponse;
+          delivery = response.ok && payload.ok ? { ok: true } : { ok: false, error: payload.description || "Media delivery failed" };
+        }
+      }
+      if (!delivery.ok) throw new Error(delivery.error);
+      await save({ delivered_at: new Date().toISOString(), locked_until: null, last_error: null });
+      delivered++;
+    } catch (error) {
+      failed++;
+      await save({
+        locked_until: null,
+        available_at: new Date(Date.now() + Math.min(3600, 30 * 2 ** Math.min(job.attempts, 7)) * 1000).toISOString(),
+        last_error: errorText(error).slice(0, 300),
+      });
+      console.warn("Telegram notification delayed", { jobId: job.id });
+    }
   }
-
-  const [userResult, taskResult] = await Promise.all([
-    supabase.from("users").select("id,name,team_id").eq("id", submissionResult.data.user_id).single(),
-    supabase.from("tasks").select("id,title,team_id").eq("id", submissionResult.data.task_id).single(),
-  ]);
-  if (userResult.error || !userResult.data) return { error: userResult.error || new Error("Participant not found") };
-  if (taskResult.error || !taskResult.data) return { error: taskResult.error || new Error("Task not found") };
-
-  const teamId = userResult.data.team_id ? String(userResult.data.team_id) : "";
-  if (!teamId || String(taskResult.data.team_id || "") !== teamId) {
-    return { error: new Error("Participant and task belong to different teams") };
-  }
-
-  const mentorsResult = await supabase
-    .from("users")
-    .select("id,name,telegram_id")
-    .eq("team_id", teamId)
-    .eq("role", "admin");
-  if (mentorsResult.error) return { error: mentorsResult.error };
-
-  const mentors = (mentorsResult.data || []).filter((mentor) => Boolean(String(mentor.telegram_id || "").trim()));
-  if (mentors.length === 0) {
-    console.warn("No linked mentors found for Telegram submission", { submissionId, teamId });
-    return { delivered: 0, failed: 0, mentors: 0, reason: "no_linked_mentors" as const };
-  }
-
-  const baseUrl = appUrl();
-  const panelUrl = baseUrl ? `${baseUrl}/admin?submission=${encodeURIComponent(submissionId)}` : "";
-  const hasOriginalMessage = Boolean(submissionResult.data.telegram_chat_id && submissionResult.data.telegram_message_id);
-  const text = [
-    "📥 Новая работа на проверку",
-    "",
-    `Участник: ${String(userResult.data.name || "Без имени")}`,
-    `Задание: ${String(taskResult.data.title || "Без названия")}`,
-    `Получено: ${new Date(String(submissionResult.data.submitted_at)).toLocaleString("ru-RU", { timeZone: "Asia/Almaty" })}`,
-    hasOriginalMessage
-      ? "Ответ будет отправлен следующим сообщением без изменений"
-      : `Ответ: ${String(submissionResult.data.answer_text || "").slice(0, 2500)}`,
-    panelUrl ? `\nОткрыть панель: ${panelUrl}` : "",
-  ].filter(Boolean).join("\n");
-
-  const deliveries = await Promise.all(
-    mentors.map(async (mentor) => {
-      const mentorChatId = String(mentor.telegram_id);
-      const summary = await sendTelegramMessage(mentorChatId, text);
-      const copied = hasOriginalMessage
-        ? await copyTelegramMessage(mentorChatId, String(submissionResult.data.telegram_chat_id), String(submissionResult.data.telegram_message_id))
-        : { ok: true as const };
-      return { summary, copied };
-    }),
-  );
-  const delivered = deliveries.filter((result) => result.summary.ok || result.copied.ok).length;
-  const failed = deliveries.length - delivered;
-  console.info("Telegram mentor notification completed", { submissionId, teamId, mentors: mentors.length, delivered, failed });
-  return { delivered, failed, mentors: mentors.length };
+  return { delivered, failed };
 }

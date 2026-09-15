@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "test:mobile": "node --test tests/mobile-interface.test.cjs"
+    "test:mobile": "node --test tests/mobile-interface.test.cjs",
+    "test:backend": "node --test tests/backend-telegram.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
