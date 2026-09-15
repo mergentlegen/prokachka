@@ -5,6 +5,7 @@ import { loadTeamSelection, submitTeamJoinRequest } from "@/frontend/shared/api/
 import { authFetch, clearDevSession } from "@/frontend/shared/api/client";
 import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
 import type { Team, TeamJoinRequest } from "@/shared/domain/types";
+import styles from "./TeamSelectionScreen.module.css";
 
 export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }) {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -12,10 +13,12 @@ export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }
   const [selectedTeam, setSelectedTeam] = useState("");
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
 
-  async function refresh(showLoading = false) {
+  async function refresh(showLoading = false, showError = false) {
     if (showLoading) setLoading(true);
+    if (showLoading || showError) setError("");
     try {
       const data = await loadTeamSelection();
       setTeams(data.teams);
@@ -23,20 +26,20 @@ export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }
       setRequest(nextRequest);
       if (nextRequest?.status === "approved") onCompleted();
     } catch {
-      if (showLoading) setError("Не удалось загрузить список команд.");
+      if (showLoading || showError) setError("Не удалось обновить данные. Проверьте соединение и попробуйте ещё раз.");
     } finally {
       if (showLoading) setLoading(false);
     }
   }
 
   useEffect(() => { void refresh(true); }, []);
-
-  useAutoRefresh(async () => {
-    await refresh(false);
-  }, { enabled: !loading && !request?.status?.includes("approved"), intervalMs: 15000 });
+  useAutoRefresh(async () => { await refresh(false); }, {
+    enabled: !loading && !pending && !checking && request?.status !== "approved", intervalMs: 15000,
+  });
 
   async function sendRequest() {
-    if (!selectedTeam) { setError("Выберите команду."); return; }
+    if (pending || request?.status === "pending") return;
+    if (!teams.some((team) => team.id === selectedTeam)) { setError("Выберите команду."); return; }
     setPending(true);
     setError("");
     try {
@@ -44,13 +47,66 @@ export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }
       setRequest(await submitTeamJoinRequest(selectedTeam, inviteToken));
     } catch {
       setError("Не удалось отправить заявку. Попробуйте ещё раз.");
-    } finally {
-      setPending(false);
-    }
+    } finally { setPending(false); }
   }
 
-  if (loading) return <div className="auth-loading">Загрузка команд...</div>;
-  if (request?.status === "pending") return <main className="team-gate"><div className="team-gate-card"><div className="login-brand"><img className="brand-logo" src="/brand/logo-light.svg" alt="Прокачка" /></div><p className="eyebrow">Заявка отправлена</p><h1>Ждём решения наставника</h1><p>Твоя заявка в команду <strong>{request.teamName || teams.find((team) => team.id === request.teamId)?.name || ""}</strong> уже у наставника.</p><span className="team-gate-status">Заявка проверяется автоматически</span><button className="back-link-button" onClick={() => { setLoading(true); void refresh(true); }}>Проверить сейчас</button></div></main>;
+  async function checkStatus() {
+    if (checking) return;
+    setChecking(true);
+    await refresh(false, true);
+    setChecking(false);
+  }
 
-  return <main className="team-gate"><div className="team-gate-card"><div className="login-brand"><img className="brand-logo" src="/brand/logo-light.svg" alt="Прокачка" /></div><p className="eyebrow">Первый шаг</p><h1>Выбери свою команду</h1><p>Отправь заявку наставнику. После одобрения появятся задания и рейтинг команды.</p>{request?.status === "rejected" && <div className="team-gate-status rejected-gate">Предыдущая заявка не одобрена. Можно выбрать другую команду.</div>}<div className="team-choice-list">{teams.length === 0 ? <div className="team-empty">Пока нет доступных команд. Попроси CEO создать команду.</div> : teams.map((team) => <button type="button" className={"team-choice " + (selectedTeam === team.id ? "selected" : "")} key={team.id} onClick={() => setSelectedTeam(team.id)}><span className="team-choice-icon">◈</span><span><strong>{team.name}</strong><small>{team.description || "Команда развития"}</small></span><b>{selectedTeam === team.id ? "✓" : "→"}</b></button>)}</div>{error && <p className="auth-error" role="alert">{error}</p>}<button className="primary-button full" onClick={() => { void sendRequest(); }} disabled={pending || teams.length === 0}>{pending ? "Отправляем..." : "Отправить заявку"}<span>→</span></button><button className="back-link-button" onClick={() => { void authFetch("/api/auth/logout", { method: "POST" }); clearDevSession(); window.location.href = "/"; }}>Выйти</button></div></main>;
+  async function logout() {
+    await authFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    clearDevSession();
+    window.location.href = "/";
+  }
+
+  return <TeamSelectionView teams={teams} request={request} selectedTeam={selectedTeam} loading={loading} pending={pending} checking={checking} error={error}
+    onSelect={(id) => { setSelectedTeam(id); setError(""); }} onSend={() => void sendRequest()} onRefresh={() => void checkStatus()} onLogout={() => void logout()} />;
+}
+
+type ViewProps = {
+  teams: Team[]; request: TeamJoinRequest | null; selectedTeam: string;
+  loading: boolean; pending: boolean; checking: boolean; error: string;
+  onSelect: (id: string) => void; onSend: () => void; onRefresh: () => void; onLogout: () => void;
+};
+
+export function TeamSelectionView({ teams, request, selectedTeam, loading, pending, checking, error, onSelect, onSend, onRefresh, onLogout }: ViewProps) {
+  const waiting = request?.status === "pending";
+  const teamName = request?.teamName || teams.find((team) => team.id === request?.teamId)?.name || "Выбранная команда";
+  const hasSelection = teams.some((team) => team.id === selectedTeam);
+  return <main className={styles.page}>
+    <section className={styles.card} aria-labelledby="team-gate-title" aria-busy={loading || pending || checking}>
+      <header className={styles.brand}><img src="/brand/logo.svg" alt="Прокачка" width="180" height="60" /><span>Вместе к результату</span></header>
+      {loading ? <div className={styles.loading}><h1 id="team-gate-title">Выбор команды</h1><p role="status">Загружаем доступные команды…</p></div> : waiting ? <>
+        <div className={styles.waitingIcon} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" /></svg></div>
+        <span className={styles.status}>Заявка отправлена</span>
+        <h1 id="team-gate-title">Ждём решения наставника</h1>
+        <p className={styles.intro}>Наставник рассмотрит вашу заявку. После одобрения откроется доступ к команде.</p>
+        <div className={styles.requestTeam}><span className={styles.teamIcon} aria-hidden="true">◈</span><div><small>Ваша команда</small><strong>{teamName}</strong></div><span className={styles.pendingDot} aria-label="Ожидает решения" /></div>
+        <p className={styles.waitingNote}>Ничего отправлять повторно не нужно.</p>
+        {error && <div className={styles.error} role="alert">{error}</div>}
+        <button type="button" className={styles.secondary} disabled={checking} onClick={onRefresh}>{checking ? "Проверяем статус…" : "Проверить статус заявки"}</button>
+      </> : <>
+        <span className={styles.step}>Вступление в команду</span>
+        <h1 id="team-gate-title">Выберите свою команду</h1>
+        <p className={styles.intro}>Отправьте заявку наставнику, чтобы получить доступ к заданиям и рейтингу команды.</p>
+        {request?.status === "rejected" && <div className={styles.warning} role="status">Предыдущая заявка не одобрена. Вы можете выбрать другую команду.</div>}
+        {teams.length ? <fieldset className={styles.choices} disabled={pending}><legend>Доступные команды</legend>{teams.map((team) =>
+          <label className={styles.choice} key={team.id}>
+            <input type="radio" name="team" value={team.id} checked={selectedTeam === team.id} onChange={() => onSelect(team.id)} />
+            <span className={styles.teamIcon} aria-hidden="true">◈</span>
+            <span className={styles.teamCopy}><strong>{team.name}</strong>{team.description && <small>{team.description}</small>}</span>
+            <span className={styles.choiceMark} aria-hidden="true">{selectedTeam === team.id ? "✓" : ""}</span>
+          </label>
+        )}</fieldset> : <div className={styles.empty}><strong>Пока нет доступных команд</strong><p>Уточните у наставника, когда можно будет присоединиться.</p><button type="button" className={styles.retry} onClick={onRefresh} disabled={checking}>Обновить список</button></div>}
+        {error && <div className={styles.error} role="alert">{error}</div>}
+        <button type="button" className={styles.primary} onClick={onSend} disabled={pending || !hasSelection}>{pending ? "Отправляем заявку…" : "Отправить заявку"}<span aria-hidden="true">→</span></button>
+        {!hasSelection && teams.length > 0 && <p className={styles.selectionHint}>Сначала выберите команду из списка.</p>}
+      </>}
+      {!loading && <footer className={styles.footer}><button type="button" onClick={onLogout}>Выйти из аккаунта</button></footer>}
+    </section>
+  </main>;
 }

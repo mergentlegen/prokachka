@@ -1,0 +1,5 @@
+.toast { position:fixed; right:24px; bottom:24px; z-index:30; display:flex; align-items:center; gap:12px; width:max-content; max-width:min(440px,calc(100% - 32px)); padding:10px 8px 10px 16px; border:1px solid #d9e2f4; border-radius:14px; background:#fff; color:#203552; box-shadow:0 12px 48px #15244230; }
+.icon { flex:0 0 24px; display:grid; place-items:center; height:24px; border-radius:50%; background:#eaf0ff; color:var(--blue); font-size:14px; font-weight:800; }
+.toast p { min-width:0; margin:0; font-size:14px; line-height:1.5; overflow-wrap:anywhere; }
+.toast button { align-self:flex-start; flex:0 0 44px; width:44px; height:44px; padding:0; border:0; border-radius:8px; background:transparent; color:#73819a; font-size:24px; }
+@media(max-width:760px) { .toast { top:calc(12px + env(safe-area-inset-top)); right:16px; bottom:auto; left:16px; width:auto; max-width:none; } }

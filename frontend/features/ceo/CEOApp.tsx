@@ -1,5 +1,7 @@
 "use client";
 
+import { Toast } from "@/frontend/shared/Toast";
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
@@ -225,7 +227,7 @@ export function CEOApp() {
     {userDraft && <UserModal draft={userDraft} setDraft={setUserDraft} users={users} teams={teams} onSubmit={saveUserAccess} pending={actionId === userDraft.id} onClose={() => setUserDraft(null)} />}
     {deleteTarget?.type === "team" && <ConfirmModal title="Удалить команду?" description={<>Команда «{deleteTarget.item.name}», её задания, программы, объявления, заявки и рейтинги будут удалены без возможности восстановления.</>} confirmLabel="Удалить команду" busy={actionId === `delete-team:${deleteTarget.item.id}`} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteTeam(deleteTarget.item); }} />}
     {deleteTarget?.type === "user" && <ConfirmModal title="Удалить пользователя?" description={<>Профиль «{deleteTarget.item.name}», отправленные работы, звёзды и история будут удалены без возможности восстановления.</>} confirmLabel="Удалить пользователя" busy={actionId === `delete-user:${deleteTarget.item.id}`} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteUser(deleteTarget.item); }} />}
-    {toast && <div className="toast">{toast}</div>}
+    {toast && <Toast message={toast} onClose={() => setToast("")} />}
   </main>;
 }
 

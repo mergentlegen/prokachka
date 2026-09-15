@@ -2,19 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
-import type { FormEvent, TouchEvent as ReactTouchEvent } from "react";
+import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { authFetch, clearDevSession, createTelegramLink, loadTelegramLinkStatus, refreshAuthSession } from "@/frontend/shared/api/client";
 import { formatDate, formatDateTime } from "@/frontend/shared/lib/format";
 import { createAdminTask, deleteAdminTask, loadAdminData, loadAdminProgramHistory, loadAdminPublicationHistory, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { loadTeamRequests, reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
+import { SubmissionCard, SubmissionSummary } from "./SubmissionCard";
+import { Toast } from "@/frontend/shared/Toast";
 import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
-import { isMenuSwipe } from "@/frontend/shared/lib/menu-swipe";
+import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
 import type { AuthUser, Store, Submission, SubmissionStatus, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/frontend/shared/api/admin-client";
 
@@ -60,7 +62,9 @@ export function AdminApp() {
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
+  const shellRef = useRef<HTMLElement>(null);
+  const openMobileMenu = useCallback(() => setMobileMenuOpen(true), []);
+  useMenuSwipe(shellRef, !authLoading && !dataLoading && hasMentorAccess(authUser) && !mobileMenuOpen && !modal, openMobileMenu);
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [section]);
@@ -120,21 +124,6 @@ export function AdminApp() {
   const pending = store.submissions.filter((submission) => submission.status === "pending");
   const pendingRequests = requests.filter((request) => request.status === "pending");
   const ranking = useMemo(() => store.users.filter((user) => user.role === "member").map((user) => ({ ...user, points: store.submissions.filter((submission) => submission.userId === user.id && submission.status === "accepted").reduce((sum, submission) => sum + submission.points, 0) })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name)), [store]);
-
-  function handleTouchStart(event: ReactTouchEvent<HTMLElement>) {
-    const touch = event.touches[0];
-    const interactive = event.target instanceof Element && event.target.closest("input, textarea, select, button, a, [role='slider'], [contenteditable='true'], .modal-backdrop");
-    touchStart.current = !mobileMenuOpen && !interactive && event.touches.length === 1 && touch.clientX <= 28 && window.matchMedia("(max-width: 850px)").matches
-      ? { x: touch.clientX, y: touch.clientY, time: event.timeStamp } : null;
-  }
-
-  function handleTouchEnd(event: ReactTouchEvent<HTMLElement>) {
-    const start = touchStart.current;
-    touchStart.current = null;
-    if (!start || event.touches.length) return;
-    const touch = event.changedTouches[0];
-    if (touch && isMenuSwipe(start, { x: touch.clientX, y: touch.clientY, time: event.timeStamp })) setMobileMenuOpen(true);
-  }
 
   async function logout() {
     clearDevSession();
@@ -359,7 +348,7 @@ export function AdminApp() {
   ];
   const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
-  return <main className="admin-shell" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStart.current = null; }}>
+  return <main className="admin-shell" ref={shellRef}>
     <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
@@ -383,7 +372,7 @@ export function AdminApp() {
       </nav>
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
     </MobileDrawer>
-    {toast && <div className="toast" role="status">{toast}</div>}
+    {toast && <Toast message={toast} onClose={() => setToast("")} />}
     {modal?.type === "task" && <TaskEditorModal draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}
@@ -431,7 +420,7 @@ function DeleteModal({ task, busy, onClose, onConfirm }: { task: Task; busy: boo
 }
 
 function AccessDenied({ onLogout }: { onLogout: () => void }) { return <main className="admin-login"><div className="admin-login-card"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><p className="eyebrow">Доступ ограничен</p><h1>Это раздел наставника</h1><p>Твой аккаунт участника не может открыть админ-панель.</p><button className="primary-button full" onClick={() => { void onLogout(); }}>Выйти</button><a className="back-link" href="/">Вернуться к заданиям</a></div></main>; }
-function Dashboard({ store, pending, ranking, onNavigate }: { store: Store; pending: Submission[]; ranking: { id: string; name: string; points: number }[]; onNavigate: (section: AdminSection) => void }) { return <><div className="metric-grid"><Metric label="Участники" value={store.users.length} note="в команде" icon="♙" /><Metric label="Активные задания" value={store.tasks.filter((task) => task.isActive && !isTaskExpired(task)).length} note={"из " + store.tasks.length + " всего"} icon="☷" /><Metric label="На проверке" value={pending.length} note="ждут внимания" icon="◷" /><Metric label="Принято работ" value={store.submissions.filter((submission) => submission.status === "accepted").length} note="за всё время" icon="✓" /></div><div className="dashboard-grid"><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Сейчас</p><h2>Нужна проверка</h2></div><button className="text-button" onClick={() => onNavigate("review")}>Все работы →</button></div>{pending.length === 0 ? <EmptyAdmin text="Все работы проверены. Так держать!" /> : pending.slice(0, 3).map((submission) => <SubmissionRow key={submission.id} submission={submission} store={store} />)}</div><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Лидеры рейтинга</h2></div><button className="text-button" onClick={() => onNavigate("history")}>История →</button></div>{ranking.slice(0, 4).map((member, index) => <div className="leader-row" key={member.id}><span>{index + 1}</span><div className="rank-avatar">{initials(member.name)}</div><strong>{member.name}</strong><b>{member.points}</b></div>)}</div></div></>; }
+function Dashboard({ store, pending, ranking, onNavigate }: { store: Store; pending: Submission[]; ranking: { id: string; name: string; points: number }[]; onNavigate: (section: AdminSection) => void }) { return <><div className="metric-grid"><Metric label="Участники" value={store.users.length} note="в команде" icon="♙" /><Metric label="Активные задания" value={store.tasks.filter((task) => task.isActive && !isTaskExpired(task)).length} note={"из " + store.tasks.length + " всего"} icon="☷" /><Metric label="На проверке" value={pending.length} note="ждут внимания" icon="◷" /><Metric label="Принято работ" value={store.submissions.filter((submission) => submission.status === "accepted").length} note="за всё время" icon="✓" /></div><div className="dashboard-grid"><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Сейчас</p><h2>Нужна проверка</h2></div><button className="text-button" onClick={() => onNavigate("review")}>Все работы →</button></div>{pending.length === 0 ? <EmptyAdmin text="Все работы проверены." /> : pending.slice(0, 3).map((submission) => <SubmissionRow key={submission.id} submission={submission} store={store} />)}</div><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Лидеры рейтинга</h2></div><button className="text-button" onClick={() => onNavigate("history")}>История →</button></div>{ranking.slice(0, 4).map((member, index) => <div className="leader-row" key={member.id}><span>{index + 1}</span><div className="rank-avatar">{initials(member.name)}</div><strong>{member.name}</strong><b>{member.points}</b></div>)}</div></div></>; }
 function Metric({ label, value, note, icon }: { label: string; value: number; note: string; icon: string }) { return <div className="metric-card"><span className="metric-icon">{icon}</span><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></div>; }
 function TaskKindSwitch({ value, onChange }: { value: "regular" | "programs"; onChange: (value: "regular" | "programs") => void }) {
   return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button></div>;
@@ -449,7 +438,11 @@ function TasksView({ store, actorId, canManageAll, onToggle, onEdit, onRemove }:
     return <div className="task-admin-row" key={task.id}><div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div><strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta} · {store.submissions.filter((submission) => submission.taskId === task.id).length} отправлений</span></div></div><span className={"admin-status " + status}>{status === "active" ? "Активно" : status === "expired" ? "Просрочено" : "Скрыто"}</span><span className="task-max">до {task.maxPoints} баллов</span>{canManage && <div className="row-actions"><button className="button button-edit" onClick={() => onEdit(task)}>Изменить</button><button className={"button " + (task.isActive ? "button-warning" : "button-success")} onClick={() => onToggle(task.id)}>{task.isActive ? "Скрыть" : "Активировать"}</button><button className="button button-danger" onClick={() => onRemove(task)}>Удалить</button></div>}</div>;
   })}</div></>;
 }
-function ReviewView({ store, submissions, onReview }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) { return <div className="admin-panel table-panel">{submissions.length === 0 ? <EmptyAdmin text="Нет работ, ожидающих проверки." /> : submissions.map((submission) => <div className="review-row" key={submission.id}><SubmissionRow submission={submission} store={store} /><div className="review-actions"><a className="telegram-button" href="https://t.me" target="_blank" rel="noreferrer">Открыть в Telegram ↗</a><div><button className="button button-success" onClick={() => onReview(submission, "accepted")}>Принять</button><button className="button button-warning" onClick={() => onReview(submission, "revision")}>На доработку</button></div></div></div>)}</div>; }
+function ReviewView({ store, submissions, onReview }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) {
+  return <div className="submission-review-list">{submissions.length === 0 ? <div className="admin-panel"><EmptyAdmin text="Нет работ, ожидающих проверки." /></div> : submissions.map((submission) =>
+    <SubmissionCard key={submission.id} submission={submission} name={store.users.find((user) => user.id === submission.userId)?.name || "Неизвестный участник"} taskTitle={store.tasks.find((task) => task.id === submission.taskId)?.title || "Удалённое задание"} onReview={onReview} />
+  )}</div>;
+}
 function RequestsView({ requests, onReview }: { requests: TeamJoinRequest[]; onReview: (teamRequest: TeamJoinRequest, status: "approved" | "rejected") => void }) {
   return <div className="admin-panel table-panel">{requests.length === 0 ? <EmptyAdmin text="Новых заявок в команду нет." /> : requests.map((teamRequest) => <div className="review-row" key={teamRequest.id}><div className="submission-row"><div className="rank-avatar">{initials(teamRequest.userName || "У")}</div><div><strong>{teamRequest.userName || "Новый участник"}</strong><span>Заявка на вступление в команду</span></div><time>{formatDateTime(teamRequest.createdAt)}</time></div><div className="review-actions"><span className="request-team-name">{teamRequest.teamName || "Твоя команда"}</span><div><button className="button button-success" onClick={() => onReview(teamRequest, "approved")}>Принять</button><button className="button button-danger" onClick={() => onReview(teamRequest, "rejected")}>Отклонить</button></div></div></div>)}</div>;
 }
@@ -526,22 +519,7 @@ function HistoryView({ store, programs, publications, onReview }: { store: Store
 function SubmissionRow({ submission, store }: { submission: Submission; store: Store }) {
   const user = store.users.find((item) => item.id === submission.userId);
   const task = store.tasks.find((item) => item.id === submission.taskId);
-  const answerLabel = submission.mediaType === "photo" ? "Фото" : submission.mediaType === "video" ? "Видео" : submission.mediaType === "document" ? "Файл" : submission.mediaType === "text" ? "Текст" : "Ответ";
-  return <div className="submission-row submission-row-with-answer">
-    <div className="rank-avatar">{user ? initials(user.name) : "?"}</div>
-    <div className="submission-row-copy">
-      <strong>{user?.name || "Неизвестный участник"}</strong>
-      <span>{task?.title || "Удалённое задание"}</span>
-      {submission.answerText && <p className="submission-answer-text">{submission.answerText}</p>}
-      {submission.mediaType && submission.mediaType !== "text" && <details className="submission-media-details">
-        <summary>Показать ответ: {answerLabel}</summary>
-        {submission.mediaType === "photo" && <img className="submission-media-preview" src={`/api/submissions/${submission.id}/media`} alt="Ответ участника" />}
-        {submission.mediaType === "video" && <video className="submission-media-preview" src={`/api/submissions/${submission.id}/media`} controls preload="metadata" />}
-        {submission.mediaType === "document" && <a className="submission-file-link" href={`/api/submissions/${submission.id}/media`} target="_blank" rel="noreferrer">Открыть файл ответа ↗</a>}
-      </details>}
-    </div>
-    <time>{formatDateTime(submission.submittedAt)}</time>
-  </div>;
+  return <SubmissionSummary submission={submission} name={user?.name || "Неизвестный участник"} taskTitle={task?.title || "Удалённое задание"} />;
 }
 function EmptyAdmin({ text }: { text: string }) { return <div className="empty-admin"><span>✓</span><p>{text}</p></div>; }
 

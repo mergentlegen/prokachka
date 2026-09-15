@@ -20,7 +20,7 @@ export function TelegramConnect({ telegramId, busy = false, onLink, onRefresh }:
     <div className="telegram-connect-icon">➤</div>
     <div className="telegram-connect-copy">
       <strong>{linked ? "Telegram привязан" : "Привяжите Telegram"}</strong>
-      <p>{linked ? "Теперь можно отправлять работы через бота." : "Это нужно, чтобы система узнала именно ваш аккаунт."}</p>
+      {!linked && <p>Для отправки ответов через бота.</p>}
     </div>
     <div className="telegram-connect-actions">
       {linked ? <span className="telegram-connect-status">Подключён</span> : <button type="button" className="button button-telegram" onClick={onLink} disabled={busy}>{busy ? "Открываем..." : "Привязать"}</button>}

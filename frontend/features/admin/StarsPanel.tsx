@@ -75,9 +75,8 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
     <div className="stars-admin-page">
       <div className="stars-admin-intro">
         <div>
-          <p className="eyebrow">Мотивация команды</p>
           <h2>Награждение звёздами</h2>
-          <p>Выдавай участникам от одной до пяти звёзд за прогресс, инициативу или отличный результат.</p>
+          <p>От 1 до 5 звёзд за достижение.</p>
         </div>
       </div>
 
@@ -88,7 +87,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
       </div>
 
       <div className="admin-panel stars-member-list">
-        <div className="stars-member-heading"><div><p className="eyebrow">Команда</p><h3>Выбери участника</h3></div><span>Награда появится в его профиле</span></div>
+        <div className="stars-member-heading"><h3>Выбери участника</h3></div>
         <label className="stars-search">Найти участника<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Имя участника" /></label>
         {visibleMembers.length === 0 ? (
           <div className="empty-admin"><span>★</span><p>{members.length ? "Участники не найдены." : "Нет участников, которых вы можете наградить."}</p></div>
@@ -96,9 +95,8 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
           visibleMembers.map((user) => (
             <div className="stars-member-row" key={user.id}>
               <div className="rank-avatar">{user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</div>
-              <div className="stars-member-copy"><strong>{user.name}</strong><span>{totals.get(user.id) || 0} звёзд</span></div>
-              <div className="stars-display" aria-label={(totals.get(user.id) || 0) + " звёзд"}>★ {totals.get(user.id) || 0}</div>
-              <button className="button button-primary" onClick={() => openAward(user)}>+ Выдать</button>
+              <div className="stars-member-copy"><strong>{user.name}</strong><span className="stars-member-total">★ {totals.get(user.id) || 0} звёзд</span></div>
+              <button type="button" className="button star-award-button" aria-label={"Выдать звёзды: " + user.name} onClick={() => openAward(user)}>+ Выдать</button>
             </div>
           ))
         )}
