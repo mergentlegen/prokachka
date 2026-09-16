@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { createAdminAnnouncement, deleteAdminAnnouncement, updateAdminAnnouncement } from "@/frontend/shared/api/admin-client";
 import type { Announcement } from "@/shared/domain/types";
+import { ResourceCard } from "@/frontend/shared/ResourceCard";
 
 type Draft = { title: string; content: string; resourceUrl: string };
 type Props = {
@@ -133,9 +134,6 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
       {editorOpen && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeEditor(); }}>
           <div className="editor-modal admin-form-modal announcement-editor" onMouseDown={(event) => event.stopPropagation()}>
-            <label>Ссылка на материал <span className="field-hint">необязательно</span>
-              <input type="url" value={draft.resourceUrl} onChange={(event) => setDraft({ ...draft, resourceUrl: event.target.value })} placeholder="https://zoom.us/..." />
-            </label>
             <button className="modal-close" onClick={closeEditor} aria-label="Закрыть">×</button>
             <p className="eyebrow">{editing ? "Редактирование" : "Новое объявление"}</p>
             <h2>{editing ? "Изменить объявление" : "Объявление для команды"}</h2>
@@ -145,6 +143,10 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
             <label>Текст объявления
               <textarea value={draft.content} onChange={(event) => setDraft({ ...draft, content: event.target.value })} maxLength={5000} rows={7} placeholder="Напиши подробности для участников" />
             </label>
+            <label>Ссылка на материал <span className="field-hint">необязательно</span>
+              <input type="url" value={draft.resourceUrl} onChange={(event) => setDraft({ ...draft, resourceUrl: event.target.value })} placeholder="https://zoom.us/..." />
+            </label>
+            <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
             <div className="modal-actions">
               <button className="button button-muted" onClick={closeEditor}>Отмена</button>
               <button className="button button-primary" onClick={() => void save()} disabled={busy}>{busy ? "Сохраняем..." : editing ? "Сохранить" : "Опубликовать"}</button>

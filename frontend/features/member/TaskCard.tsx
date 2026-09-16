@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Submission, Task } from "@/shared/domain/types";
 import { externalHref, formatDateTime } from "@/frontend/shared/lib/format";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
+import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import styles from "./TaskCard.module.css";
 
 export function TaskCard({ task, submission, onSubmit }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void> }) {
@@ -39,7 +40,7 @@ export function TaskCard({ task, submission, onSubmit }: { task: Task; submissio
         <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {task.maxPoints} баллов</span></div>
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div>
-        {resource && <a className={styles.resource} href={resource} target="_blank" rel="noopener noreferrer">Открыть материал ↗</a>}
+        {resource && <ResourceCard url={resource} />}
         {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
         {submission && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}

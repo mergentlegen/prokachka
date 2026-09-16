@@ -19,6 +19,7 @@ import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
 import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
 import type { AuthUser, Store, Submission, SubmissionStatus, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/frontend/shared/api/admin-client";
+import { ResourceCard } from "@/frontend/shared/ResourceCard";
 
 type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars" | "network";
 type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
@@ -388,6 +389,7 @@ function TaskEditorModal({ draft, editing, busy, onChange, onClose, onSubmit }: 
     <label>Название задания<input value={draft.title} onChange={(event) => onChange("title", event.target.value)} placeholder="Например, записать короткое видео" autoFocus /></label>
     <label>Описание<textarea value={draft.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Что нужно сделать участнику" rows={4} /></label>
     <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
+    <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
     <div className="form-two-columns">
       <label>Максимум баллов<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
       <label className="deadline-toggle"><span>Дедлайн</span><span className="switch-line"><input type="checkbox" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /><span>{draft.hasDeadline ? "Установлен" : "Без дедлайна"}</span></span></label>

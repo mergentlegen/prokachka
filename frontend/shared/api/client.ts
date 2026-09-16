@@ -1,4 +1,5 @@
 import type { Announcement, AuthUser, MemberProgramProgress, RankEntry, StarAward, Submission, Store, Task, TaskProgram, User } from "@/shared/domain/types";
+import { starAwardOption } from "@/shared/domain/star-awards";
 
 type ApiRow = Record<string, unknown>;
 type ApiResponse<T> = { ok: boolean; message?: string } & T;
@@ -51,7 +52,16 @@ export function mapProgress(row: ApiRow): MemberProgramProgress {
   return { id: String(row.id), userId: String(row.user_id), programId: String(row.program_id), currentTaskId: row.current_task_id ? String(row.current_task_id) : undefined, unlockedAt: String(row.unlocked_at), dueAt: String(row.due_at), status: row.status === "completed" ? "completed" : "active", completedAt: row.completed_at ? String(row.completed_at) : undefined };
 }
 export function mapAnnouncement(row: ApiRow): Announcement { return { id: String(row.id), teamId: String(row.team_id), authorId: row.author_id ? String(row.author_id) : undefined, title: String(row.title || ""), content: String(row.content || ""), resourceUrl: row.resource_url ? String(row.resource_url) : undefined, isActive: Boolean(row.is_active), createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) }; }
-export function mapStarAward(row: ApiRow): StarAward { return { id: String(row.id), userId: String(row.user_id), teamId: String(row.team_id), mentorId: row.mentor_id ? String(row.mentor_id) : undefined, stars: Number(row.stars || 0), comment: String(row.comment || ""), createdAt: String(row.created_at || new Date().toISOString()) }; }
+export function mapStarAward(row: ApiRow): StarAward {
+  const mentor = Array.isArray(row.mentor) ? row.mentor[0] : row.mentor;
+  return {
+    id: String(row.id), userId: String(row.user_id), teamId: String(row.team_id),
+    mentorId: row.mentor_id ? String(row.mentor_id) : undefined,
+    mentorName: mentor && typeof mentor === "object" && "name" in mentor ? String(mentor.name || "") : undefined,
+    kind: starAwardOption(row.award_kind)?.kind,
+    stars: Number(row.stars || 0), comment: String(row.comment || ""), createdAt: String(row.created_at || new Date().toISOString()),
+  };
+}
 export function mapUser(row: ApiRow): User { return { id: String(row.id), name: String(row.name || ""), login: row.login ? String(row.login) : undefined, telegramId: row.telegram_id ? String(row.telegram_id) : undefined, role: row.role === "ceo" ? "ceo" : row.role === "admin" ? "admin" : "member", teamId: row.team_id ? String(row.team_id) : row.teamId ? String(row.teamId) : undefined, teamJoinedAt: row.team_joined_at ? String(row.team_joined_at) : row.teamJoinedAt ? String(row.teamJoinedAt) : undefined, parentUserId: row.parent_user_id ? String(row.parent_user_id) : row.parentUserId ? String(row.parentUserId) : undefined, canReview: Boolean(row.can_review ?? row.canReview), canPublishTasks: Boolean(row.can_publish_tasks ?? row.canPublishTasks), canInviteMembers: Boolean(row.can_invite_members ?? row.canInviteMembers), createdAt: String(row.created_at || row.createdAt || new Date().toISOString()) }; }
 export function mapSubmission(row: ApiRow): Submission { return { id: String(row.id), userId: String(row.user_id), taskId: String(row.task_id), taskTitle: String((Array.isArray(row.tasks) ? row.tasks[0] : row.tasks)?.title || ""), taskMaxPoints: (Array.isArray(row.tasks) ? row.tasks[0] : row.tasks)?.max_points, reviewVersion: Number(row.review_version || 0), status: row.status === "accepted" || row.status === "revision" ? row.status : "pending", mediaType: row.media_type === "text" || row.media_type === "photo" || row.media_type === "video" || row.media_type === "document" ? row.media_type : undefined, answerText: row.answer_text ? String(row.answer_text) : undefined, points: Number(row.points || 0), comment: String(row.comment || ""), submittedAt: String(row.submitted_at || new Date().toISOString()), reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined }; }
 

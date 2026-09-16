@@ -5,11 +5,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#101d35",
 };
 
 export const metadata: Metadata = {
-  title: "Prokachka",
+  title: "Прокачка",
   description: "Платформа развития команд через практические задания",
+  applicationName: "Прокачка",
+  appleWebApp: { capable: true, title: "Прокачка", statusBarStyle: "default" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

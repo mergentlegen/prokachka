@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createAdminProgram, deleteAdminProgram, updateAdminProgram } from "@/frontend/shared/api/admin-client";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import type { Task, TaskProgram } from "@/shared/domain/types";
+import { ResourceCard } from "@/frontend/shared/ResourceCard";
 
 type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string };
 function validLink(value: string) {
@@ -106,6 +107,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
                 <label>Максимум баллов<input required type="number" min="0" max="100" step="1" value={task.maxPoints} onChange={(event) => updateTask(task.id, "maxPoints", event.target.value)} /></label>
                 <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" maxLength={2000} value={task.resourceUrl} aria-invalid={!validLink(task.resourceUrl)} onChange={(event) => updateTask(task.id, "resourceUrl", event.target.value)} placeholder="https://youtube.com/..." />{!validLink(task.resourceUrl) && <span className="program-field-error">Укажите ссылку с http:// или https://</span>}</label>
               </div>
+              <ResourceCard url={task.resourceUrl} caption="Так участник увидит материал" />
             </div>)}</div>}
           <button type="button" className="program-add-step" disabled={draftTasks.length >= 100} onClick={addStep}>＋ {draftTasks.length ? "Добавить следующий шаг" : "Добавить первый шаг"}</button>
         </fieldset>

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { createAdminStarAward, deleteAdminStarAward } from "@/frontend/shared/api/admin-client";
 import type { StarAward, User } from "@/shared/domain/types";
+import { starAwardOption, type StarAwardKind } from "@/shared/domain/star-awards";
+import { StarAwardDialog } from "./StarAwardDialog";
 
 type Props = {
   actorId: string;
@@ -15,8 +17,7 @@ type Props = {
 
 export function StarsPanel({ actorId, users, awards, onChange, onError }: Props) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [stars, setStars] = useState(1);
-  const [comment, setComment] = useState("");
+  const [awardError, setAwardError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StarAward | null>(null);
   const [query, setQuery] = useState("");
@@ -33,24 +34,24 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
 
   function openAward(user: User) {
     setSelectedUser(user);
-    setStars(1);
-    setComment("");
+    setAwardError("");
   }
 
   function closeAward() {
     if (!busy) setSelectedUser(null);
   }
 
-  async function awardStars() {
+  async function awardStars(kind: StarAwardKind, comment: string) {
     if (!selectedUser || busy) return;
     setBusy(true);
+    setAwardError("");
     try {
-      const award = await createAdminStarAward({ userId: selectedUser.id, stars, comment: comment.trim() });
+      const award = await createAdminStarAward({ userId: selectedUser.id, kind, comment });
       onChange([award, ...awards]);
       setSelectedUser(null);
       onError("");
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Не удалось присвоить звёзды.");
+      setAwardError(error instanceof Error ? error.message : "Не удалось присвоить звёзды.");
     } finally {
       setBusy(false);
     }
@@ -76,7 +77,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
       <div className="stars-admin-intro">
         <div>
           <h2>Награждение звёздами</h2>
-          <p>От 1 до 5 звёзд за достижение.</p>
+          <p>Starter · Classic · Premium. Звёзды суммируются в рейтинге.</p>
         </div>
       </div>
 
@@ -111,7 +112,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
             const user = users.find((item) => item.id === award.userId);
             return <div className="star-award-row" key={award.id}>
               <div className="rank-avatar">{user ? user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "?"}</div>
-              <div className="star-award-copy"><strong>{user?.name || "Удалённый участник"}</strong><span>{formatDateTime(award.createdAt)}{award.comment ? " · " + award.comment : ""}</span></div>
+              <div className="star-award-copy"><strong>{user?.name || "Удалённый участник"}</strong><span>{starAwardOption(award.kind)?.label || "Награждение звёздами"} · {formatDateTime(award.createdAt)}</span><span>Выдал: {award.mentorName || users.find((item) => item.id === award.mentorId)?.name || "Наставник"}</span>{award.comment && <span>{award.comment}</span>}</div>
               <b className="star-award-value">+{award.stars} ★</b>
               <button className="button button-danger" onClick={() => setDeleteTarget(award)}>Отменить</button>
             </div>;
@@ -119,28 +120,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
         )}
       </div>
 
-      {selectedUser && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeAward(); }}>
-          <div className="editor-modal admin-form-modal star-award-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <button className="modal-close" onClick={closeAward} aria-label="Закрыть">×</button>
-            <p className="eyebrow">Новое награждение</p>
-            <h2>Выдать звёзды</h2>
-            <p className="modal-description">Участник: <strong>{selectedUser.name}</strong></p>
-            <label>Количество звёзд
-              <select value={stars} onChange={(event) => setStars(Number(event.target.value))}>
-                {[1, 2, 3, 4, 5].map((value) => <option value={value} key={value}>{value} {value === 1 ? "звезда" : "звёзд"}</option>)}
-              </select>
-            </label>
-            <label>Комментарий <span className="field-hint">необязательно</span>
-              <textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={500} rows={4} placeholder="За что участник получил награду?" />
-            </label>
-            <div className="modal-actions">
-              <button className="button button-muted" onClick={closeAward}>Отмена</button>
-              <button className="button button-primary" onClick={() => void awardStars()} disabled={busy}>{busy ? "Сохраняем..." : "Выдать звёзды"}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {selectedUser && <StarAwardDialog name={selectedUser.name} total={totals.get(selectedUser.id) || 0} busy={busy} error={awardError} onClose={closeAward} onAward={(kind, comment) => void awardStars(kind, comment)} />}
 
       {deleteTarget && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setDeleteTarget(null); }}>

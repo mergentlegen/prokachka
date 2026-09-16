@@ -1,4 +1,5 @@
 import type { Announcement, RankEntry, StarAward, Store, Submission, Task, TaskProgram } from "@/shared/domain/types";
+import type { StarAwardKind } from "@/shared/domain/star-awards";
 import { mapAnnouncement, mapProgram, mapStarAward, mapSubmission, mapTask, mapUser, request } from "@/frontend/shared/api/client";
 type ApiRow = Record<string, unknown>;
 type ApiResponse<T> = { ok: boolean; message?: string } & T;
@@ -41,7 +42,7 @@ type AdminAnnouncementPatch = Partial<Omit<Pick<Announcement, "title" | "content
 export async function createAdminAnnouncement(input: AdminAnnouncementInput): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements", { method: "POST", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function updateAdminAnnouncement(id: string, input: AdminAnnouncementPatch): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function deleteAdminAnnouncement(id: string) { await request<ApiResponse<Record<string, never>>>("/api/announcements/" + id, { method: "DELETE" }); }
-export async function createAdminStarAward(input: { userId: string; stars: number; comment: string }): Promise<StarAward> { const response = await request<ApiResponse<{ award: ApiRow }>>("/api/stars", { method: "POST", body: JSON.stringify(input) }); return mapStarAward(response.award); }
+export async function createAdminStarAward(input: { userId: string; kind: StarAwardKind; comment: string }): Promise<StarAward> { const response = await request<ApiResponse<{ award: ApiRow }>>("/api/stars", { method: "POST", body: JSON.stringify(input) }); return mapStarAward(response.award); }
 export async function deleteAdminStarAward(id: string) { await request<ApiResponse<Record<string, never>>>("/api/stars/" + id, { method: "DELETE" }); }
 export type ProgramCreateInput = { title: string; deadlineHours: number; tasks: Array<{ title: string; description: string; maxPoints: number; resourceUrl?: string | null }> };
 export async function createAdminProgram(input: ProgramCreateInput): Promise<{ program: TaskProgram; tasks: Task[] }> {

@@ -4,6 +4,7 @@ import { isUuid } from "@/backend/http/security";
 import { findAccountById } from "@/backend/services/auth.service";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { findStarAwards, insertStarAward, removeStarAward } from "@/backend/services/stars.service";
+import { starAwardOption } from "@/shared/domain/star-awards";
 
 async function currentUser(request: Request) {
   const sessionUser = getRequestUser(request);
@@ -52,13 +53,16 @@ export async function createStarAward(request: Request) {
   try {
     const body = await request.json();
     const userId = body.userId;
-    const stars = Number(body.stars);
+    const awardOption = starAwardOption(body.kind);
     const comment = body.comment === undefined ? "" : body.comment;
 
     if (!isUuid(userId)) return failure("Некорректный участник.", 400);
     if (String(userId) === user.id) return failure("Нельзя выдавать звёзды самому себе.", 403);
-    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
-      return failure("Можно присвоить от 1 до 5 звёзд.", 400);
+    if (!awardOption) {
+      return failure("Выберите Starter, Classic или Premium.", 400);
+    }
+    if (body.stars !== undefined && body.stars !== awardOption.stars) {
+      return failure("Количество звёзд не соответствует награде.", 400);
     }
     if (!isValidComment(comment)) return failure("Комментарий слишком длинный.", 400);
 
@@ -79,7 +83,7 @@ export async function createStarAward(request: Request) {
       userId,
       teamId: user.teamId,
       mentorId: user.id,
-      stars,
+      kind: awardOption.kind,
       comment: comment.trim(),
     });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);

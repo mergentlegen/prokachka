@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 
 type RankingRow = { id: string; name: string; points: number };
 type RankingUser = { id: unknown; name: unknown; team_id?: unknown; role?: unknown };
@@ -39,11 +40,11 @@ export async function findStarRanking(teamId?: string, userIds?: Set<string>) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   // Do not embed users here: star_awards has two FKs to users (recipient and mentor).
-  let awardsQuery = supabase.from("star_awards").select("stars,user_id");
+  let awardsQuery = supabase.from("star_awards").select("stars,user_id").order("id");
   if (teamId) awardsQuery = awardsQuery.eq("team_id", teamId);
   const [awards, users] = await Promise.all([
-    awardsQuery,
-    supabase.from("users").select("id,name,team_id,role").eq("role", "member"),
+    readPages(awardsQuery),
+    readPages(supabase.from("users").select("id,name,team_id,role").eq("role", "member").order("id")),
   ]);
   if (awards.error || users.error) return { error: awards.error || users.error };
   const byId = new Map((users.data || []).map((user) => [String(user.id), user]));

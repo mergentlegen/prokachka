@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "test:mobile": "node --test tests/mobile-interface.test.cjs",
-    "test:backend": "node --test tests/backend-telegram.test.cjs"
+    "test:backend": "node --test tests/backend-telegram.test.cjs",
+    "test:awards": "node --test tests/awards-materials.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

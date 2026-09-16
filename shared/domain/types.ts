@@ -1,3 +1,5 @@
+import type { StarAwardKind } from "./star-awards";
+
 export type UserRole = "ceo" | "admin" | "member";
 export type SubmissionStatus = "pending" | "accepted" | "revision";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
@@ -32,7 +34,7 @@ export type Announcement = {
   id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; createdAt: string; updatedAt: string;
 };
 export type StarAward = {
-  id: string; userId: string; teamId: string; mentorId?: string; stars: number; comment: string; createdAt: string;
+  id: string; userId: string; teamId: string; mentorId?: string; mentorName?: string; kind?: StarAwardKind; stars: number; comment: string; createdAt: string;
 };
 export type Submission = {
   id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;

@@ -317,7 +317,6 @@ h1,h2,h3 { font-family:'Manrope', sans-serif; letter-spacing:-.04em; }
 .admin-resource-link { display:inline-flex; max-width:100%; margin-top:9px; overflow:hidden; color:var(--blue); font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
 .announcement-admin-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 .announcement-editor { display:flex; flex-direction:column; border-top:4px solid #9bb3ef; }
-.announcement-editor > .eyebrow { order:1; }.announcement-editor > h2 { order:2; }.announcement-editor > label:nth-of-type(2) { order:3; }.announcement-editor > label:nth-of-type(3) { order:4; }.announcement-editor > label:nth-of-type(1) { order:5; }.announcement-editor > .modal-actions { order:6; }
 @media (max-width:700px) {
   .announcement-admin-toolbar { align-items:flex-start; flex-direction:column; }
   .announcement-admin-toolbar .button { width:100%; }

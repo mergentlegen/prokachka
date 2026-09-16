@@ -16,7 +16,16 @@ function loadTs(relative, overrides = {}) {
   loaded.filename = filename;
   loaded.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = loaded.require.bind(loaded);
-  loaded.require = (name) => Object.hasOwn(overrides, name) ? overrides[name] : originalRequire(name);
+  loaded.require = (name) => {
+    if (Object.hasOwn(overrides, name)) return overrides[name];
+    if (name.endsWith(".module.css")) return new Proxy({}, { get: (_, key) => key });
+    const base = name.startsWith("@/") ? path.join(root, name.slice(2)) : name.startsWith(".") ? path.resolve(path.dirname(filename), name) : null;
+    if (base) {
+      const source = [base + ".ts", base + ".tsx"].find((file) => fs.existsSync(file));
+      if (source) return loadTs(path.relative(root, source), overrides);
+    }
+    return originalRequire(name);
+  };
   loaded._compile(compiled.outputText, filename);
   return loaded.exports;
 }
@@ -147,6 +156,13 @@ test("program builder never reorders its fields/actions using legacy flex order"
   stylesheet.walkRules((rule) => {
     if (!rule.selector.includes("program-builder")) return;
     rule.walkDecls("order", () => assert.fail(`Unexpected program order override: ${rule.selector}`));
+  });
+});
+
+test("announcement editor preserves title, description, material and preview DOM order", () => {
+  stylesheet.walkRules((rule) => {
+    if (!rule.selector.includes("announcement-editor")) return;
+    rule.walkDecls("order", () => assert.fail(`Unexpected announcement order override: ${rule.selector}`));
   });
 });
 

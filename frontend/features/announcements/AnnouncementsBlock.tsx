@@ -1,5 +1,6 @@
 import { externalHref, formatDateTime } from "@/frontend/shared/lib/format";
 import type { Announcement } from "@/shared/domain/types";
+import { ResourceCard } from "@/frontend/shared/ResourceCard";
 
 export function AnnouncementsBlock({ announcements }: { announcements: Announcement[] }) {
   return (
@@ -21,7 +22,7 @@ export function AnnouncementsBlock({ announcements }: { announcements: Announcem
                 <div className="announcement-meta"><span>Для команды</span><time>{formatDateTime(announcement.createdAt)}</time></div>
                 <h3>{announcement.title}</h3>
                 <p>{announcement.content}</p>
-                {href && <a className="resource-link" href={href} target="_blank" rel="noopener noreferrer">Открыть материал <span>↗</span></a>}
+                {href && <ResourceCard url={href} caption="Материал объявления" />}
               </div>
             </article>
             );

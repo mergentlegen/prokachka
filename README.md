@@ -114,6 +114,8 @@ npm start        # запуск production-сервера
 
 Обновление безопасности Telegram, миграция и обязательный таймер повторной доставки: [инструкция](docs/telegram-backend-deploy.md).
 
+Starter / Classic / Premium, карточки материалов и иконка приложения: [миграция и проверка](docs/star-awards-and-materials.md).
+
 Перед публикацией:
 
 1. Установите `AUTH_DEV_MODE=false`.

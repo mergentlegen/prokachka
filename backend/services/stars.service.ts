@@ -1,17 +1,19 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { canReviewNetwork, descendants, findTeamNetwork } from "@/backend/services/network.service";
+import { starAwardOption, type StarAwardKind } from "@/shared/domain/star-awards";
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 
-const starSelect = "id,user_id,team_id,mentor_id,stars,comment,created_at";
+const starSelect = "id,user_id,team_id,mentor_id,award_kind,stars,comment,created_at,mentor:users!mentor_id(name)";
 
 export async function findStarAwards(options: { teamId?: string; userId?: string; viewer?: { id: string; role: string; canReview?: boolean } } = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
 
-  let query = supabase.from("star_awards").select(starSelect).order("created_at", { ascending: false });
+  let query = supabase.from("star_awards").select(starSelect).order("created_at", { ascending: false }).order("id", { ascending: false });
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (options.userId) query = query.eq("user_id", options.userId);
 
-  const result = await query;
+  const result = await readPages(query);
   if (result.error) return { error: result.error };
   if (options.viewer?.role !== "member" || !options.teamId) return { data: result.data };
   const network = await findTeamNetwork(options.teamId);
@@ -25,12 +27,14 @@ export async function insertStarAward(input: {
   userId: string;
   teamId: string;
   mentorId: string;
-  stars: number;
+  kind: StarAwardKind;
   comment: string;
 }) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   if (input.userId === input.mentorId) return { forbidden: true as const };
+  const option = starAwardOption(input.kind);
+  if (!option) return { error: new Error("Unknown star award kind") };
 
   const result = await supabase
     .from("star_awards")
@@ -38,7 +42,8 @@ export async function insertStarAward(input: {
       user_id: input.userId,
       team_id: input.teamId,
       mentor_id: input.mentorId,
-      stars: input.stars,
+      award_kind: option.kind,
+      stars: option.stars,
       comment: input.comment,
     })
     .select(starSelect)

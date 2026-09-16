@@ -56,6 +56,11 @@ create table public.star_awards (
   team_id uuid not null references public.teams(id) on delete cascade,
   mentor_id uuid references public.users(id) on delete set null,
   stars integer not null check (stars between 1 and 5),
+  award_kind text,
+  constraint star_awards_kind_stars_check check (
+    award_kind is null or (award_kind = 'starter' and stars = 1) or
+    (award_kind = 'classic' and stars = 2) or (award_kind = 'premium' and stars = 3)
+  ),
   comment text not null default '',
   created_at timestamptz not null default now()
 );

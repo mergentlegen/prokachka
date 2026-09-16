@@ -23,7 +23,6 @@
 .detail { min-width:0; }
 .detail h3 { margin:18px 0; color:var(--navy); font-size:23px; line-height:1.4; overflow-wrap:anywhere; }
 .description { color:#354661; font-size:16px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
-.resource { display:inline-flex; align-items:center; min-height:44px; margin-top:18px; color:var(--blue); font-size:14px; font-weight:650; text-decoration:none; }
 .comment { margin-top:20px; padding:16px; border-radius:12px; background:#f4f6fb; color:#4b5e7b; font-size:14px; line-height:1.65; }
 .comment p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .detailAction { display:flex; justify-content:flex-end; margin-top:24px; padding-top:16px; border-top:1px solid var(--line); }
