@@ -9,7 +9,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "img-src 'self' data: blob: https://i.ytimg.com",
   "media-src 'self' blob:",
-  "font-src 'self' data:",
+  "font-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline'" + (isDevelopment ? " 'unsafe-eval'" : ""),
   "connect-src 'self' ws: wss:",
