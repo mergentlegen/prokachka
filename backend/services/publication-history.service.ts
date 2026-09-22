@@ -1,20 +1,9 @@
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
 import type { AuthUser } from "@/shared/domain/types";
 
-export type PublicationHistoryItem = {
-  id: string;
-  type: "task" | "program" | "announcement";
-  title: string;
-  authorId?: string;
-  authorName: string;
-  teamId: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  deadlineAt?: string;
-  stepCount?: number;
-};
+import type { PublicationHistoryItem } from "@/shared/domain/history";
 
 export async function findPublicationHistory(teamId: string, viewer: AuthUser) {
   const supabase = getSupabaseAdmin();
@@ -22,9 +11,9 @@ export async function findPublicationHistory(teamId: string, viewer: AuthUser) {
 
   const [network, tasksResult, programsResult, announcementsResult] = await Promise.all([
     findTeamNetwork(teamId),
-    supabase.from("tasks").select("id,title,team_id,publisher_id,is_active,created_at,updated_at,deadline_at,publication_type").eq("team_id", teamId).neq("publication_type", "sequential").order("created_at", { ascending: false }),
-    supabase.from("task_programs").select("id,title,team_id,publisher_id,is_active,created_at,updated_at").eq("team_id", teamId).order("created_at", { ascending: false }),
-    supabase.from("announcements").select("id,title,team_id,author_id,is_active,created_at,updated_at").eq("team_id", teamId).order("created_at", { ascending: false }),
+    readPages(supabase.from("tasks").select("id,title,team_id,publisher_id,is_active,created_at,updated_at,deadline_at,publication_type").eq("team_id", teamId).neq("publication_type", "sequential").order("created_at", { ascending: false }).order("id")),
+    readPages(supabase.from("task_programs").select("id,title,team_id,publisher_id,is_active,created_at,updated_at").eq("team_id", teamId).order("created_at", { ascending: false }).order("id")),
+    readPages(supabase.from("announcements").select("id,title,team_id,author_id,is_active,created_at,updated_at").eq("team_id", teamId).order("created_at", { ascending: false }).order("id")),
   ]);
 
   if ("unavailable" in network) return network;

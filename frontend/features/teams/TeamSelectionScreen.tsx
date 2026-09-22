@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { loadTeamSelection, submitTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { authFetch, clearDevSession } from "@/frontend/shared/api/client";
-import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
-import type { Team, TeamJoinRequest } from "@/shared/domain/types";
+import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
+import { invalidateData } from "@/frontend/shared/api/data-cache";
+import type { AuthUser, Team, TeamJoinRequest } from "@/shared/domain/types";
 import styles from "./TeamSelectionScreen.module.css";
 
-export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }) {
+export function TeamSelectionScreen({ authUser, onCompleted }: { authUser: AuthUser; onCompleted: () => void }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [request, setRequest] = useState<TeamJoinRequest | null>(null);
   const [selectedTeam, setSelectedTeam] = useState("");
@@ -33,8 +34,9 @@ export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }
   }
 
   useEffect(() => { void refresh(true); }, []);
-  useAutoRefresh(async () => { await refresh(false); }, {
-    enabled: !loading && !pending && !checking && request?.status !== "approved", intervalMs: 15000,
+  useLiveUpdates(authUser, async (topics) => {
+    if (topics.includes("session")) { onCompleted(); return; }
+    await refresh(false);
   });
 
   async function sendRequest() {
@@ -53,6 +55,7 @@ export function TeamSelectionScreen({ onCompleted }: { onCompleted: () => void }
   async function checkStatus() {
     if (checking) return;
     setChecking(true);
+    invalidateData(["requests", "teams"]);
     await refresh(false, true);
     setChecking(false);
   }

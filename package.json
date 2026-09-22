@@ -6,14 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit --incremental false",
+    "test": "node --test tests/mobile-interface.test.cjs tests/backend-telegram.test.cjs tests/awards-materials.test.cjs tests/architecture.test.cjs tests/live-updates.test.cjs",
+    "test:architecture": "node --test tests/architecture.test.cjs",
+    "test:concurrency": "node --test tests/telegram-concurrency.test.cjs",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "test:mobile": "node --test tests/mobile-interface.test.cjs",
     "test:backend": "node --test tests/backend-telegram.test.cjs",
     "test:awards": "node --test tests/awards-materials.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
-    "@types/ws": "^8.18.1",
     "next": "^16.3.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -23,6 +27,10 @@
     "@types/node": "^22.18.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "@types/ws": "^8.18.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4",
+    "postcss": "^8.5.28",
     "typescript": "^5.9.2"
   }
 }

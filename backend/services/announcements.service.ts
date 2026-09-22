@@ -1,3 +1,4 @@
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
@@ -24,7 +25,7 @@ export async function findAnnouncements(options: { teamId?: string; includeInact
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (!options.includeInactive) query = query.eq("is_active", true);
 
-  const result = await query;
+  const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };
   if (!options.teamId || !options.viewer || options.viewer.role === "ceo" || options.viewer.role === "admin") return { data: result.data };
   const network = await findTeamNetwork(options.teamId);

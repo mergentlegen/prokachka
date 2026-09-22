@@ -111,13 +111,15 @@ test('service inserts independent awards and derives stars from kind, not caller
   assert.ok(!db.calls.some(({ ops }) => ops.some(([op]) => op === 'upsert' || op === 'update')));
   assert.equal((await service.insertStarAward({ userId: 'self', mentorId: 'self', kind: 'premium' })).forbidden, true);
 });
-test('common star ranking sums Starter and Premium and retains historical five-star awards', async () => {
-  const db = dbMock({
-    star_awards: { data: [{ user_id: 'a', stars: 1 }, { user_id: 'a', stars: 3 }, { user_id: 'b', stars: 5 }] },
-    users: { data: [{ id: 'a', name: 'Alice', role: 'member', team_id: 'team' }, { id: 'b', name: 'Bob', role: 'member', team_id: 'team' }] },
-  });
+test('common star ranking uses the SQL aggregate and preserves its totals', async () => {
+  const db = dbMock({ aggregate: { data: [{ id: 'b', name: 'Bob', points: '5' }, { id: 'a', name: 'Alice', points: '4' }] } });
+  db.rpc = (name, args) => {
+    assert.equal(name, 'app_ranking');
+    assert.deepEqual(args, { p_team_id: 'team', p_metric: 'stars' });
+    return db.from('aggregate');
+  };
   const service = load('backend/services/ranking.service.ts', { [dbKey]: { getSupabaseAdmin: () => db } });
-  const result = await service.findStarRanking('team');
+  const result = await service.findStarRanking({ kind: 'team', teamId: 'team' });
   assert.deepEqual(result.data.map(({ id, points }) => [id, points]), [['b', 5], ['a', 4]]);
 });
 test('controller rejects arbitrary amounts, old clients and tampering before inserting', async () => {
@@ -147,16 +149,18 @@ test('home-screen manifest points to dedicated public PNGs and uses the Russian 
   assert.ok(manifest.icons.some((icon) => icon.purpose === 'maskable'));
 });
 
-test('cumulative ranking includes awards past the first thousand rows', async () => {
+test('ranking also paginates aggregate results beyond the first thousand members', async () => {
   const db = dbMock({
-    star_awards: ({ ops }) => {
+    aggregate: ({ ops }) => {
       const offset = ops.filter(([op]) => op === 'range').at(-1)[1];
-      return { data: Array.from({ length: offset < 1000 ? 500 : 1 }, () => ({ user_id: 'a', stars: 3 })), error: null };
+      return { data: Array.from({ length: offset < 1000 ? 500 : 1 }, (_, i) => ({ id: String(offset + i), name: 'Member', points: 3003 })), error: null };
     },
-    users: { data: [{ id: 'a', name: 'Alice', role: 'member' }], error: null },
   });
+  db.rpc = () => db.from('aggregate');
   const ranking = load('backend/services/ranking.service.ts', { [dbKey]: { getSupabaseAdmin: () => db } });
-  assert.equal((await ranking.findStarRanking()).data[0].points, 3003);
+  const result = await ranking.findStarRanking({ kind: 'all' });
+  assert.equal(result.data.length, 1001);
+  assert.equal(result.data[1000].points, 3003);
 });
 
 test('history records the award label and mentor, never infers a tier for a legacy row', () => {

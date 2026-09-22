@@ -54,3 +54,27 @@ test('parallel webhook retries and competing reviews save one answer and one dec
   assert.equal(reviews.filter((value) => JSON.parse(value).data).length, 1);
   assert.equal(reviews.filter((value) => JSON.parse(value).validationError).length, 1);
 });
+
+test('concurrent hierarchy moves cannot create a two-user cycle', { skip: !port }, async () => {
+  const { root, alice, bob } = fixture();
+  const results = await Promise.allSettled([
+    parallel(`select app_update_network_user('${root}','${alice}','{"parent_user_id":"${bob}"}');`),
+    parallel(`select app_update_network_user('${root}','${bob}','{"parent_user_id":"${alice}"}');`),
+  ]);
+  assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(query(`select count(*) from team_assignment_history where user_id in ('${alice}','${bob}')`), '1');
+  assert.equal(query(`select count(*) from users a join users b on a.parent_user_id=b.id and b.parent_user_id=a.id where a.id='${alice}'`), '0');
+});
+
+test('competing approval and rejection process a request once', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  const request = randomUUID();
+  query(`update users set team_id=null where id='${alice}';
+    insert into team_join_requests(id,user_id,team_id) values('${request}','${alice}','${team}');`);
+  const results = await Promise.all(['approved','rejected'].map((status) =>
+    parallel(`select app_review_join_request('${request}','${status}','${root}',false);`)));
+  assert.equal(results.filter((value) => JSON.parse(value).processed).length, 1);
+  assert.equal(results.filter((value) => JSON.parse(value).validationError).length, 1);
+  const state = JSON.parse(query(`select jsonb_build_object('status',r.status,'team',u.team_id) from team_join_requests r join users u on u.id=r.user_id where r.id='${request}'`));
+  assert.equal(state.team, state.status === 'approved' ? team : null);
+});

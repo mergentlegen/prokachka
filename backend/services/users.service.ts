@@ -1,17 +1,5 @@
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-
-async function syncPendingJoinRequests(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, userId: string, teamId: string | null) {
-  const pending = await supabase.from("team_join_requests").select("id,team_id").eq("user_id", userId).eq("status", "pending");
-  if (pending.error) return;
-  const reviewedAt = new Date().toISOString();
-  for (const request of pending.data || []) {
-    await supabase.from("team_join_requests").update({
-      status: teamId && String(request.team_id) === teamId ? "approved" : "rejected",
-      reviewed_at: reviewedAt,
-      reviewed_by: null,
-    }).eq("id", request.id).eq("status", "pending");
-  }
-}
 
 export async function findUsers(options: { teamId?: string; userId?: string; includeLogin?: boolean } = {}) {
   const supabase = getSupabaseAdmin();
@@ -22,7 +10,7 @@ export async function findUsers(options: { teamId?: string; userId?: string; inc
   let query = supabase.from("users").select(fields).order("created_at", { ascending: false });
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (options.userId) query = query.eq("id", options.userId);
-  const result = await query;
+  const result = await readPages(query.order("id"));
   return result.error ? { error: result.error } : { data: result.data };
 }
 
@@ -55,7 +43,6 @@ export async function updateUserAccess(id: string, input: { role?: "admin" | "me
     if (input.canInviteMembers !== undefined) patch.can_invite_members = input.canInviteMembers;
   }
   const result = await supabase.from("users").update(patch).eq("id", id).select("id,name,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at").single();
-  if (!result.error && result.data) await syncPendingJoinRequests(supabase, id, result.data.team_id ? String(result.data.team_id) : null);
   return result.error ? { error: result.error } : { data: result.data };
 }
 

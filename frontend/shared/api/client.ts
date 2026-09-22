@@ -1,4 +1,7 @@
-import type { Announcement, AuthUser, MemberProgramProgress, RankEntry, StarAward, Submission, Store, Task, TaskProgram, User } from "@/shared/domain/types";
+import type { Announcement, AuthUser, RankEntry, StarAward, Submission, Store, Task, TaskProgram, User } from "@/shared/domain/types";
+import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
+import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
+import { ScopeChangedError } from "@/frontend/shared/lib/query-cache";
 import { starAwardOption } from "@/shared/domain/star-awards";
 
 type ApiRow = Record<string, unknown>;
@@ -15,24 +18,56 @@ export function authFetch(input: RequestInfo | URL, init?: RequestInit) {
   const token = devSessionToken();
   return fetchWithTimeout(input, { ...init, cache: init?.cache || "no-store", headers: { ...(token ? { "x-incruises-dev-session": token } : {}), ...(init?.headers || {}) } });
 }
-export function clearDevSession() { if (typeof window !== "undefined") { window.sessionStorage.removeItem(devSessionStorageKey); window.localStorage.removeItem(devSessionStorageKey); } }export function saveDevSession(value: unknown) {
+export function clearDevSession() { dataCache.activate(""); if (typeof window !== "undefined") { window.sessionStorage.removeItem(devSessionStorageKey); window.localStorage.removeItem(devSessionStorageKey); } }export function saveDevSession(value: unknown) {
   if (typeof window !== "undefined" && typeof value === "string" && value.length > 0) {
     window.sessionStorage.setItem(devSessionStorageKey, value);
   }
 }
-export async function refreshAuthSession(): Promise<AuthUser> {
-  const response = await authFetch("/api/auth/session");
-  const body = await response.json().catch(() => ({})) as ApiResponse<{ user?: AuthUser; session?: string; devAuthMode?: boolean }>;
-  if (!response.ok || !body.user) throw new Error(typeof body.message === "string" ? body.message : "Сессия не найдена.");
-  if (body.devAuthMode === true) saveDevSession(body.session);
-  return body.user;
+let sessionRequest: { epoch: number; promise: Promise<AuthUser> } | undefined;
+export function refreshAuthSession(): Promise<AuthUser> {
+  const epoch = dataCache.epoch;
+  if (sessionRequest?.epoch === epoch) return sessionRequest.promise;
+  const promise = (async () => {
+    const response = await authFetch("/api/auth/session");
+    const body = await response.json().catch(() => ({})) as ApiResponse<{ user?: AuthUser; session?: string; devAuthMode?: boolean }>;
+    if (epoch !== dataCache.epoch) throw new ScopeChangedError();
+    if (!response.ok || !body.user) {
+      if (response.status === 401) dataCache.activate("");
+      throw new ApiError(typeof body.message === "string" ? body.message : "Сессия не найдена.", response.status);
+    }
+    dataCache.activate(userScope(body.user));
+    if (body.devAuthMode === true) saveDevSession(body.session);
+    return body.user;
+  })().finally(() => { if (sessionRequest?.promise === promise) sessionRequest = undefined; });
+  sessionRequest = { epoch, promise };
+  return promise;
+}
+export class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message); }
+}
+export function openLiveStream(signal: AbortSignal) {
+  const token = devSessionToken();
+  return fetch("/api/events", { signal, cache: "no-store", headers: token ? { "x-incruises-dev-session": token } : {} });
 }
 export async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const token = devSessionToken();
-  const response = await fetchWithTimeout(input, { ...init, cache: init?.cache || "no-store", headers: { "Content-Type": "application/json", ...(token ? { "x-incruises-dev-session": token } : {}), ...(init?.headers || {}) } });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof body.message === "string" ? body.message : "API request failed");
-  return body as T;
+  const url = String(input);
+  const method = (init?.method || "GET").toUpperCase();
+  const fetcher = async () => {
+    const response = await authFetch(input, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401 && typeof window !== "undefined") {
+        dataCache.activate("");
+        window.dispatchEvent(new CustomEvent(localChangeEvent, { detail: ["session"] }));
+      }
+      throw new ApiError(typeof body.message === "string" ? body.message : "API request failed", response.status);
+    }
+    return body as T;
+  };
+  if (typeof window !== "undefined" && method === "GET" && resourceTopics(url).length) return dataCache.read(url, fetcher);
+  const body = await fetcher();
+  if (method !== "GET") announceMutation(mutationTopics(url, method));
+  return body;
 }
 export function mapTask(row: ApiRow): Task {
   return { id: String(row.id), title: String(row.title || ""), description: String(row.description || ""), maxPoints: Number(row.max_points || 0),
@@ -47,9 +82,6 @@ export function mapTask(row: ApiRow): Task {
 }
 export function mapProgram(row: ApiRow): TaskProgram {
   return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), publisherId: row.publisher_id ? String(row.publisher_id) : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
-}
-export function mapProgress(row: ApiRow): MemberProgramProgress {
-  return { id: String(row.id), userId: String(row.user_id), programId: String(row.program_id), currentTaskId: row.current_task_id ? String(row.current_task_id) : undefined, unlockedAt: String(row.unlocked_at), dueAt: String(row.due_at), status: row.status === "completed" ? "completed" : "active", completedAt: row.completed_at ? String(row.completed_at) : undefined };
 }
 export function mapAnnouncement(row: ApiRow): Announcement { return { id: String(row.id), teamId: String(row.team_id), authorId: row.author_id ? String(row.author_id) : undefined, title: String(row.title || ""), content: String(row.content || ""), resourceUrl: row.resource_url ? String(row.resource_url) : undefined, isActive: Boolean(row.is_active), createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) }; }
 export function mapStarAward(row: ApiRow): StarAward {
@@ -66,10 +98,13 @@ export function mapUser(row: ApiRow): User { return { id: String(row.id), name: 
 export function mapSubmission(row: ApiRow): Submission { return { id: String(row.id), userId: String(row.user_id), taskId: String(row.task_id), taskTitle: String((Array.isArray(row.tasks) ? row.tasks[0] : row.tasks)?.title || ""), taskMaxPoints: (Array.isArray(row.tasks) ? row.tasks[0] : row.tasks)?.max_points, reviewVersion: Number(row.review_version || 0), status: row.status === "accepted" || row.status === "revision" ? row.status : "pending", mediaType: row.media_type === "text" || row.media_type === "photo" || row.media_type === "video" || row.media_type === "document" ? row.media_type : undefined, answerText: row.answer_text ? String(row.answer_text) : undefined, points: Number(row.points || 0), comment: String(row.comment || ""), submittedAt: String(row.submitted_at || new Date().toISOString()), reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined }; }
 
 export type MemberData = { store: Store; ranking: RankEntry[]; starRanking: RankEntry[]; network: User[] };
-export async function loadMemberData(userId: string): Promise<MemberData> {
+export type MemberDataset = "tasks" | "submissions" | "ranking" | "announcements" | "stars" | "network";
+export async function loadMemberData(userId: string, keys: readonly MemberDataset[] = ["tasks", "submissions", "ranking", "announcements", "stars", "network"]): Promise<MemberData> {
+  const read = <T,>(key: MemberDataset, url: string, empty: T): Promise<T> => keys.includes(key)
+    ? request<T>(url) : Promise.resolve(dataCache.peek<T>(url) ?? empty);
   const [tasksResponse, submissionsResponse, rankingResponse, announcementsResponse, starsResponse, networkResponse] = await Promise.all([
-    request<ApiResponse<{ tasks: ApiRow[] }>>("/api/tasks?view=member"), request<ApiResponse<{ submissions: ApiRow[] }>>("/api/submissions?userId=" + encodeURIComponent(userId)),
-    request<ApiResponse<{ ranking: RankEntry[]; starRanking: RankEntry[] }>>("/api/ranking"), request<ApiResponse<{ announcements: ApiRow[] }>>("/api/announcements"), request<ApiResponse<{ awards: ApiRow[] }>>("/api/stars"), request<ApiResponse<{ users: ApiRow[] }>>("/api/network"),
+    read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
+    read("ranking", "/api/ranking", { ranking: [] as RankEntry[], starRanking: [] as RankEntry[] }), read("announcements", "/api/announcements", { announcements: [] as ApiRow[] }), read("stars", "/api/stars", { awards: [] as ApiRow[] }), read("network", "/api/network", { users: [] as ApiRow[] }),
   ]);
   return { store: { tasks: tasksResponse.tasks.map(mapTask), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapUser) };
 }

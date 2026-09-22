@@ -1,14 +1,7 @@
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
-import { findAccountById } from "@/backend/services/auth.service";
 import { findPublicationHistory } from "@/backend/services/publication-history.service";
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 export async function listPublicationHistory(request: Request) {
   const user = await currentUser(request);

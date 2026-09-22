@@ -1,7 +1,6 @@
 import { session } from "@/backend/controllers/auth.controller";
 import { serverEnv } from "@/backend/config/env";
 import { sessionCookie } from "@/backend/http/session-cookie";
-import { enforceRequestSecurity } from "@/backend/http/security";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {

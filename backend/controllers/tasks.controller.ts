@@ -1,16 +1,9 @@
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
-import { findAccountById } from "@/backend/services/auth.service";
 import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
 import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from "@/backend/services/tasks.service";
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
   return Boolean(user && (user.role === "ceo" || user.role === "admin" || user.canPublishTasks));

@@ -3,19 +3,28 @@ import type { StarAwardKind } from "@/shared/domain/star-awards";
 import { mapAnnouncement, mapProgram, mapStarAward, mapSubmission, mapTask, mapUser, request } from "@/frontend/shared/api/client";
 type ApiRow = Record<string, unknown>;
 type ApiResponse<T> = { ok: boolean; message?: string } & T;
-export type ProgramHistoryStatus = "on_time" | "active" | "late" | "missed" | "completed" | "locked";
-export type ProgramHistoryStepMember = { userId: string; name: string; status: Exclude<ProgramHistoryStatus, "completed">; dueAt?: string; submittedAt?: string; points?: number };
-export type ProgramHistoryMember = { userId: string; name: string; status: ProgramHistoryStatus; currentStep?: number; currentTaskTitle?: string; dueAt?: string; submittedAt?: string; points?: number };
-export type ProgramHistory = { id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; publisherName?: string; createdAt: string; steps: Array<{ id: string; title: string; position: number; maxPoints: number; deadlineHours: number; members: ProgramHistoryStepMember[] }>; members: ProgramHistoryMember[] };
-export type PublicationHistoryItem = { id: string; type: "task" | "program" | "announcement"; title: string; authorId?: string; authorName: string; teamId: string; isActive: boolean; createdAt: string; updatedAt: string; deadlineAt?: string; stepCount?: number };
+import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
+export type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 
-export async function loadAdminData(): Promise<Store> {
-  const [tasksResponse, usersResponse, submissionsResponse, announcementsResponse, starsResponse, programsResponse] = await Promise.all([
-    request<ApiResponse<{ tasks: ApiRow[] }>>("/api/tasks"), request<ApiResponse<{ users: ApiRow[] }>>("/api/users"),
-    request<ApiResponse<{ submissions: ApiRow[] }>>("/api/submissions"), request<ApiResponse<{ announcements: ApiRow[] }>>("/api/announcements"),
-    request<ApiResponse<{ awards: ApiRow[] }>>("/api/stars"), request<ApiResponse<{ programs: ApiRow[] }>>("/api/programs"),
-  ]);
-  return { tasks: tasksResponse.tasks.map(mapTask), users: usersResponse.users.map(mapUser), programs: programsResponse.programs.map(mapProgram), programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) };
+export type AdminDataset = Exclude<keyof Store, "programProgress">;
+const datasetLoaders: { [K in AdminDataset]: () => Promise<Store[K]> } = {
+  tasks: async () => (await request<ApiResponse<{ tasks: ApiRow[] }>>("/api/tasks")).tasks.map(mapTask),
+  users: async () => (await request<ApiResponse<{ users: ApiRow[] }>>("/api/users")).users.map(mapUser),
+  submissions: async () => (await request<ApiResponse<{ submissions: ApiRow[] }>>("/api/submissions")).submissions.map(mapSubmission),
+  announcements: async () => (await request<ApiResponse<{ announcements: ApiRow[] }>>("/api/announcements")).announcements.map(mapAnnouncement),
+  starAwards: async () => (await request<ApiResponse<{ awards: ApiRow[] }>>("/api/stars")).awards.map(mapStarAward),
+  programs: async () => (await request<ApiResponse<{ programs: ApiRow[] }>>("/api/programs")).programs.map(mapProgram),
+};
+export async function loadAdminData(keys: readonly AdminDataset[]): Promise<Partial<Store>> {
+  const entries = await Promise.all([...new Set(keys)].map(async (key) => [key, await datasetLoaders[key]()]));
+  return Object.fromEntries(entries);
+}
+export async function loadAdminRanking(): Promise<RankEntry[]> {
+  return (await request<ApiResponse<{ ranking: RankEntry[] }>>("/api/ranking")).ranking;
+}
+export type MentorCounts = { pending: number; accepted: number; requests: number };
+export async function loadMentorCounts(): Promise<MentorCounts> {
+  return (await request<ApiResponse<{ counts: MentorCounts }>>("/api/submissions?summary=1")).counts;
 }
 export async function loadAdminProgramHistory(): Promise<ProgramHistory[]> {
   const response = await request<ApiResponse<{ programs: ProgramHistory[] }>>("/api/programs/history");

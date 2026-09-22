@@ -77,20 +77,6 @@ export async function createTeamInvitation(teamId: string, inviterId: string) {
   return result.error ? { error: result.error } : { data: { ...result.data, token } };
 }
 
-export async function approveTeamJoinRequest(requestId: string, reviewerId?: string) {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return { unavailable: true as const };
-  const result = await supabase.rpc("approve_team_join_request", {
-    p_request_id: requestId,
-    p_reviewer_id: reviewerId && reviewerId !== "ceo" ? reviewerId : null,
-  });
-  if (result.error) return { error: result.error };
-  const status = String(result.data || "");
-  if (status === "approved") return { approved: true as const };
-  if (status === "already_joined_other_team") return { validationError: "Пользователь уже состоит в другой команде." };
-  if (status === "invalid_invitation") return { validationError: "Ссылка приглашения недействительна или больше не доступна." };
-  return { validationError: "Заявка уже обработана или больше недоступна." };
-}
 
 export async function getNetworkForViewer(user: AuthUser) {
   if (!user.teamId) return { data: [] as ReturnType<typeof mapNetworkUser>[] };
@@ -122,12 +108,11 @@ export async function updateNetworkUser(actor: AuthUser, targetId: string, input
   if (input.canReview !== undefined) patch.can_review = input.canReview;
   if (input.canPublishTasks !== undefined) patch.can_publish_tasks = input.canPublishTasks;
   if (!Object.keys(patch).length) return { validationError: "Нет изменений для сохранения." };
-  const saved = await supabase.from("users").update(patch).eq("id", targetId).eq("team_id", actor.teamId).eq("role", "member").select(networkSelect).single();
+  const saved = await supabase.rpc("app_update_network_user", { p_actor: actor.id, p_target: targetId, p_patch: patch });
   if (saved.error) return { error: saved.error };
-  if (input.parentUserId !== undefined && String(target.parent_user_id || "") !== String(input.parentUserId || "")) {
-    await supabase.from("team_assignment_history").insert({ team_id: actor.teamId, user_id: targetId, previous_parent_user_id: target.parent_user_id || null, new_parent_user_id: input.parentUserId || null, changed_by: actor.id === "ceo" ? null : actor.id });
-  }
-  return { data: mapNetworkUser(saved.data as NetworkUserRow) };
+  const outcome = saved.data as { forbidden?: boolean; data: NetworkUserRow };
+  if (outcome.forbidden) return { forbidden: true as const };
+  return { data: mapNetworkUser(outcome.data) };
 }
 
 export function descendants(rows: NetworkUserRow[], rootId: string, includeRoot = true) {
@@ -173,12 +158,6 @@ export function isAudienceVisible(rows: NetworkUserRow[], viewerId: string, audi
   return ancestors(rows, viewerId).has(String(audienceRootId));
 }
 
-export function visibleNetworkIds(rows: NetworkUserRow[], viewerId: string, role: string) {
-  if (role === "ceo" || role === "admin") {
-    return new Set(rows.filter((row) => row.role === "member").map((row) => String(row.id)));
-  }
-  return new Set([...descendants(rows, viewerId, true)].filter((id) => rows.find((row) => String(row.id) === id)?.role === "member"));
-}
 
 export function canReviewNetwork(rows: NetworkUserRow[], reviewerId: string, targetUserId: string, role: string) {
   if (reviewerId === targetUserId) return false;

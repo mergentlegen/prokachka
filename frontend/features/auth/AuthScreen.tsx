@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { clearDevSession } from "@/frontend/shared/api/client";
+import { dataCache } from "@/frontend/shared/api/data-cache";
+import { userScope } from "@/shared/domain/live-updates";
 import { registrationServerField, validateAuthForm } from "@/frontend/shared/lib/auth-validation";
 import type { AuthMode, AuthValues, AuthFieldName, AuthErrors } from "@/frontend/shared/lib/auth-validation";
 import type { AuthUser } from "@/shared/domain/types";
@@ -50,6 +52,7 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
       }
       if (body.devAuthMode === true && typeof body.session === "string") window.sessionStorage.setItem("incruises_dev_session", body.session);
       else clearDevSession();
+      dataCache.activate(userScope(body.user as AuthUser));
       onAuthenticated(body.user as AuthUser);
     } catch {
       setError("Не удалось связаться с сервером. Проверьте соединение и попробуйте ещё раз.");

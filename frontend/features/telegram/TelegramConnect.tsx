@@ -1,7 +1,5 @@
 "use client";
 
-import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
-
 type TelegramConnectProps = {
   telegramId?: string;
   busy?: boolean;
@@ -11,10 +9,6 @@ type TelegramConnectProps = {
 
 export function TelegramConnect({ telegramId, busy = false, onLink, onRefresh }: TelegramConnectProps) {
   const linked = Boolean(telegramId);
-
-  useAutoRefresh(async () => {
-    if (!linked && !busy) await onRefresh(true);
-  }, { enabled: !linked && !busy, intervalMs: 20000 });
 
   return <section className={"telegram-connect " + (linked ? "is-linked" : "is-unlinked")}>
     <div className="telegram-connect-icon">➤</div>

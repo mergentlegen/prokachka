@@ -62,7 +62,6 @@ http://localhost:3000
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 AUTH_SECRET=
 ```
@@ -105,12 +104,19 @@ public/brand/           Логотипы и брендовые ассеты
 
 ```powershell
 npm run dev      # development-сервер
-npm run lint     # проверка TypeScript
+npm run lint     # ESLint (Next.js и React)
+npm run typecheck # строгая проверка TypeScript
+npm test         # unit- и компонентные проверки
+npm run check    # lint, typecheck, tests и сборка
 npm run build    # production-сборка
 npm start        # запуск production-сервера
 ```
 
 ## Production
+
+Кэш разделов, мягкая загрузка и realtime: [миграция, Nginx и проверка](docs/live-updates.md).
+
+Обновление архитектуры, транзакции, рейтинг и обязательная миграция: [порядок обновления](docs/architecture-hardening.md).
 
 Обновление безопасности Telegram, миграция и обязательный таймер повторной доставки: [инструкция](docs/telegram-backend-deploy.md).
 

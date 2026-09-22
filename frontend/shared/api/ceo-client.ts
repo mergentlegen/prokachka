@@ -1,4 +1,4 @@
-import type { Team, TeamJoinRequest, User } from "@/shared/domain/types";
+import type { TeamJoinRequest } from "@/shared/domain/types";
 import { mapUser, request } from "@/frontend/shared/api/client";
 import { loadTeamRequests, mapTeam } from "@/frontend/shared/api/team-client";
 

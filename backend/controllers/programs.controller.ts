@@ -1,18 +1,11 @@
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { createProgram, deleteProgram, findPrograms, updateProgram } from "@/backend/services/programs.service";
 import { findProgramHistory } from "@/backend/services/program-history.service";
-import { findAccountById } from "@/backend/services/auth.service";
 
 function validText(value: unknown, max: number) { return typeof value === "string" && value.trim().length >= 2 && value.trim().length <= max; }
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 function canMentor(user: Awaited<ReturnType<typeof currentUser>>) {
   return Boolean(user && (user.role === "ceo" || user.role === "admin" || user.canReview || user.canPublishTasks));

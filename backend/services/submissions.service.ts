@@ -5,6 +5,13 @@ type SubmissionViewer = { id: string; role: string; teamId?: string; canReview?:
 type FindOptions = { userId?: string; teamId?: string; viewer?: SubmissionViewer };
 const submissionSelect = "id,user_id,task_id,status,media_type,answer_text,points,comment,submitted_at,reviewed_at,review_version,created_at";
 
+export async function findMentorCounts(userId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const result = await supabase.rpc("app_mentor_counts", { p_viewer: userId });
+  return result.error ? { error: result.error } : { data: result.data };
+}
+
 export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };

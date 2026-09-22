@@ -1,22 +1,22 @@
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { findSubmissionMedia, findSubmissions, saveReview } from "@/backend/services/submissions.service";
+import { findSubmissionMedia, findSubmissions, findMentorCounts, saveReview } from "@/backend/services/submissions.service";
 import { prepareTelegramSubmission } from "@/backend/services/telegram-submission.service";
 import { serverEnv } from "@/backend/config/env";
-import { findAccountById } from "@/backend/services/auth.service";
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 export async function listSubmissions(request: Request) {
   const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   const params = new URL(request.url).searchParams;
+  if (params.get("summary") === "1") {
+    if (user.id === "ceo" || !user.teamId) return ok({ counts: { pending: 0, accepted: 0, requests: 0 } });
+    const result = await findMentorCounts(user.id);
+    if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if (result.error) return failure("Не удалось обновить счётчики.");
+    return ok({ counts: result.data });
+  }
   const requestedUserId = params.get("userId");
   if (requestedUserId && requestedUserId !== user.id) return failure("Недостаточно прав.", 403);
   const personal = params.get("view") === "member" || requestedUserId === user.id || (user.role === "member" && !user.canReview);

@@ -1,17 +1,10 @@
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { findAccountById } from "@/backend/services/auth.service";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { findStarAwards, insertStarAward, removeStarAward } from "@/backend/services/stars.service";
 import { starAwardOption } from "@/shared/domain/star-awards";
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 function isValidComment(value: unknown) {
   return typeof value === "string" && value.trim().length <= 500;

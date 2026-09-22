@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { AuthUser, User } from "@/shared/domain/types";
-import { createNetworkInvitation, loadNetwork, updateNetworkUser } from "@/frontend/shared/api/network-client";
+import { createNetworkInvitation, updateNetworkUser } from "@/frontend/shared/api/network-client";
 import { NetworkTree } from "@/frontend/shared/NetworkTree";
 import { buildNetworkTree, networkDescendantIds } from "@/frontend/shared/lib/network-tree";
 
-export function NetworkPanel({ authUser, onError }: { authUser: AuthUser; onError: (message: string) => void }) {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [retry, setRetry] = useState(0);
+export function NetworkPanel({ authUser, users, onChange: setUsers, onError }: {
+  authUser: AuthUser; users: User[]; onChange: Dispatch<SetStateAction<User[]>>; onError: (message: string) => void;
+}) {
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -21,15 +19,6 @@ export function NetworkPanel({ authUser, onError }: { authUser: AuthUser; onErro
   const canManage = authUser.role === "admin";
   const entries = useMemo(() => buildNetworkTree(users), [users]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setFailed(false);
-    loadNetwork().then((data) => { if (!cancelled) setUsers(data); })
-      .catch(() => { if (!cancelled) setFailed(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [retry]);
 
   useEffect(() => {
     if (!inviteCopied) return;
@@ -70,8 +59,6 @@ export function NetworkPanel({ authUser, onError }: { authUser: AuthUser; onErro
     } catch { onError("Не удалось скопировать ссылку. Выделите её и скопируйте вручную."); }
   }
 
-  if (loading) return <div className="admin-panel network-intro" role="status"><p>Загружаем структуру сети...</p></div>;
-  if (failed) return <div className="admin-panel network-intro"><p role="alert">Не удалось загрузить структуру сети.</p><button className="button button-edit" onClick={() => setRetry((value) => value + 1)}>Повторить</button></div>;
 
   return <div className="network-page">
     <div className="admin-panel network-intro">

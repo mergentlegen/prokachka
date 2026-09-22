@@ -1,15 +1,9 @@
-import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
+import { hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { createJoinRequest, findJoinRequests, reviewJoinRequest } from "@/backend/services/team-requests.service";
-import { findAccountById } from "@/backend/services/auth.service";
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 export async function listTeamRequests(request: Request) {
   const user = await currentUser(request);
@@ -42,12 +36,13 @@ export async function createTeamRequest(request: Request) {
 export async function reviewTeamRequest(request: Request, id: string) {
   const user = await currentUser(request);
   if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (user.role !== "ceo" && !user.teamId) return failure("За наставником не закреплена команда.", 403);
   try {
     const body = await request.json();
     if (!isUuid(id)) return failure("Некорректная заявка.", 400);
     const status = body.status === "approved" || body.status === "rejected" ? body.status : null;
     if (!status) return failure("Неизвестный статус заявки.", 400);
-    const result = await reviewJoinRequest(id, status, user.id, user.role === "admin" ? user.teamId : undefined);
+    const result = await reviewJoinRequest(id, status, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("Заявка относится к другой команде.", 403);
     if ("validationError" in result) return failure(result.validationError || "Заявка не может быть обработана.", 400);

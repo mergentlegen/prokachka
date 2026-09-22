@@ -2,13 +2,12 @@ import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { deleteUser, findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
-import { findAccountById } from "@/backend/services/auth.service";
+import { getCurrentUser } from "@/backend/http/current-user";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 
 export async function listUsers(request: Request) {
-  const sessionUser = getRequestUser(request);
-  const currentUser = sessionUser?.id === "ceo" ? sessionUser : sessionUser ? (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser) : null;
+  const currentUser = await getCurrentUser(request);
   if (!currentUser) return failure("Сначала войдите в аккаунт.", 401);
   if (currentUser.role === "admin" && !currentUser.teamId) return ok({ users: [] });
   if (currentUser.role === "member" && currentUser.teamId) {
@@ -50,7 +49,9 @@ export async function updateUserAccessController(request: Request, id: string) {
     if (body.teamId !== undefined && body.teamId !== null && body.teamId !== "" && !isUuid(body.teamId)) return failure("Некорректная команда.", 400);
     const result = await updateUserAccess(id, { role: body.role, teamId: body.teamId });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
-    if (result.error) return failure("Не удалось обновить доступ пользователя.");
+    if (result.error) return failure(result.error.code === "23514"
+      ? "Не удалось изменить команду. Сначала переподчините участников нижней ветки и проверьте выбранную команду."
+      : "Не удалось обновить доступ пользователя.", result.error.code === "23514" ? 409 : 500);
     scheduleTelegramDelivery();
     return ok({ user: result.data });
   } catch { return failure("Некорректные данные.", 400); }
@@ -62,6 +63,8 @@ export async function deleteUserController(request: Request, id: string) {
   if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
   const result = await deleteUser(id);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
-  if (result.error) return failure("Не удалось удалить пользователя.");
+  if (result.error) return failure(result.error.code === "23503"
+    ? "Пользователь связан с материалами своей ветки. Сначала переназначьте аудиторию материалов; удаление не должно открыть их всей команде."
+    : "Не удалось удалить пользователя.", result.error.code === "23503" ? 409 : 500);
   return ok({});
 }

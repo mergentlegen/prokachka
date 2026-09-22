@@ -11,7 +11,7 @@ function load(relative, overrides = {}) {
   loaded.filename = file;
   loaded.paths = Module._nodeModulePaths(path.dirname(file));
   const original = loaded.require.bind(loaded);
-  loaded.require = (name) => name in overrides ? overrides[name] : name === '@/shared/domain/star-awards' ? load('shared/domain/star-awards.ts') : original(name);
+  loaded.require = (name) => name in overrides ? overrides[name] : name.startsWith('@/') ? load(name.slice(2) + '.ts', overrides) : original(name);
   loaded._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, file);
   return loaded.exports;
 }

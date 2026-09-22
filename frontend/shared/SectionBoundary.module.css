@@ -1,0 +1,19 @@
+.region { position: relative; min-width: 0; }
+.skeleton { filter: blur(3px); opacity: .65; pointer-events: none; min-height: 340px; }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+.metrics > div, .panel { background: #fff; border: 1px solid #e2e7f0; border-radius: 16px; padding: 22px; }
+.metrics i, .metrics b { display: block; border-radius: 6px; background: #e8edf7; height: 12px; width: 68%; margin: 6px 0 18px; }
+.metrics b { height: 28px; width: 40%; margin-bottom: 0; }
+.row { display: flex; gap: 16px; align-items: center; padding: 18px 0; border-bottom: 1px solid #eef1f6; }
+.row:last-child { border: 0; }
+.row i { width: 36px; height: 36px; border-radius: 50%; background: #e8edf7; }
+.row span { height: 12px; width: 45%; border-radius: 5px; background: #e8edf7; }
+.row b { margin-left: auto; width: 15%; height: 26px; border-radius: 8px; background: #e8edf7; }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; color: #334c90; font-size: 14px; animation: appear .2s ease-out both; }
+.spinner { height: 20px; width: 20px; border: 2px solid #d5def3; border-top-color: #3554a1; border-radius: 50%; animation: spin .8s linear infinite; }
+.error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 18px; margin-top: 16px; border: 1px solid #edc7cd; border-radius: 12px; color: #923c4a; background: #fff6f7; }
+.error button { border: 1px solid currentColor; border-radius: 8px; color: inherit; background: transparent; padding: 10px 16px; min-height: 44px; cursor: pointer; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 480px) { .metrics { gap: 8px; } .metrics > div, .panel { padding: 14px; } }
+@media (prefers-reduced-motion: reduce) { .spinner, .overlay { animation: none; } }

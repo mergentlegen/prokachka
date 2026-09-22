@@ -1,16 +1,9 @@
 import { failure, ok } from "@/backend/http/api-response";
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
-import { findAccountById } from "@/backend/services/auth.service";
 import { createTeamInvitation, getNetworkForViewer, updateNetworkUser } from "@/backend/services/network.service";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 
-async function currentUser(request: Request) {
-  const sessionUser = getRequestUser(request);
-  if (!sessionUser) return null;
-  if (sessionUser.id === "ceo") return sessionUser;
-  return (await findAccountById(sessionUser.id)) || (process.env.NEXT_PUBLIC_SUPABASE_URL ? null : sessionUser);
-}
 
 export async function listNetwork(request: Request) {
   const user = await currentUser(request);

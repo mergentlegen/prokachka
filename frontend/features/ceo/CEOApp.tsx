@@ -4,8 +4,10 @@ import { Toast } from "@/frontend/shared/Toast";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
-import { authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
-import { useAutoRefresh } from "@/frontend/shared/hooks/use-auto-refresh";
+import { ApiError, authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
+import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
+import { dataCache } from "@/frontend/shared/api/data-cache";
+import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, reviewCeoRequest, updateCeoTeam, updateCeoUser } from "@/frontend/shared/api/ceo-client";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { formatDate, formatDateTime } from "@/frontend/shared/lib/format";
@@ -37,13 +39,15 @@ export function CEOApp() {
 
   async function refresh(silent = false) {
     if (!silent) setDataLoading(true);
+    const epoch = dataCache.epoch;
     try {
       const data = await loadCeoData();
+      if (epoch !== dataCache.epoch) return;
       setTeams(data.teams);
       setUsers(data.users);
       setRequests(data.requests);
     } catch {
-      setToast("Не удалось загрузить данные CEO-панели.");
+      if (epoch === dataCache.epoch) setToast("Не удалось загрузить данные CEO-панели.");
     } finally {
       setHasLoaded(true);
       if (!silent) setDataLoading(false);
@@ -75,14 +79,22 @@ export function CEOApp() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  useAutoRefresh(async () => {
-    await refresh(true);
-  }, { enabled: authUser?.role === "ceo" && hasLoaded && !dataLoading, intervalMs: 30000 });
+  useLiveUpdates(authUser, async (topics) => {
+    try {
+      if (topics.includes("session") || topics.includes("resync")) {
+        const current = await refreshAuthSession();
+        setAuthUser(current);
+        if (current.role !== "ceo") { setTeams([]); setUsers([]); setRequests([]); setUserDraft(null); setTeamDraft(null); return; }
+      }
+      await refresh(true);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) { setAuthUser(null); setTeams([]); setUsers([]); setRequests([]); }
+    }
+  });
 
   const pendingRequests = useMemo(() => requests.filter((request) => request.status === "pending"), [requests]);
   const activeTeams = teams.filter((team) => team.isActive);
   const mentors = users.filter((user) => user.role === "admin");
-  const members = users.filter((user) => user.role === "member");
 
   function handleAuthenticated(nextUser: AuthUser) {
     if (nextUser.role === "ceo") {
@@ -214,12 +226,12 @@ export function CEOApp() {
       </aside>
       <section className="ceo-content">
         <div className="ceo-heading"><div><p className="eyebrow">Пульт руководителя</p><h1>{section === "overview" ? "Всё под контролем" : sectionLabels[section]}</h1><p className="ceo-subtitle">Управляйте командами, заявками и доступами из одного места.</p>{dataLoading && hasLoaded && <span className="ceo-sync">Синхронизация данных...</span>}</div>{section === "teams" && <button className="primary-button" onClick={() => setTeamDraft({ name: "", description: "", isActive: true })}>+ Создать команду</button>}</div>
-        {dataLoading && !hasLoaded ? <div className="ceo-loading">Обновляем данные...</div> : <>
+        <SectionBoundary loading={dataLoading && !hasLoaded}>
           {section === "overview" && <Overview activeTeams={activeTeams.length} users={users.length} mentors={mentors.length} pending={pendingRequests.length} requests={pendingRequests} teams={teams} onNavigate={setSection} onResolve={resolveRequest} actionId={actionId} />}
           {section === "teams" && <TeamsView teams={teams} users={users} onEdit={(team) => setTeamDraft({ id: team.id, name: team.name, description: team.description, isActive: team.isActive })} onToggle={toggleTeam} onDelete={requestDeleteTeam} actionId={actionId} />}
           {section === "requests" && <RequestsView requests={requests} onResolve={resolveRequest} actionId={actionId} />}
           {section === "users" && <UsersView users={users} teams={teams} onEdit={(user) => setUserDraft({ id: user.id, role: user.role === "admin" ? "admin" : "member", teamId: user.teamId || "" })} onDelete={requestDeleteUser} actionId={actionId} />}
-        </>}
+        </SectionBoundary>
       </section>
     </div>
     <div className="ceo-mobile-nav">{(Object.keys(sectionLabels) as CeoSection[]).map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><span>{item === "overview" ? "⌂" : item === "teams" ? "◈" : item === "requests" ? "✉" : "♙"}</span>{sectionLabels[item]}{item === "requests" && pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>)}</div>

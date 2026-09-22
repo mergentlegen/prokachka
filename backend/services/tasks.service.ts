@@ -1,3 +1,4 @@
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
@@ -14,7 +15,7 @@ export async function findTasks(teamId?: string, viewer?: TaskViewer) {
   if (!supabase) return { unavailable: true as const };
   let query = supabase.from("tasks").select("*").order("created_at", { ascending: false });
   if (teamId) query = query.eq("team_id", teamId);
-  const result = await query;
+  const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };
   if (!teamId || !viewer || viewer.role === "ceo" || viewer.role === "admin") return { data: result.data };
   const network = await findTeamNetwork(teamId);

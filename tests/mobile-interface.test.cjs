@@ -400,7 +400,6 @@ test("login offers registration below the password; confirmation uses the reques
 const { TeamSelectionView } = loadTs("frontend/features/teams/TeamSelectionScreen.tsx", {
   "@/frontend/shared/api/team-client": {},
   "@/frontend/shared/api/client": {},
-  "@/frontend/shared/hooks/use-auto-refresh": {},
   "./TeamSelectionScreen.module.css": moduleCss,
 });
 const teamProps = {
