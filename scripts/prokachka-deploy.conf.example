@@ -1,0 +1,7 @@
+APP_ROOT=/var/www/prokachka-deploy
+LEGACY_APP_PATH=/var/www/prokachka
+APP_ENV_FILE=/var/www/prokachka/.env.production
+NODE_BIN=/usr/bin/node
+SERVICE_NAME=prokachka.service
+APP_PORT=3000
+PREFLIGHT_PORT=3100

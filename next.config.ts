@@ -28,6 +28,8 @@ const securityHeaders = [
 if (!isDevelopment) securityHeaders.push({ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" });
 
 const nextConfig: NextConfig = {
+  output: process.env.PROKACHKA_STANDALONE === "1" ? "standalone" : undefined,
+  deploymentId: process.env.PROKACHKA_RELEASE_ID,
   reactStrictMode: true,
   poweredByHeader: false,
   allowedDevOrigins: ["192.168.8.141", "*.trycloudflare.com"],
