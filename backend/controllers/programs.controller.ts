@@ -54,7 +54,7 @@ export async function postProgram(request: Request) {
       });
     }
     if (tasks.some((task: { title: string; description: string; maxPoints: number }) => !validText(task.title, 160) || !validText(task.description, 5000) || !Number.isInteger(task.maxPoints) || task.maxPoints < 0 || task.maxPoints > 100)) {
-      return failure("Проверьте названия, описания и баллы всех шагов.", 400);
+      return failure("Проверьте названия, описания и мили всех шагов.", 400);
     }
     const teamId = user.role === "ceo" ? typeof body.teamId === "string" ? body.teamId : undefined : user.teamId;
     if (!teamId || !isUuid(teamId)) return failure("Программа должна быть привязана к команде.", 400);

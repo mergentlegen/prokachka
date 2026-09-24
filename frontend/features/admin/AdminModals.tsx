@@ -2,6 +2,7 @@
 import type { FormEvent } from "react";
 import type { Task } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
+import { formatMiles } from "@/frontend/shared/lib/format";
 export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 export type ReviewDraft = { points: string; comment: string };
 
@@ -15,7 +16,7 @@ export function TaskEditorModal({ draft, editing, busy, onChange, onClose, onSub
     <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
     <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
     <div className="form-two-columns">
-      <label>Максимум баллов<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
+    <label>Максимум миль<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
       <label className="deadline-toggle"><span>Дедлайн</span><span className="switch-line"><input type="checkbox" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /><span>{draft.hasDeadline ? "Установлен" : "Без дедлайна"}</span></span></label>
     </div>
     {draft.hasDeadline && <label>Дата и время дедлайна<input type="datetime-local" value={draft.deadline} onChange={(event) => onChange("deadline", event.target.value)} /></label>}
@@ -29,8 +30,8 @@ export function ReviewModal({ draft, status, maxPoints, busy, onChange, onClose,
     <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
     <p className={"eyebrow " + (accepting ? "eyebrow-success" : "eyebrow-warning")}>{accepting ? "Финальная проверка" : "Нужна доработка"}</p>
     <h2>{accepting ? "Принять работу?" : "Вернуть на доработку?"}</h2>
-    <p className="modal-description">{accepting ? "Укажи результат проверки. Баллы автоматически попадут в рейтинг участника." : "Напиши понятный комментарий, чтобы участник знал, что исправить."}</p>
-    <label>Баллы <span className="field-hint">максимум {maxPoints}</span><input type="number" min="0" max={maxPoints} step="1" value={draft.points} onChange={(event) => onChange("points", event.target.value)} /></label>
+    <p className="modal-description">{accepting ? "Укажи результат проверки. Мили автоматически попадут в рейтинг участника." : "Напиши понятный комментарий, чтобы участник знал, что исправить."}</p>
+    <label>Мили <span className="field-hint">максимум {formatMiles(maxPoints)}</span><input type="number" min="0" max={maxPoints} step="1" value={draft.points} onChange={(event) => onChange("points", event.target.value)} /></label>
     <label>{accepting ? "Комментарий наставника" : "Что нужно доработать"}<textarea value={draft.comment} onChange={(event) => onChange("comment", event.target.value)} placeholder={accepting ? "Например, отличный разбор..." : "Например, подробнее раскрой второй пункт..."} rows={5} /></label>
     <div className="modal-actions"><button type="button" className="button button-muted" onClick={onClose}>Отмена</button><button type="submit" className={"button " + (accepting ? "button-success" : "button-warning")} disabled={busy}>{busy ? "Сохраняем..." : accepting ? "Принять работу" : "Вернуть на доработку"}</button></div>
   </form></div>;

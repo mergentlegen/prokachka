@@ -336,7 +336,7 @@ test("task preview is escaped and opens details without embedding an extra modal
 });
 test("task actions retain pending, accepted, late-program and closed-deadline states", () => {
   assert.ok(!taskMarkup(fixtureTask, fixtureSubmission).includes("Отправить ответ"));
-  assert.match(taskMarkup(fixtureTask, { ...fixtureSubmission, status: "accepted", points: 7 }), /\+7 баллов/);
+  assert.match(taskMarkup(fixtureTask, { ...fixtureSubmission, status: "accepted", points: 7 }), /\+7 миль/);
   assert.match(taskMarkup(fixtureTask, { ...fixtureSubmission, status: "revision" }), /Отправить повторно/);
   const expired = { ...fixtureTask, deadlineAt: "2000-01-01" };
   assert.match(taskMarkup(expired), /Приём завершён/);

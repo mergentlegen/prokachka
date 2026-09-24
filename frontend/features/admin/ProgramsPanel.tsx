@@ -5,6 +5,7 @@ import { createAdminProgram, deleteAdminProgram, updateAdminProgram } from "@/fr
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
+import { formatMiles } from "@/frontend/shared/lib/format";
 
 type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string };
 function validLink(value: string) {
@@ -89,7 +90,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
         <h3 ref={reviewTitle} tabIndex={-1}>Проверьте программу перед публикацией</h3>
         <p><strong>{title.trim()}</strong><br />Шагов: {draftTasks.length} · На каждый шаг: {deadlineHours} ч</p>
         {draftTasks.length === 1 && <p className="program-review-note">Сейчас в программе только один шаг. Если планировали несколько, вернитесь к редактированию и добавьте остальные.</p>}
-        <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {task.maxPoints} баллов{task.resourceUrl.trim() ? " · С материалом" : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
+        <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {formatMiles(task.maxPoints)}{task.resourceUrl.trim() ? " · С материалом" : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
         <div className="program-builder-actions"><button type="button" className="button button-edit" disabled={busy} onClick={() => setPreview(false)}>← К редактированию</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? "Публикуем..." : "Подтвердить и опубликовать"}</button></div>
       </div> : <>
         <fieldset disabled={busy} className="program-fields">
@@ -104,7 +105,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
               <label>Название шага<input ref={index === draftTasks.length - 1 ? newStepInput : undefined} required minLength={2} maxLength={160} value={task.title} onChange={(event) => updateTask(task.id, "title", event.target.value)} placeholder="Например, Познакомиться с командой" /></label>
               <label>Описание<textarea required minLength={2} maxLength={5000} rows={3} value={task.description} onChange={(event) => updateTask(task.id, "description", event.target.value)} placeholder="Что нужно сделать и какой ответ отправить" /></label>
               <div className="form-two-columns">
-                <label>Максимум баллов<input required type="number" min="0" max="100" step="1" value={task.maxPoints} onChange={(event) => updateTask(task.id, "maxPoints", event.target.value)} /></label>
+                <label>Максимум миль<input required type="number" min="0" max="100" step="1" value={task.maxPoints} onChange={(event) => updateTask(task.id, "maxPoints", event.target.value)} /></label>
                 <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" maxLength={2000} value={task.resourceUrl} aria-invalid={!validLink(task.resourceUrl)} onChange={(event) => updateTask(task.id, "resourceUrl", event.target.value)} placeholder="https://youtube.com/..." />{!validLink(task.resourceUrl) && <span className="program-field-error">Укажите ссылку с http:// или https://</span>}</label>
               </div>
               <ResourceCard url={task.resourceUrl} caption="Так участник увидит материал" />

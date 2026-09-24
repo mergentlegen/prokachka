@@ -241,7 +241,7 @@ export function AdminApp() {
       return;
     }
     if (!Number.isFinite(maxPoints) || maxPoints < 0) {
-      setToast("Максимум баллов должен быть неотрицательным числом.");
+      setToast("Максимум миль должен быть неотрицательным числом.");
       return;
     }
     let deadlineAt: string | null = null;
