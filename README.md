@@ -114,6 +114,8 @@ npm start        # запуск production-сервера
 
 ## Production
 
+CI/CD для GitHub Actions и Ubuntu/systemd: [настройка сервера и GitHub](docs/ci-cd.md).
+
 Кэш разделов, мягкая загрузка и realtime: [миграция, Nginx и проверка](docs/live-updates.md).
 
 Обновление архитектуры, транзакции, рейтинг и обязательная миграция: [порядок обновления](docs/architecture-hardening.md).

@@ -1,10 +1,68 @@
 name: Project checks
-on: [push, pull_request]
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: pipeline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Never interrupt a production activation halfway through.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  quality:
+    name: Code quality
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Check deployment shell scripts
+        run: |
+          bash -n scripts/deploy-production.sh scripts/start-production.sh
+          shellcheck scripts/deploy-production.sh scripts/start-production.sh
+
+  tests:
+    name: Unit and deployment tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: node --test tests/deployment.test.cjs
+
+  database:
+    name: Database integration
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17
@@ -16,19 +74,20 @@ jobs:
           --health-timeout 5s --health-retries 10
     env:
       PGHOST: 127.0.0.1
-      PGPORT: 5432
+      PGPORT: '5432'
       PGUSER: postgres
       PGDATABASE: postgres
       PGPASSWORD: test-only
-      PROKACHKA_TEST_PG_PORT: 5432
+      PROKACHKA_TEST_PG_PORT: '5432'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
-      - run: npm run check
       - name: Bootstrap disposable database
         run: |
           psql -X -v ON_ERROR_STOP=1 -f tests/database-roles.sql
@@ -40,3 +99,137 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/architecture-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/live-updates.sql
           npm run test:concurrency
+      - name: Star award migration on a separate empty database
+        run: |
+          createdb star_migration_test
+          PGDATABASE=star_migration_test psql -X -v ON_ERROR_STOP=1 -f tests/star-award-kinds.sql
+
+  build:
+    name: Build and smoke test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      PROKACHKA_STANDALONE: '1'
+      PROKACHKA_RELEASE_ID: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}
+      NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL || 'https://prokachka.kz' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://ci.invalid' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Validate clean build configuration
+        run: |
+          if find . -maxdepth 1 -name '.env*' ! -name '.env.example' | grep -q .; then
+            echo 'Build must not contain private .env files' >&2
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/package-release.cjs
+      - name: Boot the packaged application and verify HTTP responses
+        run: |
+          SMOKE_DIR=$(mktemp -d "$RUNNER_TEMP/prokachka-smoke.XXXXXX")
+          tar -xzf .next/artifact/release.tar.gz -C "$SMOKE_DIR"
+          node "$SMOKE_DIR/scripts/start-release.cjs" --ci 3100 > .next/smoke.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
+          node "$SMOKE_DIR/scripts/smoke-test.cjs" http://127.0.0.1:3100 "$PROKACHKA_RELEASE_ID"
+          kill -0 "$SERVER_PID"
+      - name: Print boot log on failure
+        if: failure()
+        run: test ! -f .next/smoke.log || cat .next/smoke.log
+      - name: Upload the tested package
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-release-${{ github.run_attempt }}
+          path: .next/artifact/release.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  check:
+    name: CI passed
+    needs: [quality, tests, database, build]
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    env:
+      JOB_RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - name: Require every check to pass (including skipped/cancelled checks)
+        run: echo "$JOB_RESULTS" | jq -e 'all(.[]; .result == "success")'
+
+  deploy:
+    name: Deploy production
+    needs: [check]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    env:
+      PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+      PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+      PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: production-release-${{ github.run_attempt }}
+          path: artifact
+      - name: Check that this is still the latest main commit
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [[ "$MAIN_SHA" == "$GITHUB_SHA" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer main commit exists; skipping this outdated deployment.'
+          fi
+      - name: Configure verified SSH connection
+        if: steps.latest.outputs.deploy == 'true'
+        env:
+          SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+          BUILD_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+        run: |
+          : "${SSH_KEY:?Missing PRODUCTION_SSH_KEY}" "${KNOWN_HOSTS:?Missing PRODUCTION_KNOWN_HOSTS}"
+          : "${BUILD_SUPABASE_URL:?Missing repository variable NEXT_PUBLIC_SUPABASE_URL}"
+          [[ "$PRODUCTION_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$PRODUCTION_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$PRODUCTION_SSH_PORT" =~ ^[0-9]+$ ]]
+          install -d -m 700 "$RUNNER_TEMP/prokachka-ssh"
+          printf '%s\n' "$SSH_KEY" > "$RUNNER_TEMP/prokachka-ssh/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/prokachka-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/prokachka-ssh/"*
+      - name: Upload and activate the tested release
+        if: steps.latest.outputs.deploy == 'true'
+        run: |
+          SSH_OPTIONS=(-i "$RUNNER_TEMP/prokachka-ssh/key" -o BatchMode=yes -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/prokachka-ssh/known_hosts"
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          TARGET="$PRODUCTION_USER@$PRODUCTION_HOST"
+          CHECKSUM=$(sha256sum artifact/release.tar.gz | cut -d ' ' -f 1)
+          scp "${SSH_OPTIONS[@]}" -P "$PRODUCTION_SSH_PORT" artifact/release.tar.gz \
+            "$TARGET:/var/www/prokachka-deploy/incoming/$RELEASE_ID.tar.gz"
+          ssh "${SSH_OPTIONS[@]}" -p "$PRODUCTION_SSH_PORT" "$TARGET" \
+            "bash -s -- '$RELEASE_ID' '$CHECKSUM'" < scripts/deploy-production.sh
+      - name: Remove temporary SSH credentials
+        if: always()
+        run: |
+          rm -f -- "$RUNNER_TEMP/prokachka-ssh/key" "$RUNNER_TEMP/prokachka-ssh/known_hosts"
