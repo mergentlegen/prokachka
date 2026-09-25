@@ -6,6 +6,7 @@ import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { formatMiles } from "@/frontend/shared/lib/format";
+import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
 
 type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string };
 function validLink(value: string) {
@@ -115,12 +116,13 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
         <div className="program-builder-actions"><p className="program-publish-hint">{canPublish ? "Все шаги заполнены. Проверьте их перед публикацией." : "Заполните название, срок и каждый добавленный шаг."}</p><button type="submit" className="button button-primary" disabled={busy || !canPublish}>Далее: проверить программу →</button></div>
       </>}
     </form>
+    <ReadyProgramsPanel programs={programs} tasks={tasks} actorId={actorId} canManageAll={canManageAll} onChange={onChange} onError={onError} />
     <div className="admin-panel table-panel">
       <div className="panel-title"><div><p className="eyebrow">Опубликованные</p><h2>Программы команды</h2></div></div>
       {programs.length === 0 ? <div className="empty-admin"><p>Программ пока нет.</p></div> : programs.map((program) => {
         const canManage = canManageAll || program.publisherId === actorId;
         return <div className="program-row" key={program.id}>
-          <div className="program-row-copy"><strong>{program.title}</strong><span>{tasks.filter((task) => task.programId === program.id).length} шагов · {program.deadlineHours} ч на шаг</span></div>
+          <div className="program-row-copy"><strong>{program.title}</strong><span>{tasks.filter((task) => task.programId === program.id).length} шагов · {program.templateKey ? "Без дедлайна" : `${program.deadlineHours} ч на шаг`}</span></div>
           <span className={"admin-status " + (program.isActive ? "active" : "inactive")}>{program.isActive ? "Активна" : "Скрыта"}</span>
           {canManage && <div className="row-actions"><button className={"button " + (program.isActive ? "button-warning" : "button-success")} onClick={() => void toggle(program)} disabled={busy}>{program.isActive ? "Скрыть" : "Активировать"}</button><button className="button button-danger" onClick={() => setDeleteTarget(program)} disabled={busy}>Удалить</button></div>}
         </div>;

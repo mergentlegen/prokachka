@@ -5,6 +5,8 @@ export type SubmissionStatus = "pending" | "accepted" | "revision";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
+export type ReadyProgramKey = "dream-plan";
+export type TaskInteractiveKind = "dream-plan";
 
 export type Team = {
   id: string; name: string; description: string; isActive: boolean; createdAt: string;
@@ -20,7 +22,7 @@ export type User = {
 export type AuthUser = Pick<User, "id" | "name" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
 
 export type TaskProgram = {
-  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; createdAt: string; updatedAt: string;
+  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
 };
 export type MemberProgramProgress = {
   id: string; userId: string; programId: string; currentTaskId?: string; unlockedAt: string; dueAt: string; status: ProgramStatus; completedAt?: string;
@@ -28,7 +30,7 @@ export type MemberProgramProgress = {
 export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
-  publisherId?: string; createdAt: string; updatedAt: string;
+  publisherId?: string; interactiveKind?: TaskInteractiveKind; createdAt: string; updatedAt: string;
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; createdAt: string; updatedAt: string;

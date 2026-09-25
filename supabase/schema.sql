@@ -98,6 +98,7 @@ create table public.tasks (
   max_points integer not null default 10 check (max_points >= 0 and max_points <= 100),
   deadline_at timestamptz,
   resource_url text check (resource_url is null or resource_url ~ '^https?://'),
+  interactive_kind text check (interactive_kind is null or interactive_kind in ('dream-plan')),
   publisher_id uuid references public.users(id) on delete set null,
   audience_root_id uuid references public.users(id) on delete set null,
   is_active boolean not null default true,
@@ -152,6 +153,7 @@ create table public.task_programs (
   team_id uuid not null references public.teams(id) on delete cascade,
   title text not null check (char_length(trim(title)) between 2 and 160),
   deadline_hours integer not null default 72 check (deadline_hours between 1 and 720),
+  template_key text check (template_key is null or template_key in ('dream-plan')),
   publisher_id uuid references public.users(id) on delete set null,
   audience_root_id uuid references public.users(id) on delete set null,
   is_active boolean not null default true,
@@ -181,6 +183,7 @@ create table public.member_program_progress (
 
 create index task_programs_team_idx on public.task_programs(team_id, is_active, created_at desc);
 create index task_programs_audience_root_idx on public.task_programs(team_id, audience_root_id, created_at desc);
+create unique index task_programs_team_template_unique_idx on public.task_programs(team_id, template_key) where template_key is not null;
 create index tasks_program_position_idx on public.tasks(program_id, position);
 create index member_progress_user_idx on public.member_program_progress(user_id, status);
 create index member_progress_program_idx on public.member_program_progress(program_id, status);

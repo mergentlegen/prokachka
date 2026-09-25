@@ -1,0 +1,41 @@
+.game { display: grid; gap: 16px; margin-top: 22px; padding: 18px; border: 1px solid #dce7ec; border-radius: 16px; background: #f7fbfb; color: #0e3b5c; }
+.gameHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.gameHeader h4 { margin: 0; font-size: 18px; line-height: 1.35; }
+.gameHeader p { max-width: 610px; margin: 6px 0 0; color: #5b7382; font-size: 13px; line-height: 1.55; }
+.kicker { margin: 0 0 6px !important; color: #1f7a8c !important; font-size: 10px !important; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.goal { flex: 0 0 auto; padding: 8px 11px; border-radius: 10px; background: #fff5d9; color: #9a6c1d; font-size: 10px; line-height: 1.25; text-align: center; }
+.goal b { font-size: 15px; }
+.sea { position: relative; height: 64px; overflow: hidden; border-radius: 13px; background: #eaf4f4; color: #1f7a8c; }
+.sea > span { position: absolute; top: 9px; right: 11px; color: #1f7a8c; font-size: 11px; font-weight: 700; }
+.ship { position: absolute; bottom: 12px; width: 42px; height: 36px; color: #0e3b5c; transition: left .55s cubic-bezier(.3,.8,.3,1); }
+.wave { position: absolute; bottom: 0; left: 0; width: 200%; height: 27px; }
+.progressHead { display: flex; justify-content: space-between; gap: 10px; color: #5b7382; font-size: 12px; }
+.progressHead b { color: #0e3b5c; }
+.calendar { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.month { padding: 6px 2px; border-radius: 7px; background: #eaf4f4; color: #5b7382; font-size: 10px; text-align: center; }
+.current { outline: 2px solid #0e3b5c; outline-offset: -1px; }
+.expense { background: #c8553d; color: white; }
+.complete { background: #1f7a8c; color: white; }
+.compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.path { min-width: 0; padding: 14px; border: 1px solid #cfe2e4; border-radius: 13px; background: #fff; }
+.path h5 { margin: 0; font-size: 14px; }
+.path > span { display: block; margin-top: 2px; color: #5b7382; font-size: 11px; }
+.path strong { display: block; margin-top: 12px; font-size: 22px; line-height: 1.2; }
+.path small { display: block; margin-top: 4px; color: #5b7382; font-size: 10px; }
+.path i { display: block; height: 8px; margin: 10px 0 7px; overflow: hidden; border-radius: 5px; background: #eaf4f4; }
+.path i em { display: block; height: 100%; border-radius: inherit; transition: width .55s; }
+.self i em { background: #f2b134; }.club i em { background: #1f7a8c; }
+.path p { min-height: 34px; margin: 0; color: #c8553d; font-size: 11px; line-height: 1.45; }.club p { color: #1f7a8c; font-weight: 700; }
+.same { margin: 0; color: #5b7382; font-size: 12px; line-height: 1.5; }
+.controls { display: flex; gap: 9px; }
+.controls button,.option { min-height: 44px; border-radius: 10px; font: inherit; cursor: pointer; }
+.next { flex: 1; border: 0; background: #0e3b5c; color: #fff; font-size: 13px; font-weight: 700; }
+.next:disabled { opacity: .7; cursor: default; }
+.reset { flex: 0 0 48px; border: 1px solid #cfe2e4; background: transparent; color: #0e3b5c; font-size: 20px; }
+.finish,.quiz { padding: 14px; border-radius: 13px; background: #eaf4f4; }
+.finish p,.quiz p { margin: 0 0 8px; color: #355a69; font-size: 13px; line-height: 1.55; }.finish p:last-child,.quiz p:last-child { margin-bottom: 0; }
+.quiz { background: #fff; border: 1px solid #cfe2e4; }.quiz h5 { margin: 0 0 8px; font-size: 15px; }.quiz > p { margin-bottom: 12px; }
+.option { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid #cfe2e4; background: #fff; color: #0e3b5c; font-size: 12px; line-height: 1.4; text-align: left; }.option.correct { border-color: #1f7a8c; background: #eaf4f4; }.option.incorrect { border-color: #c8553d; background: #fff2ee; }
+.result { margin-top: 12px !important; }.correctText { color: #1f7a8c !important; font-weight: 700; }.incorrectText { color: #c8553d !important; }
+@media (max-width: 560px) { .game { padding: 14px; }.gameHeader { display: block; }.goal { display: inline-block; margin-top: 11px; }.compare { grid-template-columns: minmax(0,1fr); }.path p { min-height: 0; }.calendar { gap: 4px; }.month { font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) { .ship,.path i em { transition: none; } }

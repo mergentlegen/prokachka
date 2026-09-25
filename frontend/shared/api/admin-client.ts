@@ -1,4 +1,6 @@
 import type { Announcement, RankEntry, StarAward, Store, Submission, Task, TaskProgram } from "@/shared/domain/types";
+import type { ReadyProgramDefinition } from "@/shared/domain/ready-programs";
+import type { ReadyProgramKey } from "@/shared/domain/types";
 import type { StarAwardKind } from "@/shared/domain/star-awards";
 import { mapAnnouncement, mapProgram, mapStarAward, mapSubmission, mapTask, mapUser, request } from "@/frontend/shared/api/client";
 type ApiRow = Record<string, unknown>;
@@ -62,3 +64,12 @@ export async function updateAdminProgram(id: string, input: { title?: string; de
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
 export async function deleteAdminProgram(id: string) { await request<ApiResponse<Record<string, never>>>("/api/programs/" + id, { method: "DELETE" }); }
+export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean };
+export async function loadReadyPrograms(): Promise<ReadyProgramStatus[]> {
+  const response = await request<ApiResponse<{ readyPrograms: ReadyProgramStatus[] }>>("/api/ready-programs");
+  return response.readyPrograms || [];
+}
+export async function publishReadyProgram(key: ReadyProgramKey): Promise<{ program: TaskProgram; tasks: Task[]; alreadyPublished: boolean }> {
+  const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[]; alreadyPublished?: boolean }>>("/api/ready-programs", { method: "POST", body: JSON.stringify({ key }) });
+  return { program: mapProgram(response.program), tasks: response.tasks.map(mapTask), alreadyPublished: Boolean(response.alreadyPublished) };
+}

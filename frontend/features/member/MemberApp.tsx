@@ -124,7 +124,7 @@ export function MemberApp() {
   const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential");
+  const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" || Boolean(task.interactiveKind) : task.publicationType !== "sequential" && !task.interactiveKind);
 
   async function hydrateUser(nextUser: AuthUser) {
     if (nextUser.role === "ceo") { window.location.href = "/ceo"; return; }

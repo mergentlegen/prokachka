@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Submission, Task } from "@/shared/domain/types";
 import { externalHref, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
+import { DreamPlanGame } from "./DreamPlanGame";
 import styles from "./TaskCard.module.css";
 
 export function TaskCard({ task, submission, onSubmit }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [interactiveReady, setInteractiveReady] = useState(false);
   const deadline = task.dueAt || task.deadlineAt;
   const expired = Boolean(deadline && new Date(deadline).getTime() <= Date.now());
   const status = submission?.status || (expired ? "missed" : "new");
@@ -21,30 +23,33 @@ export function TaskCard({ task, submission, onSubmit }: { task: Task; submissio
     setOpen(false); setSending(true);
     try { await onSubmit(task.id); } finally { setSending(false); }
   }
-  function action() {
+  function action(inDetail = false) {
     if (status === "accepted") return <strong className={styles.accepted}>+{formatMiles(submission?.points || 0)}</strong>;
     if (status === "pending") return <span className={styles.waiting}>Ответ на проверке</span>;
     if (!canSubmit) return <span className={styles.waiting}>Приём завершён</span>;
+    if (task.interactiveKind === "dream-plan") return <button className={styles.submit} disabled={sending || (inDetail && !interactiveReady)} title={inDetail && !interactiveReady ? "Сначала пройди игру и ответь на финальный вопрос" : undefined} onClick={() => inDetail ? void send() : setOpen(true)}>{sending ? "Открываем..." : inDetail && !interactiveReady ? "Заверши игру" : inDetail ? "Отправить результат" : "Начать игру"}</button>;
     return <button className={styles.submit} disabled={sending} onClick={() => void send()}>{sending ? "Открываем..." : status === "revision" ? "Отправить повторно" : expired ? "Отправить с опозданием" : "Отправить ответ"}</button>;
   }
+  const markInteractiveReady = useCallback((ready: boolean) => setInteractiveReady(ready), []);
   return <>
     <article className={styles.card}>
       <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
       <h3><button className={styles.title} onClick={() => setOpen(true)} aria-haspopup="dialog">{task.title}</button></h3>
       <p className={styles.preview}>{task.description}</p>
       {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>}
-      <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
+      <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : task.interactiveKind === "dream-plan" ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
     </article>
     {open && <ModalSheet title="Задание" onClose={() => setOpen(false)}>
       <div className={styles.detail}>
         <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div>
+        {task.interactiveKind === "dream-plan" && <DreamPlanGame onReadyChange={markInteractiveReady} />}
         {resource && <ResourceCard url={resource} />}
         {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
         {submission && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}
-        <div className={styles.detailAction}>{action()}</div>
+        <div className={styles.detailAction}>{action(true)}</div>
       </div>
     </ModalSheet>}
   </>;
