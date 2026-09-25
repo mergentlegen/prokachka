@@ -2,6 +2,7 @@ import type { StarAwardKind } from "./star-awards";
 
 export type UserRole = "ceo" | "admin" | "member";
 export type SubmissionStatus = "pending" | "accepted" | "revision";
+export type SubmissionSource = "telegram" | "interactive";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
@@ -40,7 +41,7 @@ export type StarAward = {
 };
 export type Submission = {
   id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
-  mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
+  source?: SubmissionSource; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 export type RankEntry = { id: string; name: string; points: number };

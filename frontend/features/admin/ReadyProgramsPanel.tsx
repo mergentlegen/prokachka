@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { loadReadyPrograms, publishReadyProgram, updateAdminProgram, type ReadyProgramStatus } from "@/frontend/shared/api/admin-client";
+import { READY_PROGRAMS } from "@/shared/domain/ready-programs";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import styles from "./ReadyProgramsPanel.module.css";
 
@@ -15,16 +16,21 @@ type Props = {
 };
 
 export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onChange, onError }: Props) {
-  const [readyPrograms, setReadyPrograms] = useState<ReadyProgramStatus[]>([]);
+  const [readyPrograms, setReadyPrograms] = useState<ReadyProgramStatus[]>(() => READY_PROGRAMS.map(({ tasks: _tasks, ...program }) => ({ ...program, published: false })));
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     void loadReadyPrograms().then((items) => {
-      if (!cancelled) setReadyPrograms(items);
+      if (!cancelled) { setReadyPrograms(items); setLoadError(""); }
     }).catch((error) => {
-      if (!cancelled) onError(error instanceof Error ? error.message : "Не удалось загрузить готовые программы.");
+      if (!cancelled) {
+        const message = error instanceof Error ? error.message : "Не удалось загрузить готовые программы.";
+        setLoadError(message);
+        onError(message + " Примените миграцию готовых программ в Supabase.");
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -66,7 +72,9 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
       </div>
       <span className={styles.spark} aria-hidden="true">✦</span>
     </div>
-    {loading ? <div className={styles.loading} aria-live="polite">Загружаем готовые программы...</div> : <div className={styles.grid}>
+    {loading ? <div className={styles.loading} aria-live="polite">Загружаем готовые программы...</div> : <>
+      {loadError && <div className={styles.warning} role="status">Каталог показан в режиме предпросмотра. Чтобы публиковать программы, примените миграцию базы данных и обновите страницу.</div>}
+      <div className={styles.grid}>
       {readyPrograms.map((item) => {
         const canActivate = Boolean(item.publishedProgramId && (!programs.find((program) => program.id === item.publishedProgramId) || canManageAll || programs.find((program) => program.id === item.publishedProgramId)?.publisherId === actorId));
         return <article className={styles.card} key={item.key}>
@@ -75,9 +83,10 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
           <h3>{item.title}</h3>
           <p className={styles.description}>{item.description}</p>
           <div className={styles.meta}><span>{item.badge}</span><span>{item.taskCount} интерактивный шаг</span></div>
-          {item.published ? item.publishedActive === false && canActivate ? <button type="button" className="button button-success" disabled={Boolean(busyKey)} onClick={() => void activate(item)}>{busyKey === item.key ? "Активируем..." : "Активировать"}</button> : <button type="button" className={styles.publishedButton} disabled>✓ Уже опубликована</button> : <button type="button" className="button button-primary" disabled={Boolean(busyKey)} onClick={() => void publish(item.key)}>{busyKey === item.key ? "Публикуем..." : "Опубликовать программу"}</button>}
+          {item.published ? item.publishedActive === false && canActivate ? <button type="button" className="button button-success" disabled={Boolean(busyKey)} onClick={() => void activate(item)}>{busyKey === item.key ? "Активируем..." : "Активировать"}</button> : <button type="button" className={styles.publishedButton} disabled>✓ Уже опубликована</button> : <button type="button" className="button button-primary" disabled={Boolean(busyKey) || Boolean(loadError)} onClick={() => void publish(item.key)}>{busyKey === item.key ? "Публикуем..." : loadError ? "Нужна миграция БД" : "Опубликовать программу"}</button>}
         </article>;
       })}
-    </div>}
+      </div>
+    </>}
   </section>;
 }

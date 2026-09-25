@@ -3,7 +3,7 @@ import { descendants, findTeamNetwork } from "@/backend/services/network.service
 
 type SubmissionViewer = { id: string; role: string; teamId?: string; canReview?: boolean };
 type FindOptions = { userId?: string; teamId?: string; viewer?: SubmissionViewer };
-const submissionSelect = "id,user_id,task_id,status,media_type,answer_text,points,comment,submitted_at,reviewed_at,review_version,created_at";
+const submissionSelect = "id,user_id,task_id,status,submission_source,media_type,answer_text,points,comment,submitted_at,reviewed_at,review_version,created_at";
 
 export async function findMentorCounts(userId: string) {
   const supabase = getSupabaseAdmin();

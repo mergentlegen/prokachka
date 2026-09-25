@@ -70,9 +70,35 @@ test("interactive ready tasks are shown in the member Programs view", () => {
 
 test("the converted game does not execute arbitrary HTML", () => {
   const source = fs.readFileSync(path.join(root, "frontend/features/member/DreamPlanGame.tsx"), "utf8");
+  const taskCard = fs.readFileSync(path.join(root, "frontend/features/member/TaskCard.tsx"), "utf8");
+  const sheetCss = fs.readFileSync(path.join(root, "frontend/shared/ModalSheet.module.css"), "utf8");
+  const gameCss = fs.readFileSync(path.join(root, "frontend/features/member/DreamPlanGame.module.css"), "utf8");
   assert.doesNotMatch(source, /innerHTML|dangerouslySetInnerHTML/);
-  assert.match(source, /quizAnswer/);
+  assert.match(source, /questions/);
+  assert.match(source, /QUIZ_TOTAL = 5/);
   assert.match(source, /formatMiles/);
-  assert.match(source, /onReadyChange/);
-  assert.match(fs.readFileSync(path.join(root, "frontend/features/member/TaskCard.tsx"), "utf8"), /interactiveReady/);
+  assert.match(source, /completeReadyProgram/);
+  assert.match(source, /restartReadyProgramQuiz/);
+  assert.match(source, /answeredIncorrectly/);
+  assert.match(source, /onCompleted/);
+  assert.match(source, /бонусных баллов/);
+  assert.match(taskCard, /onInteractiveComplete/);
+  assert.match(taskCard, /variant=\{isDreamPlan \? "immersive" : "default"\}/);
+  assert.match(sheetCss, /\.immersivePanel \{ width:100%; height:100dvh; max-height:100dvh;/);
+  assert.match(gameCss, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(gameCss, /\.quizFailure/);
+});
+
+test("ready program scoring is server-owned and cannot be edited as a regular submission", () => {
+  const migration = fs.readFileSync(path.join(root, "supabase/20260925-ready-programs.sql"), "utf8");
+  const retryMigration = fs.readFileSync(path.join(root, "supabase/20260925-ready-program-quiz-retry.sql"), "utf8");
+  assert.match(migration, /app_complete_ready_program/);
+  assert.match(migration, /submission_source = 'interactive'/);
+  assert.match(migration, /app_guard_interactive_submission_update/);
+  assert.match(migration, /Ответ неверный/);
+  assert.match(migration, /earned_points = next_points/);
+  assert.match(migration, /attempt\.earned_points <> 5/);
+  assert.match(retryMigration, /app_restart_ready_program_quiz/);
+  assert.match(retryMigration, /'failed', true/);
+  assert.doesNotMatch(retryMigration, /current_step = 12, earned_points = 0/);
 });

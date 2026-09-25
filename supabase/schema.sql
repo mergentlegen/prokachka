@@ -116,6 +116,7 @@ create table public.submissions (
   telegram_update_id bigint,
   media_type text check (media_type in ('text', 'photo', 'video', 'document')),
   telegram_file_id text,
+  submission_source text not null default 'telegram' check (submission_source in ('telegram', 'interactive')),
   answer_text text not null default '' check (char_length(answer_text) <= 10000),
   points integer not null default 0 check (points >= 0 and points <= 100),
   comment text not null default '',
@@ -138,6 +139,8 @@ create index tasks_audience_root_idx on public.tasks(team_id, audience_root_id, 
 create index submissions_status_idx on public.submissions(status);
 create index submissions_user_task_idx on public.submissions(user_id, task_id, submitted_at desc);
 create unique index submissions_telegram_update_id_idx on public.submissions(telegram_update_id) where telegram_update_id is not null;
+create unique index submissions_interactive_accepted_idx on public.submissions(user_id, task_id)
+  where submission_source = 'interactive' and status = 'accepted';
 create index telegram_contexts_expiry_idx on public.telegram_contexts(expires_at);
 
 create or replace function public.touch_updated_at() returns trigger language plpgsql as $$
@@ -187,6 +190,26 @@ create unique index task_programs_team_template_unique_idx on public.task_progra
 create index tasks_program_position_idx on public.tasks(program_id, position);
 create index member_progress_user_idx on public.member_program_progress(user_id, status);
 create index member_progress_program_idx on public.member_program_progress(program_id, status);
+
+create table public.ready_program_attempts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  current_step integer not null default 0 check (current_step between 0 and 12),
+  status text not null default 'active' check (status in ('active', 'completed')),
+  attempt_number integer not null default 1 check (attempt_number >= 1),
+  earned_points integer not null default 0 check (earned_points >= 0),
+  state jsonb not null default '{}'::jsonb,
+  started_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  completed_at timestamptz,
+  unique(user_id, task_id)
+);
+
+create index ready_program_attempts_user_idx on public.ready_program_attempts(user_id, status, updated_at desc);
+create index ready_program_attempts_task_idx on public.ready_program_attempts(task_id, status, updated_at desc);
+create trigger ready_program_attempts_touch_updated_at before update on public.ready_program_attempts
+  for each row execute function public.touch_updated_at();
 
 create table public.team_invitation_links (
   id uuid primary key default gen_random_uuid(),

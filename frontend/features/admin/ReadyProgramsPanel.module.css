@@ -19,6 +19,7 @@
 .intro { max-width: 680px; margin: 8px 0 0; color: #718097; font-size: 12px; line-height: 1.6; }
 .spark { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 13px; background: #fff1ce; color: #bc8425; font-size: 24px; }
 .loading { padding: 28px 24px; color: #7b879b; font-size: 13px; }
+.warning { margin: 16px 18px 0; padding: 12px 14px; border: 1px solid #f1d9a8; border-radius: 10px; background: #fff8e8; color: #8f6d2a; font-size: 12px; line-height: 1.5; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; padding: 18px; }
 .card { display: grid; align-content: start; min-width: 0; padding: 19px; border: 1px solid #eadfca; border-radius: 12px; background: #fff; }
 .cardTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

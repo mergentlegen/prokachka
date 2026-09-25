@@ -21,6 +21,7 @@
 .read span { margin-left:5px; }
 .waiting { color:#7f8b9e; font-size:12px; line-height:1.5; }
 .detail { min-width:0; }
+.interactiveDetail { width:100%; }
 .detail h3 { margin:18px 0; color:var(--navy); font-size:23px; line-height:1.4; overflow-wrap:anywhere; }
 .description { color:#354661; font-size:16px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
 .comment { margin-top:20px; padding:16px; border-radius:12px; background:#f4f6fb; color:#4b5e7b; font-size:14px; line-height:1.65; }

@@ -7,3 +7,4 @@
 \ir 20260917-architecture-integrity.sql
 \ir 20260919-live-updates.sql
 \ir 20260925-ready-programs.sql
+\ir 20260925-ready-program-quiz-retry.sql
