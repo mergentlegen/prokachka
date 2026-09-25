@@ -173,3 +173,36 @@ test('webhook refuses unauthenticated and mismatched chat updates before saving'
   assert.equal((await controller.receiveTelegramUpdate(new Request('https://fixture.test', { method: 'POST', headers: { 'x-telegram-bot-api-secret-token': 'fixture' }, body: JSON.stringify(invalid) }))).status, 400);
   assert.equal(calls, 0);
 });
+
+test('successful Telegram linking sends confirmation followed by the club welcome message', async () => {
+  const messages = [];
+  const controller = load('backend/controllers/telegram.controller.ts', {
+    'next/server': { NextResponse: { json: (data) => ({ data, status: 200 }) } },
+    '@/backend/http/api-response': { failure: (message, status) => ({ message, status }) },
+    '@/backend/http/auth-guard': {}, ...dbOverrides(null),
+    [envKey]: { serverEnv: {}, isValidTelegramSecret: (value) => value === 'fixture' },
+    '@/backend/services/telegram-submission.service': { beginTelegramSubmission: async () => ({}) },
+    '@/backend/services/telegram-link.service': { linkTelegramAccount: async () => ({ userId: 'alice' }) },
+    '@/backend/services/telegram-notifications.service': {
+      sendTelegramMessage: async (_chatId, message) => { messages.push(message); return { ok: true }; },
+      scheduleTelegramDelivery: () => {},
+    },
+  });
+  const update = {
+    update_id: 7,
+    message: { from: { id: 111 }, chat: { id: 111, type: 'private' }, message_id: 8, text: '/start link_fixture' },
+  };
+  const result = await controller.receiveTelegramUpdate(new Request('https://fixture.test', {
+    method: 'POST', headers: { 'x-telegram-bot-api-secret-token': 'fixture' }, body: JSON.stringify(update),
+  }));
+  assert.equal(result.status, 200);
+  assert.equal(messages.length, 2);
+  assert.match(messages[0], /Telegram привязан/);
+  assert.equal(messages[1], [
+    'Твой помощник в клубе inCruises.',
+    '',
+    'Пошаговая программа запуска на 14 дней: узнай, как путешествовать больше и дешевле, собирай мили за задания и капитанские звёзды за приглашённых друзей.',
+    '',
+    'Получи гарантированный бонус 100 $',
+  ].join('\n'));
+});

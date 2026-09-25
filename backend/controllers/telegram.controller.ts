@@ -11,6 +11,14 @@ function botUsername() {
   return serverEnv.telegramBotUsername?.replace(/^@/, "");
 }
 
+const telegramLinkWelcomeMessage = [
+  "Твой помощник в клубе inCruises.",
+  "",
+  "Пошаговая программа запуска на 14 дней: узнай, как путешествовать больше и дешевле, собирай мили за задания и капитанские звёзды за приглашённых друзей.",
+  "",
+  "Получи гарантированный бонус 100 $",
+].join("\n");
+
 
 export async function createTelegramLink(request: Request) {
   const user = getRequestUser(request);
@@ -63,7 +71,8 @@ export async function receiveTelegramUpdate(request: Request) {
         if ("error" in cleared || "unavailable" in cleared) return failure("Временно недоступно.", 503);
         const linked = await linkTelegramAccount(payload.slice(5), telegramId);
         if ("unavailable" in linked || ("error" in linked && typeof linked.error !== "string")) return failure("Не удалось проверить привязку.", 503);
-        await sendTelegramMessage(telegramId, "error" in linked ? String(linked.error) : "Telegram привязан к вашему аккаунту. Выберите задание на сайте, чтобы отправить ответ.");
+        const confirmation = await sendTelegramMessage(telegramId, "error" in linked ? String(linked.error) : "Telegram привязан к вашему аккаунту. Выберите задание на сайте, чтобы отправить ответ.");
+        if (!("error" in linked) && confirmation.ok) await sendTelegramMessage(telegramId, telegramLinkWelcomeMessage);
         scheduleTelegramDelivery();
       } else {
         const selected = await beginTelegramSubmission(payload?.startsWith("submit_") ? payload.slice(7) : "", telegramId, messageId);
