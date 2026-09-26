@@ -19,3 +19,4 @@
 \ir 20260928-publication-audiences.sql
 \ir 20260929-publication-pin-order.sql
 \ir 20260930-welcome-video-pro.sql
+\ir 20261001-profile-avatars.sql

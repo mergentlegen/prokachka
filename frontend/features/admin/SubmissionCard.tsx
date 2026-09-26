@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { Avatar } from "@/frontend/shared/Avatar";
 import type { Submission } from "@/shared/domain/types";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import styles from "./SubmissionCard.module.css";
 
-type Props = { submission: Submission; name: string; taskTitle: string };
+type Props = { submission: Submission; name: string; avatarUrl?: string; taskTitle: string };
 
-function SubmissionHeader({ submission, name, taskTitle }: Props) {
+function SubmissionHeader({ submission, name, avatarUrl, taskTitle }: Props) {
   return <header className={styles.header}>
-    <div className={styles.avatar} aria-hidden="true">{name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("")}</div>
+    <Avatar className={styles.avatar} name={name} src={avatarUrl} />
     <div className={styles.identity}><strong>{name}</strong><span>{taskTitle}</span></div>
     <time dateTime={submission.submittedAt}>{formatDateTime(submission.submittedAt)}</time>
   </header>;

@@ -5,8 +5,8 @@ export async function findUsers(options: { teamId?: string; userId?: string; inc
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const fields = options.includeLogin
-    ? "id,name,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at"
-    : "id,name,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at";
+    ? "id,name,avatar_path,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at"
+    : "id,name,avatar_path,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at";
   let query = supabase.from("users").select(fields).order("created_at", { ascending: false });
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (options.userId) query = query.eq("id", options.userId);
@@ -17,7 +17,7 @@ export async function findUsers(options: { teamId?: string; userId?: string; inc
 export async function saveUser(name: string, telegramId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await supabase.from("users").upsert({ name, telegram_id: telegramId, role: "member" }, { onConflict: "telegram_id" }).select("id,name,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at").single();
+  const result = await supabase.from("users").upsert({ name, telegram_id: telegramId, role: "member" }, { onConflict: "telegram_id" }).select("id,name,avatar_path,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at").single();
   return result.error ? { error: result.error } : { data: result.data };
 }
 export async function updateUserAccess(id: string, input: { role?: "admin" | "member"; teamId?: string | null; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean }) {
@@ -42,7 +42,7 @@ export async function updateUserAccess(id: string, input: { role?: "admin" | "me
     if (input.canPublishTasks !== undefined) patch.can_publish_tasks = input.canPublishTasks;
     if (input.canInviteMembers !== undefined) patch.can_invite_members = input.canInviteMembers;
   }
-  const result = await supabase.from("users").update(patch).eq("id", id).select("id,name,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at").single();
+  const result = await supabase.from("users").update(patch).eq("id", id).select("id,name,avatar_path,login,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at").single();
   return result.error ? { error: result.error } : { data: result.data };
 }
 

@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
 
 import type { ProgramHistory, ProgramHistoryStatus, ProgramHistoryStep, ProgramHistoryStepMember, ProgramHistoryMember } from "@/shared/domain/history";
 
@@ -30,13 +31,12 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
   const [programsResult, tasksResult, usersResult] = await Promise.all([
     readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).order("created_at", { ascending: false }).order("id")),
     readPages(supabase.from("tasks").select("id,title,max_points,program_id,position,deadline_hours").eq("team_id", teamId).eq("publication_type", "sequential").order("position", { ascending: true }).order("id")),
-    readPages(supabase.from("users").select("id,name,role,team_id,team_joined_at").eq("team_id", teamId).eq("role", "member").order("created_at", { ascending: true }).order("id")),
+    readPages(supabase.from("users").select("id,name,avatar_path,role,team_id,team_joined_at").eq("team_id", teamId).eq("role", "member").order("created_at", { ascending: true }).order("id")),
   ]);
   if (programsResult.error || tasksResult.error || usersResult.error) return { error: programsResult.error || tasksResult.error || usersResult.error };
 
   const programs = programsResult.data || [];
   const tasks = tasksResult.data || [];
-  const users = usersResult.data || [];
   const [progressResult, submissionsResult] = await Promise.all([
     readPages(supabase.from("member_program_progress").select("*,task_programs!inner(team_id)").eq("task_programs.team_id", teamId).order("id")),
     readPages(supabase.from("submissions").select("id,user_id,task_id,status,points,submitted_at,reviewed_at,tasks!inner(team_id,publication_type)").eq("tasks.team_id", teamId).eq("tasks.publication_type", "sequential").order("id")),
@@ -54,6 +54,7 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
     ? programs.filter((program) => program.publisher_id ? visibleAuthors?.has(String(program.publisher_id)) : isAudienceVisible(network.data, viewer?.id || "", program.audience_root_id))
     : programs;
   const authorNames = network && "data" in network ? new Map(network.data.map((row) => [String(row.id), String(row.name || "")])) : new Map<string, string>();
+  const users = await withAvatarUrls((usersResult.data || []).filter((row) => !visibleUsers || visibleUsers.has(String(row.id))));
 
   const progress = progressResult.data || [];
   const submissions = submissionsResult.data || [];
@@ -82,7 +83,7 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
         const previousTask = programTasks[stepIndex - 1];
         const previousAccepted = previousTask ? accepted.get(userId + ":" + String(previousTask.id)) : undefined;
         const unlockedAt = stepIndex === 0 ? start : previousAccepted ? String(previousAccepted.reviewed_at || previousAccepted.submitted_at) : undefined;
-        if (!unlockedAt) return { userId, name: String(user.name || ""), status: "locked" };
+        if (!unlockedAt) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "locked" };
 
         const dueAt = addHours(unlockedAt, Number(step.deadlineHours || deadlineHours));
         const submission = latest.get(userId + ":" + String(step.id));
@@ -90,20 +91,20 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
         const status: Exclude<ProgramHistoryStatus, "completed"> = submission
           ? new Date(submittedAt as string).getTime() <= new Date(dueAt).getTime() ? "on_time" : "late"
           : new Date(dueAt).getTime() > Date.now() ? "active" : "missed";
-        return { userId, name: String(user.name || ""), status, dueAt, submittedAt, points: Number(submission?.points || 0) };
+        return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status, dueAt, submittedAt, points: Number(submission?.points || 0) };
       }));
       steps.forEach((step, index) => { step.members = stepMembers[index]; });
 
       const members = programUsers.map((user, userIndex): ProgramHistoryMember => {
         const userId = String(user.id);
         const memberProgress = progressByMember.get(userId + ":" + programId);
-        if (memberProgress?.status === "completed") return { userId, name: String(user.name || ""), status: "completed" };
+        if (memberProgress?.status === "completed") return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "completed" };
         const currentIndex = Math.max(0, programTasks.findIndex((task) => String(task.id) === String(memberProgress?.current_task_id)));
         const currentTask = programTasks[currentIndex];
-        if (!currentTask || !steps[currentIndex]) return { userId, name: String(user.name || ""), status: "active" };
+        if (!currentTask || !steps[currentIndex]) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "active" };
         const current = stepMembers[currentIndex][userIndex];
         return {
-          userId, name: String(user.name || ""), status: current?.status || "active", currentStep: Number(currentTask.position || currentIndex + 1),
+          userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: current?.status || "active", currentStep: Number(currentTask.position || currentIndex + 1),
           currentTaskTitle: String(currentTask.title || ""), dueAt: current?.dueAt, submittedAt: current?.submittedAt, points: current?.points,
         };
       });

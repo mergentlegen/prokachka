@@ -110,6 +110,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f supabase/20260929-publication-pin-order.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20260930-welcome-video-pro.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/welcome-video-pro.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261001-profile-avatars.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/profile-avatars.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

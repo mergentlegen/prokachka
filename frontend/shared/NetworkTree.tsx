@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Avatar } from "./Avatar";
 import type { CSSProperties, ReactNode } from "react";
 import type { User } from "@/shared/domain/types";
 import { buildNetworkTree, visibleNetworkEntries } from "./lib/network-tree";
@@ -28,7 +29,7 @@ export function NetworkTree({ users, currentUserId, query = "", filter = "all", 
         return <li className={styles.row} key={user.id} style={{ "--tree-indent": `${searching ? 0 : Math.min(depth, 3) * 12}px` } as CSSProperties}>
           <div className={styles.person}>
             {childCount > 0 && !searching ? <button type="button" className={styles.toggle} aria-label={`${collapsed.has(user.id) ? "Развернуть" : "Свернуть"} ветку ${user.name}`} aria-expanded={!collapsed.has(user.id)} onClick={() => setCollapsed((current) => { const next = new Set(current); if (next.has(user.id)) next.delete(user.id); else next.add(user.id); return next; })}>{collapsed.has(user.id) ? "›" : "⌄"}</button> : <span className={styles.leaf} aria-hidden="true">{depth ? "↳" : "•"}</span>}
-            <span className="rank-avatar" aria-hidden="true">{user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span>
+            <Avatar className="rank-avatar" name={user.name} src={user.avatarUrl} />
             <div className={styles.copy}><strong>{user.name}{user.id === currentUserId && <em>Вы</em>}</strong><small>{parent ? `В ветке: ${parent.name}` : user.role === "admin" ? "Руководитель команды" : user.parentUserId ? "Начало доступной вам ветки" : "Без закрепления"}</small><div className={styles.meta}><span>Уровень {depth + 1}</span>{descendantCount > 0 && <span>В сети: {descendantCount}</span>}{user.canReview && <span>Проверяет</span>}{user.canPublishTasks && <span>Публикует</span>}</div></div>
           </div>
           {renderControls && user.role === "member" && <ParticipantSettings user={user} renderControls={renderControls} />}

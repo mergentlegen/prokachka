@@ -11,7 +11,7 @@ export function mapTeam(row: ApiRow): Team {
 function mapRequest(row: ApiRow): TeamJoinRequest {
   const user = Array.isArray(row.users) ? row.users[0] : row.users;
   const team = Array.isArray(row.teams) ? row.teams[0] : row.teams;
-  return { id: String(row.id), userId: String(row.user_id), teamId: String(row.team_id), status: row.status === "approved" || row.status === "rejected" ? row.status : "pending", createdAt: String(row.created_at || ""), reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined, invitedByUserId: row.invited_by_user_id ? String(row.invited_by_user_id) : undefined, userName: user && typeof user === "object" ? String((user as { name?: unknown }).name || "") : undefined, teamName: team && typeof team === "object" ? String((team as { name?: unknown }).name || "") : undefined };
+  return { id: String(row.id), userId: String(row.user_id), teamId: String(row.team_id), status: row.status === "approved" || row.status === "rejected" ? row.status : "pending", createdAt: String(row.created_at || ""), reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined, invitedByUserId: row.invited_by_user_id ? String(row.invited_by_user_id) : undefined, userName: user && typeof user === "object" ? String((user as { name?: unknown }).name || "") : undefined, userAvatarUrl: user && typeof user === "object" && "avatar_url" in user && user.avatar_url ? String(user.avatar_url) : undefined, teamName: team && typeof team === "object" ? String((team as { name?: unknown }).name || "") : undefined };
 }
 
 export async function loadTeamSelection() {

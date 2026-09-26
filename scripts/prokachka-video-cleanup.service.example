@@ -1,5 +1,5 @@
 [Unit]
-Description=Clean retired and abandoned Prokachka welcome videos
+Description=Clean retired and abandoned Prokachka welcome videos and avatars
 Wants=network-online.target
 After=network-online.target
 

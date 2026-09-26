@@ -1,10 +1,13 @@
 import { createHash, createHmac } from "node:crypto";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import type { AuthUser } from "@/shared/domain/types";
+import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
 
 export type NetworkUserRow = {
   id: string;
   name: string;
+  avatar_path?: string | null;
+  avatar_url?: string;
   login?: string | null;
   role: string;
   team_id?: string | null;
@@ -15,7 +18,7 @@ export type NetworkUserRow = {
   created_at?: string;
 };
 
-const networkSelect = "id,name,login,role,team_id,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at";
+const networkSelect = "id,name,avatar_path,login,role,team_id,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at";
 
 export async function findTeamNetwork(teamId: string) {
   const supabase = getSupabaseAdmin();
@@ -85,7 +88,7 @@ export async function getNetworkForViewer(user: AuthUser) {
   const allowed = user.role === "ceo" || user.role === "admin"
     ? new Set(result.data.map((row) => String(row.id)))
     : descendants(result.data, user.id, true);
-  return { data: result.data.filter((row) => allowed.has(String(row.id))).map(mapNetworkUser) };
+  return { data: (await withAvatarUrls(result.data.filter((row) => allowed.has(String(row.id))))).map(mapNetworkUser) };
 }
 
 export async function updateNetworkUser(actor: AuthUser, targetId: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean }) {
@@ -112,7 +115,7 @@ export async function updateNetworkUser(actor: AuthUser, targetId: string, input
   if (saved.error) return { error: saved.error };
   const outcome = saved.data as { forbidden?: boolean; data: NetworkUserRow };
   if (outcome.forbidden) return { forbidden: true as const };
-  return { data: mapNetworkUser(outcome.data) };
+  return { data: mapNetworkUser((await withAvatarUrls([outcome.data]))[0]) };
 }
 
 export function descendants(rows: NetworkUserRow[], rootId: string, includeRoot = true) {
@@ -167,7 +170,7 @@ export function canReviewNetwork(rows: NetworkUserRow[], reviewerId: string, tar
 
 export function mapNetworkUser(row: NetworkUserRow) {
   return {
-    id: String(row.id), name: String(row.name || ""), login: row.login ? String(row.login) : undefined,
+    id: String(row.id), name: String(row.name || ""), avatarUrl: row.avatar_url, login: row.login ? String(row.login) : undefined,
     role: row.role === "admin" ? "admin" : "member", teamId: row.team_id ? String(row.team_id) : undefined,
     parentUserId: row.parent_user_id ? String(row.parent_user_id) : undefined,
     canReview: Boolean(row.can_review), canPublishTasks: Boolean(row.can_publish_tasks), canInviteMembers: Boolean(row.can_invite_members),

@@ -2,6 +2,7 @@ export type ProgramHistoryStatus = "on_time" | "active" | "late" | "missed" | "c
 export type ProgramHistoryStepMember = {
   userId: string;
   name: string;
+  avatarUrl?: string;
   status: Exclude<ProgramHistoryStatus, "completed">;
   dueAt?: string;
   submittedAt?: string;
@@ -10,6 +11,7 @@ export type ProgramHistoryStepMember = {
 export type ProgramHistoryMember = {
   userId: string;
   name: string;
+  avatarUrl?: string;
   status: ProgramHistoryStatus;
   currentStep?: number;
   currentTaskTitle?: string;

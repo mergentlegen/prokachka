@@ -9,6 +9,8 @@ import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { createAdminTask, deleteAdminTask, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
+import { Avatar } from "@/frontend/shared/Avatar";
+import { ProfileDialog } from "@/frontend/features/profile/ProfileDialog";
 import { Toast } from "@/frontend/shared/Toast";
 import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
@@ -64,6 +66,7 @@ export function AdminApp() {
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const shellRef = useRef<HTMLElement>(null);
   const openMobileMenu = useCallback(() => setMobileMenuOpen(true), []);
   useMenuSwipe(shellRef, !authLoading && hasMentorAccess(authUser) && !mobileMenuOpen && !modal, openMobileMenu);
@@ -368,7 +371,7 @@ export function AdminApp() {
   const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements" || id === "welcome-video") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
   return <><main className="admin-shell" ref={shellRef}>
-    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><button type="button" className="avatar-button" aria-label="Открыть профиль" onClick={() => setProfileOpen(true)}><Avatar name={authUser.name} src={authUser.avatarUrl} className="header-avatar" eager /></button><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
         {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
@@ -391,12 +394,14 @@ export function AdminApp() {
     </div>
     <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
       <nav className="admin-mobile-drawer-nav">
+        <button type="button" onClick={() => { setProfileOpen(true); setMobileMenuOpen(false); }}><span>◌</span>Мой профиль</button>
         <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
         {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
         {authUser.role === "admin" && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav>
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
     </MobileDrawer>
+    {profileOpen && <ProfileDialog user={authUser} onClose={() => setProfileOpen(false)} onSaved={(updated) => { setAuthUser(updated); setToast("Профиль обновлён."); void refreshData(); }} />}
     {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}

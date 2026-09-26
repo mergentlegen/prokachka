@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Avatar } from "@/frontend/shared/Avatar";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { createAdminStarAward, deleteAdminStarAward } from "@/frontend/shared/api/admin-client";
 import type { StarAward, User } from "@/shared/domain/types";
@@ -95,7 +96,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
         ) : (
           visibleMembers.map((user) => (
             <div className="stars-member-row" key={user.id}>
-              <div className="rank-avatar">{user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</div>
+              <Avatar className="rank-avatar" name={user.name} src={user.avatarUrl} />
               <div className="stars-member-copy"><strong>{user.name}</strong><span className="stars-member-total">★ {totals.get(user.id) || 0} звёзд</span></div>
               <button type="button" className="button star-award-button" aria-label={"Выдать звёзды: " + user.name} onClick={() => openAward(user)}>+ Выдать</button>
             </div>
@@ -111,7 +112,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
           awards.map((award) => {
             const user = users.find((item) => item.id === award.userId);
             return <div className="star-award-row" key={award.id}>
-              <div className="rank-avatar">{user ? user.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "?"}</div>
+              <Avatar className="rank-avatar" name={user?.name || "?"} src={user?.avatarUrl} />
               <div className="star-award-copy"><strong>{user?.name || "Удалённый участник"}</strong><span>{starAwardOption(award.kind)?.label || "Награждение звёздами"} · {formatDateTime(award.createdAt)}</span><span>Выдал: {award.mentorName || users.find((item) => item.id === award.mentorId)?.name || "Наставник"}</span>{award.comment && <span>{award.comment}</span>}</div>
               <b className="star-award-value">+{award.stars} ★</b>
               <button className="button button-danger" onClick={() => setDeleteTarget(award)}>Отменить</button>

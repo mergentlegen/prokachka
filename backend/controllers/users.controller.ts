@@ -5,6 +5,7 @@ import { deleteUser, findUsers, saveUser, updateUserAccess } from "@/backend/ser
 import { getCurrentUser } from "@/backend/http/current-user";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
+import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
 
 export async function listUsers(request: Request) {
   const currentUser = await getCurrentUser(request);
@@ -15,7 +16,7 @@ export async function listUsers(request: Request) {
     if ("unavailable" in network) return failure("База данных не настроена.", 503);
     if ("error" in network) return failure("Не удалось загрузить участников.");
     const allowed = descendants(network.data, currentUser.id, true);
-    return ok({ users: network.data.filter((row) => allowed.has(String(row.id))) });
+    return ok({ users: await withAvatarUrls(network.data.filter((row) => allowed.has(String(row.id)))) });
   }
   const result = await findUsers({
     teamId: currentUser.role === "ceo" ? undefined : currentUser.teamId,
@@ -24,7 +25,7 @@ export async function listUsers(request: Request) {
   });
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure("Не удалось загрузить участников.");
-  return ok({ users: result.data });
+  return ok({ users: await withAvatarUrls(result.data || []) });
 }
 
 export async function upsertUser(request: Request) {
@@ -36,7 +37,7 @@ export async function upsertUser(request: Request) {
     const result = await saveUser(body.name.trim(), String(body.telegramId));
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure("Не удалось сохранить участника.");
-    return ok({ user: result.data }, 201);
+    return ok({ user: (await withAvatarUrls([result.data]))[0] }, 201);
   } catch { return failure("Некорректные данные.", 400); }
 }
 export async function updateUserAccessController(request: Request, id: string) {
@@ -53,7 +54,7 @@ export async function updateUserAccessController(request: Request, id: string) {
       ? "Не удалось изменить команду. Сначала переподчините участников нижней ветки и проверьте выбранную команду."
       : "Не удалось обновить доступ пользователя.", result.error.code === "23514" ? 409 : 500);
     scheduleTelegramDelivery();
-    return ok({ user: result.data });
+    return ok({ user: (await withAvatarUrls([result.data]))[0] });
   } catch { return failure("Некорректные данные.", 400); }
 }
 

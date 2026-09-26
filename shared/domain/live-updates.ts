@@ -27,6 +27,7 @@ export function resourceTopics(url: string): ChangeTopic[] {
   return [];
 }
 export function mutationTopics(url: string, method: string): ChangeTopic[] {
+  if (url === "/api/profile") return ["users", "network", "requests"];
   if (url.startsWith("/api/network/users/")) return ["users", "network"];
   if (url.startsWith("/api/team-requests")) return ["requests", "users", "network"];
   if (url.startsWith("/api/users")) return ["users", "network", "requests"];

@@ -3,6 +3,7 @@ import { serverEnv } from "@/backend/config/env";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { findInvitationByToken } from "@/backend/services/network.service";
 import type { AuthUser } from "@/shared/domain/types";
+import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
 
 type StoredAccount = { user: AuthUser; passwordHash: string };
 const demoAccounts = new Map<string, StoredAccount>();
@@ -42,6 +43,10 @@ export function publicUser(row: Record<string, unknown>): AuthUser {
   return {
     id: String(row.id),
     name,
+    firstName: valueOrUndefined(row.first_name),
+    lastName: valueOrUndefined(row.last_name),
+    avatarUrl: valueOrUndefined(row.avatar_url),
+    profileVersion: valueOrUndefined(row.profile_updated_at),
     login: email,
     telegramId: row.telegram_id ? String(row.telegram_id) : undefined,
     role: row.role === "ceo" ? "ceo" : row.role === "admin" ? "admin" : "member",
@@ -59,10 +64,10 @@ export async function findAccountById(id: string) {
   if (!supabase || !/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data, error } = await supabase
     .from("users")
-    .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
+    .select("id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
     .eq("id", id)
     .maybeSingle();
-  return error || !data ? null : publicUser(data);
+  return error || !data ? null : publicUser((await withAvatarUrls([data]))[0]);
 }
 
 export function getSessionToken(request: Request) {
@@ -156,7 +161,7 @@ export async function registerAccount(
         password_hash: passwordHash,
         role: "member",
       })
-      .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
+      .select("id,name,first_name,last_name,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
       .single();
 
     if (error) {
@@ -219,7 +224,7 @@ export async function authenticateAccount(email: string, password: string) {
 
     const byEmail = await supabase
       .from("users")
-      .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
+      .select("id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -229,7 +234,7 @@ export async function authenticateAccount(email: string, password: string) {
     if (!data && !error) {
       const legacy = await supabase
         .from("users")
-        .select("id,name,first_name,last_name,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
+        .select("id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
         .eq("login", normalizedEmail)
         .maybeSingle();
       data = legacy.data as Record<string, unknown> | null;
@@ -239,7 +244,7 @@ export async function authenticateAccount(email: string, password: string) {
     if (error || !data || !verifyPassword(password, String(data.password_hash))) {
       return { error: "Неверный email или пароль." };
     }
-    return { user: publicUser(data) };
+    return { user: publicUser((await withAvatarUrls([data]))[0]) };
   }
 
   const account = demoAccounts.get(normalizedEmail);
@@ -260,8 +265,9 @@ function getSessionSecret() {
 export function createSession(user: AuthUser) {
   const secret = getSessionSecret();
   if (!secret) throw new Error("AUTH_SECRET is not configured");
+  const { avatarUrl: _avatarUrl, firstName: _firstName, lastName: _lastName, profileVersion: _profileVersion, ...identity } = user;
   const payload = Buffer.from(
-    JSON.stringify({ ...user, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 }),
+    JSON.stringify({ ...identity, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 }),
   ).toString("base64url");
   const signature = createHmac("sha256", secret).update(payload).digest("base64url");
   return payload + "." + signature;

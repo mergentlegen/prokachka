@@ -4,13 +4,14 @@ const http = require('node:http');
 const fs = require('node:fs');
 const welcomeFile = process.env.PROKACHKA_TEST_WELCOME_FILE;
 let welcomeCompleted = false;
+const avatarFiles = new Map();
 const { READY_PROGRAMS } = require('./load-ts.cjs')('shared/domain/ready-programs.ts');
 const requests = {};
 const streams = new Set();
 let delay = 500, points = 10;
 const people = [
-  { id: 'mentor', name: 'Тестовый наставник', role: 'admin', team_id: 'team', created_at: '2026-09-19' },
-  { id: 'member', name: 'Тестовый участник', role: 'member', team_id: 'team', parent_user_id: 'mentor', created_at: '2026-09-19' },
+  { id: 'mentor', name: 'Тестовый наставник', first_name: 'Тестовый', last_name: 'наставник', profile_updated_at: '2026-09-26T10:00:00.000Z', login: 'mentor@fixture.test', role: 'admin', team_id: 'team', created_at: '2026-09-19' },
+  { id: 'member', name: 'Тестовый участник', first_name: 'Тестовый', last_name: 'участник', profile_updated_at: '2026-09-26T10:00:00.000Z', login: 'member@fixture.test', role: 'member', team_id: 'team', parent_user_id: 'mentor', created_at: '2026-09-19' },
 ];
 const task = { id: 'task', title: 'Тестовое задание', description: 'Описание для проверки обновлений интерфейса.', max_points: 10, team_id: 'team', publisher_id: 'mentor', is_active: true, is_pinned: false, publication_type: 'evergreen', created_at: '2026-09-19' };
 const readyProgram = { id: 'ready', title: 'Мечта с планом', team_id: 'team', publisher_id: 'mentor', template_key: 'dream-plan', is_active: true, created_at: '2026-09-25' };
@@ -45,6 +46,33 @@ http.createServer((req, res) => {
     if (start >= size || end < start) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
     res.writeHead(range ? 206 : 200, { 'Content-Type': 'video/mp4', 'Content-Length': end - start + 1, 'Accept-Ranges': 'bytes', ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}) });
     fs.createReadStream(welcomeFile, { start, end }).pipe(res); return;
+  }
+  if (url.pathname.startsWith('/__test/avatar/')) {
+    const bytes = avatarFiles.get(url.pathname.split('/').at(-1));
+    if (!bytes) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'private, max-age=86400' }); return res.end(bytes);
+  }
+  if (url.pathname === '/api/profile' && req.method === 'PATCH') {
+    const parts = [];
+    req.on('data', chunk => parts.push(chunk));
+    req.on('end', async () => {
+      try {
+        const person = people[new URL(req.headers.referer || 'http://localhost').pathname.startsWith('/admin') ? 0 : 1];
+        const form = await new Response(Buffer.concat(parts), { headers: { 'Content-Type': req.headers['content-type'] } }).formData();
+        if (form.get('expectedVersion') !== person.profile_updated_at) return json({ message: 'Профиль уже изменён в другом окне.' }, 409);
+        person.first_name = form.get('firstName'); person.last_name = form.get('lastName');
+        person.name = person.first_name + ' ' + person.last_name;
+        person.profile_updated_at = new Date().toISOString();
+        if (form.get('avatarAction') === 'replace') {
+          const file = form.get('avatar');
+          avatarFiles.set(person.id, Buffer.from(await file.arrayBuffer()));
+          person.avatar_url = '/__test/avatar/' + person.id + '?v=' + Date.now();
+        }
+        if (form.get('avatarAction') === 'remove') { avatarFiles.delete(person.id); person.avatar_url = undefined; }
+        return json({ ok: true, user: { id: person.id, name: person.name, firstName: person.first_name, lastName: person.last_name, avatarUrl: person.avatar_url, profileVersion: person.profile_updated_at, login: person.login, role: person.role, teamId: 'team' } });
+      } catch { json({ message: 'Invalid profile fixture' }, 400); }
+    });
+    return;
   }
   if (url.pathname === '/__test/stats') return json(requests);
   if (url.pathname === '/__test/change' && req.method === 'POST') {
@@ -161,7 +189,8 @@ http.createServer((req, res) => {
     if (req.method !== 'GET') return json({ message: 'Unmocked mutation; not forwarded' }, 405);
     if (url.pathname === '/api/auth/session') {
       const admin = new URL(req.headers.referer || 'http://localhost').pathname.startsWith('/admin');
-      return json({ ok: true, user: { id: admin ? 'mentor' : 'member', name: admin ? 'Тестовый наставник' : 'Тестовый участник', role: admin ? 'admin' : 'member', teamId: 'team' } });
+      const person = people[admin ? 0 : 1];
+      return json({ ok: true, user: { id: person.id, name: person.name, firstName: person.first_name, lastName: person.last_name, profileVersion: person.profile_updated_at, avatarUrl: person.avatar_url, login: person.login, role: person.role, teamId: 'team' } });
     }
     const fixtures = {
       '/api/users': { users: people }, '/api/network': { users: people }, '/api/tasks': { tasks: [...tasks, ...(readyPublished && (!url.searchParams.has('view') || readyProgram.is_active) ? [game] : []), ...(rulesPublished && (!url.searchParams.has('view') || rulesProgram.is_active) ? [rulesGame] : []), ...(heartPublished && (!url.searchParams.has('view') || heartProgram.is_active) ? [heartGame] : [])].map((item) => {
@@ -170,7 +199,7 @@ http.createServer((req, res) => {
         return { ...item, is_pinned: Boolean(program?.is_pinned), pinned_at: program?.pinned_at || null, program_title: program?.title };
       }) },
       '/api/submissions': url.searchParams.has('summary') ? { counts: { pending: 0, accepted: 1, requests: 0 } } : { submissions: results },
-      '/api/ranking': { ranking: [{ id: 'member', name: people[1].name, points }], starRanking: [{ id: 'member', name: people[1].name, points: 3 }] },
+      '/api/ranking': { ranking: [{ id: 'member', name: people[1].name, avatarUrl: people[1].avatar_url, points }], starRanking: [{ id: 'member', name: people[1].name, avatarUrl: people[1].avatar_url, points: 3 }] },
       '/api/programs': { programs: [...programs, ...(readyPublished ? [readyProgram] : []), ...(rulesPublished ? [rulesProgram] : []), ...(heartPublished ? [heartProgram] : [])] }, '/api/programs/history': { programs: [] }, '/api/publication-history': { history: [] },
       '/api/ready-programs': { readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...item }) => {
         if (item.key === 'heart-survey') return { ...item, published: heartPublished, publishedProgramId: heartPublished ? heartProgram.id : undefined, publishedActive: heartPublished && heartProgram.is_active, publishedPinned: heartProgram.is_pinned, publishedPinnedAt: heartProgram.pinned_at, publishedCreatedAt: heartProgram.created_at, canManage: heartPublished };

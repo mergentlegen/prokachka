@@ -31,7 +31,9 @@ async function cleanup({ env = process.env, request = fetch } = {}) {
   return { removed, deferred };
 }
 module.exports = { cleanup };
-if (require.main === module) cleanup().then(({ removed, deferred }) => {
-  console.log(`Welcome video cleanup: ${removed} removed, ${deferred} deferred`);
-  if (deferred) process.exitCode = 1;
+if (require.main === module) Promise.all([cleanup(), require('./cleanup-profile-avatars.cjs').cleanupAvatars()]).then(results => {
+  for (const [index, { removed, deferred }] of results.entries()) {
+    console.log(`${index ? 'Avatar' : 'Welcome video'} cleanup: ${removed} removed, ${deferred} deferred`);
+    if (deferred) process.exitCode = 1;
+  }
 }).catch(error => { console.error(error.message); process.exitCode = 1; });

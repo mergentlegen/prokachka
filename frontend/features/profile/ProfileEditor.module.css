@@ -1,0 +1,49 @@
+.form { display:grid; gap:22px; min-width:0; }
+.photoSection { padding:20px; border:1px solid var(--line); border-radius:16px; background:#f8faff; }
+.photoHeading { display:flex; align-items:center; gap:20px; justify-content:space-between; }
+.photoHeading h3 { margin:0 0 7px; font-size:16px; color:var(--navy); }
+.photoHeading p,.hint { margin:0; font-size:13px; line-height:1.6; color:#677891; }
+.previewAvatar { flex:0 0 80px; width:80px; height:80px; font-size:25px; }
+.fileInput { display:none; }
+.photoActions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-top:18px; }
+.photoActions .removeButton,.photoActions .resetButton { min-height:44px; padding:8px 3px; border:0; background:transparent; font:inherit; font-size:13px; font-weight:600; }
+.removeButton { color:#ad354c; }
+.resetButton { color:#62718a; }
+.hint { margin-top:12px; font-size:12px; }
+.cropper { display:grid; grid-template-columns:180px minmax(0,1fr); gap:22px; align-items:center; margin-top:20px; }
+.cropArea { position:relative; width:100%; aspect-ratio:1; border-radius:50%; overflow:hidden; border:2px solid #d3dff7; background:#e8eef7; cursor:grab; touch-action:none; }
+.cropArea:active { cursor:grabbing; }
+.cropArea img { position:absolute; display:block; max-width:none; pointer-events:none; user-select:none; }
+.cropControls { display:grid; gap:12px; min-width:0; }
+.cropControls p { margin:0; color:#62718a; font-size:12px; line-height:1.5; }
+.cropControls label { display:grid; gap:3px; color:#476086; font-size:12px; }
+.cropControls input { width:100%; min-height:32px; margin:0; padding:0; border:0; accent-color:var(--blue); }
+.fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.fields label { display:grid; gap:8px; color:var(--navy); font-size:13px; font-weight:600; }
+.fields input { width:100%; min-width:0; min-height:48px; padding:11px 13px; border:1px solid #d7e0ed; border-radius:10px; background:#fff; color:var(--navy); font:inherit; font-size:16px; }
+.fields input:focus-visible { outline:2px solid #869ddd; outline-offset:2px; }
+.accountInfo { display:grid; gap:6px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#fafbfd; }
+.accountInfo span { color:#738098; font-size:12px; }
+.accountInfo strong { overflow-wrap:anywhere; color:#52627c; font-size:14px; font-weight:500; }
+.error { padding:13px 15px; border:1px solid #edc4cc; border-radius:10px; background:#fff5f7; color:#a1384c; font-size:13px; line-height:1.6; }
+.error p { margin:0; }
+.error button { margin-top:10px; }
+.formActions { display:flex; flex-wrap:wrap; gap:10px; padding-top:18px; border-top:1px solid var(--line); }
+.formActions > button { min-height:46px; }
+.formActions > button:first-child { flex:1; }
+.identity { display:flex; align-items:center; gap:16px; margin-bottom:22px; }
+.identity h2 { margin:0 0 6px; font-size:23px; overflow-wrap:anywhere; }
+.identity p { margin:0; color:#677891; font-size:13px; }
+.identity > div { min-width:0; }
+.overview { display:grid; gap:18px; }
+.editButton { min-height:46px; width:100%; }
+@media(max-width:480px) {
+  .photoSection { padding:16px; }
+  .photoHeading { gap:12px; align-items:flex-start; }
+  .previewAvatar { flex-basis:64px; width:64px; height:64px; font-size:22px; }
+  .cropper { grid-template-columns:1fr; gap:16px; }
+  .cropArea { max-width:200px; margin:0 auto; }
+  .fields { grid-template-columns:1fr; gap:16px; }
+  .photoActions { gap:8px; }
+  .formActions > button { flex:1; }
+}

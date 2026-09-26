@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/frontend/shared/Avatar";
 import { Toast } from "@/frontend/shared/Toast";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -20,7 +21,6 @@ type DeleteTarget = { type: "team"; item: Team } | { type: "user"; item: User } 
 
 const sectionLabels: Record<CeoSection, string> = { overview: "Обзор", teams: "Команды", requests: "Заявки", users: "Пользователи" };
 const roleLabels: Record<UserRole, string> = { ceo: "CEO", admin: "Наставник", member: "Участник" };
-const initials = (name: string) => name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
 export function CEOApp() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -261,11 +261,11 @@ function RequestsView({ requests, onResolve, actionId }: { requests: TeamJoinReq
 
 function RequestRow({ request, onResolve, actionId, showDate = false }: { request: TeamJoinRequest; onResolve: (request: TeamJoinRequest, status: "approved" | "rejected") => void; actionId: string; showDate?: boolean }) {
   const pending = request.status === "pending";
-  return <div className="ceo-request-row"><div className="ceo-user-avatar">{initials(request.userName || "?")}</div><div className="ceo-request-main"><strong>{request.userName || "Пользователь"}</strong><span>хочет в команду <b>{request.teamName || "—"}</b></span>{showDate && <small>{formatDateTime(request.createdAt)}</small>}</div>{pending ? <div className="ceo-request-actions"><button className="button button-success" onClick={() => onResolve(request, "approved")} disabled={actionId === request.id}>Одобрить</button><button className="button button-danger" onClick={() => onResolve(request, "rejected")} disabled={actionId === request.id}>Отклонить</button></div> : <span className={`request-result ${request.status}`}>{request.status === "approved" ? "Одобрена" : "Отклонена"}</span>}</div>;
+  return <div className="ceo-request-row"><Avatar className="ceo-user-avatar" name={request.userName || "?"} src={request.userAvatarUrl} /><div className="ceo-request-main"><strong>{request.userName || "Пользователь"}</strong><span>хочет в команду <b>{request.teamName || "—"}</b></span>{showDate && <small>{formatDateTime(request.createdAt)}</small>}</div>{pending ? <div className="ceo-request-actions"><button className="button button-success" onClick={() => onResolve(request, "approved")} disabled={actionId === request.id}>Одобрить</button><button className="button button-danger" onClick={() => onResolve(request, "rejected")} disabled={actionId === request.id}>Отклонить</button></div> : <span className={`request-result ${request.status}`}>{request.status === "approved" ? "Одобрена" : "Отклонена"}</span>}</div>;
 }
 
 function UsersView({ users, teams, onEdit, onDelete, actionId }: { users: User[]; teams: Team[]; onEdit: (user: User) => void; onDelete: (user: User) => void; actionId: string }) {
-  return <div className="ceo-panel ceo-users-panel"><div className="ceo-panel-title"><div><p className="eyebrow">Глобальный доступ</p><h2>Пользователи и роли</h2></div><span className="ceo-count-label">{users.length} всего</span></div>{users.length === 0 ? <CeoEmpty text="Пользователи появятся после регистрации." /> : users.map((user) => <div className="ceo-user-row" key={user.id}><div className="ceo-user-avatar">{initials(user.name)}</div><div className="ceo-user-main"><strong>{user.name}</strong><span>{user.login || "логин не указан"}</span></div><span className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</span><span className="ceo-user-team">{teams.find((team) => team.id === user.teamId)?.name || "Без команды"}</span><button className="button button-edit ceo-edit-access" onClick={() => onEdit(user)}>Настроить</button><button className="button button-danger ceo-delete-user" onClick={() => onDelete(user)} disabled={actionId === `delete-user:${user.id}`}>Удалить</button></div>)}</div>;
+  return <div className="ceo-panel ceo-users-panel"><div className="ceo-panel-title"><div><p className="eyebrow">Глобальный доступ</p><h2>Пользователи и роли</h2></div><span className="ceo-count-label">{users.length} всего</span></div>{users.length === 0 ? <CeoEmpty text="Пользователи появятся после регистрации." /> : users.map((user) => <div className="ceo-user-row" key={user.id}><Avatar className="ceo-user-avatar" name={user.name} src={user.avatarUrl} /><div className="ceo-user-main"><strong>{user.name}</strong><span>{user.login || "логин не указан"}</span></div><span className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</span><span className="ceo-user-team">{teams.find((team) => team.id === user.teamId)?.name || "Без команды"}</span><button className="button button-edit ceo-edit-access" onClick={() => onEdit(user)}>Настроить</button><button className="button button-danger ceo-delete-user" onClick={() => onDelete(user)} disabled={actionId === `delete-user:${user.id}`}>Удалить</button></div>)}</div>;
 }
 
 function TeamModal({ draft, setDraft, onSubmit, pending, onClose }: { draft: TeamDraft; setDraft: (draft: TeamDraft | null) => void; onSubmit: (event: FormEvent) => void; pending: boolean; onClose: () => void }) {

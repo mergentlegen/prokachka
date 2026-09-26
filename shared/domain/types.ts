@@ -19,13 +19,13 @@ export type Team = {
 };
 export type TeamJoinRequest = {
   id: string; userId: string; teamId: string; status: TeamRequestStatus; createdAt: string; reviewedAt?: string; userName?: string; teamName?: string;
-  invitedByUserId?: string;
+  invitedByUserId?: string; userAvatarUrl?: string;
 };
 export type User = {
-  id: string; name: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string;
+  id: string; name: string; firstName?: string; lastName?: string; avatarUrl?: string; profileVersion?: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string;
   parentUserId?: string; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean; createdAt: string;
 };
-export type AuthUser = Pick<User, "id" | "name" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
+export type AuthUser = Pick<User, "id" | "name" | "firstName" | "lastName" | "avatarUrl" | "profileVersion" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
 
 export type TaskProgram = {
   id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; pinnedAt?: string; publisherId?: string; audienceRootId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
@@ -50,7 +50,7 @@ export type Submission = {
   source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
-export type RankEntry = { id: string; name: string; points: number };
+export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number };
 export type Store = {
   users: User[]; tasks: Task[]; programs: TaskProgram[]; programProgress: MemberProgramProgress[];
   announcements: Announcement[]; starAwards: StarAward[]; submissions: Submission[];

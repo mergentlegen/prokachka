@@ -1,0 +1,2 @@
+.avatar { position:relative; display:inline-grid; place-items:center; flex-shrink:0; width:36px; height:36px; overflow:hidden; border-radius:50%; background:#e8edf9; color:var(--blue); font-size:12px; font-weight:700; line-height:1; vertical-align:middle; }
+.avatar > img { position:absolute; inset:0; display:block; width:100%; height:100%; max-width:none; object-fit:cover; }

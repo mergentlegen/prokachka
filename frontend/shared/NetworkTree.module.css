@@ -20,7 +20,7 @@
 @media (max-width: 560px) {
   .row { padding: 14px 12px 14px calc(4px + var(--tree-indent)); }
   .person { gap: 6px; }
-  .person > :global(.rank-avatar) { display: none; }
+  .person > :global(.rank-avatar) { flex-basis:28px; width:28px; height:28px; margin-top:8px; }
   .settings { margin-left: 8px; }
   .toolbar { padding: 10px 12px; }
 }

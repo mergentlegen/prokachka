@@ -2,15 +2,22 @@ import type { AuthUser } from "@/shared/domain/types";
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { findInvitationByToken } from "@/backend/services/network.service";
+import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
+
+async function requestAvatars<T extends Record<string, unknown>>(rows: T[]) {
+  const people = rows.map((row) => (Array.isArray(row.users) ? row.users[0] : row.users) || {});
+  const signed = await withAvatarUrls(people);
+  return rows.map((row, index) => ({ ...row, users: Array.isArray(row.users) ? [signed[index]] : signed[index] }));
+}
 
 export async function findJoinRequests(options: { userId?: string; teamId?: string } = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("team_join_requests").select("*, users!team_join_requests_user_id_fkey(name,team_id), teams(name)").order("created_at", { ascending: false });
+  let query = supabase.from("team_join_requests").select("*, users!team_join_requests_user_id_fkey(name,team_id,avatar_path), teams(name)").order("created_at", { ascending: false });
   if (options.userId) query = query.eq("user_id", options.userId);
   if (options.teamId) query = query.eq("team_id", options.teamId);
   const result = await readPages(query.order("id"));
-  return result.error ? { error: result.error } : { data: result.data };
+  return result.error ? { error: result.error } : { data: await requestAvatars(result.data || []) };
 }
 
 export async function createJoinRequest(userId: string, teamId: string, inviteToken?: string) {
@@ -48,6 +55,6 @@ export async function reviewJoinRequest(id: string, status: "approved" | "reject
   if (outcome.forbidden) return { forbidden: true as const };
   if (outcome.validationError) return { validationError: outcome.validationError };
   if (!outcome.processed) return { error: new Error("Request was not processed") };
-  const updated = await supabase.from("team_join_requests").select("*, users!team_join_requests_user_id_fkey(name,team_id), teams(name)").eq("id", id).single();
-  return updated.error ? { error: updated.error } : { data: updated.data };
+  const updated = await supabase.from("team_join_requests").select("*, users!team_join_requests_user_id_fkey(name,team_id,avatar_path), teams(name)").eq("id", id).single();
+  return updated.error ? { error: updated.error } : { data: (await requestAvatars([updated.data]))[0] };
 }
