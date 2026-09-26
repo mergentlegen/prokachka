@@ -83,6 +83,7 @@ test("member Tasks view contains games and ordinary tasks, while Programs only c
   const TaskCard = () => null;
   const { MemberApp } = loadTs("frontend/features/member/MemberApp.tsx", {
     react: harness.react,
+    "@/frontend/features/auth/AuthScreen": { AuthScreen: () => null },
     "./TaskCard": { TaskCard },
     "@/frontend/shared/hooks/use-live-updates": { useLiveUpdates() {} },
     "./use-member-data": { useMemberData: () => ({ store: { tasks, submissions: [], announcements: [], starAwards: [] }, ranking: [], starRanking: [], network: [], refreshData() {}, dataLoading: false }) },

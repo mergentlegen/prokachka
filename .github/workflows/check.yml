@@ -93,9 +93,11 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/database-roles.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/realtime-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/storage-fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/auth-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/bootstrap.sql
       - name: Database integration and concurrent requests
         run: |
+          psql -X -v ON_ERROR_STOP=1 -f tests/email-auth.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/telegram-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/architecture-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/live-updates.sql

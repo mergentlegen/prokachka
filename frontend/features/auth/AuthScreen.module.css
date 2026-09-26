@@ -29,4 +29,14 @@
 .screen .submit { width:100%; min-height:48px; margin:0; padding:12px 18px; border-radius:10px; font-size:14px; justify-content:center; }
 .screen .tabs { margin:0; }
 .screen .tabs button { min-height:44px; font-size:13px; }
+.mailIcon { display:grid; place-items:center; width:56px; height:56px; margin-bottom:24px; border:1px solid #40516e; border-radius:16px; background:#1a2943; color:#f1c977; font-size:30px; }
+.emailAddress { color:#e7efff; overflow-wrap:anywhere; }
+.screen input.codeInput { text-align:center; font-size:26px; font-variant-numeric:tabular-nums; letter-spacing:.35em; padding-left:calc(12px + .35em); min-height:56px; }
+.codeHint { margin:0; color:#aebcd4; font-size:13px; line-height:1.5; }
+.successNotice { margin:0; padding:14px; border:1px solid #50b8975e; border-radius:12px; background:#50b89714; color:#b8efd8; font-size:14px; line-height:1.5; }
+.secondaryAction,.backAction { width:100%; min-height:48px; padding:12px; border-radius:10px; color:#e7efff; font:inherit; font-size:14px; line-height:1.5; }
+.secondaryAction { border:1px solid #40516e; background:#1a2943; }
+.backAction { border:0; background:transparent; color:#c0cee5; text-decoration:underline; text-underline-offset:4px; }
+.secondaryAction:disabled,.backAction:disabled { cursor:default; opacity:.6; }
+.secondaryAction:focus-visible,.backAction:focus-visible { outline:2px solid #f1c977; outline-offset:3px; }
 @media(max-width:380px) { .names { grid-template-columns:minmax(0,1fr); } .heading { font-size:27px; } }

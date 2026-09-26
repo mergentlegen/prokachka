@@ -13,6 +13,7 @@ export function validateAuthForm(mode: AuthMode, values: AuthValues): AuthErrors
   if (!values.email.trim()) errors.email = "Введите email.";
   else if (values.email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) errors.email = "Укажите email в формате name@example.com.";
   if (values.password.length < 6) errors.password = "Пароль должен содержать минимум 6 символов.";
+  else if (values.password.length > 1024) errors.password = "Пароль должен содержать не больше 1024 символов.";
   if (mode === "register" && (!values.passwordConfirmation || values.password !== values.passwordConfirmation)) errors.passwordConfirmation = "Пароли не совпадают.";
   return errors;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { clearDevSession } from "@/frontend/shared/api/client";
 import { dataCache } from "@/frontend/shared/api/data-cache";
@@ -9,6 +9,7 @@ import { registrationServerField, validateAuthForm } from "@/frontend/shared/lib
 import type { AuthMode, AuthValues, AuthFieldName, AuthErrors } from "@/frontend/shared/lib/auth-validation";
 import type { AuthUser } from "@/shared/domain/types";
 import styles from "./AuthScreen.module.css";
+import { EmailConfirmation, emailConfirmationSnapshot, rememberEmailConfirmation, restoreEmailConfirmation, subscribeEmailConfirmation } from "./EmailConfirmation";
 
 export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthenticated: (user: AuthUser) => void; initialMode?: AuthMode }) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -19,10 +20,21 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
   const [error, setError] = useState("");
   const [credentialsInvalid, setCredentialsInvalid] = useState(false);
   const [pending, setPending] = useState(false);
+  const confirmationSnapshot = useSyncExternalStore(subscribeEmailConfirmation, emailConfirmationSnapshot, () => "");
+  const confirmation = restoreEmailConfirmation(confirmationSnapshot);
   const formRef = useRef<HTMLFormElement>(null);
   const validation = validateAuthForm(mode, values);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); }, []);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
+  function finishAuthentication(body: { user: AuthUser; session?: string; devAuthMode?: boolean }) {
+    rememberEmailConfirmation(null);
+    if (body.devAuthMode === true && typeof body.session === "string") window.sessionStorage.setItem("incruises_dev_session", body.session);
+    else clearDevSession();
+    dataCache.activate(userScope(body.user));
+    onAuthenticated(body.user);
+  }
   function focusField(field: AuthFieldName) { formRef.current?.querySelector<HTMLInputElement>(`[name="${field}"]`)?.focus(); }
   function change(field: AuthFieldName, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -50,10 +62,14 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
         else { setError(message); setCredentialsInvalid(mode === "login" && response.status === 401); }
         return;
       }
-      if (body.devAuthMode === true && typeof body.session === "string") window.sessionStorage.setItem("incruises_dev_session", body.session);
-      else clearDevSession();
-      dataCache.activate(userScope(body.user as AuthUser));
-      onAuthenticated(body.user as AuthUser);
+      if (body.verificationRequired === true && typeof body.email === "string") {
+        const next = { email: body.email, resendAt: Date.now() + Math.max(0, Number(body.resendAfter) || 0) * 1000 };
+        rememberEmailConfirmation(next);
+        setValues((current) => ({ ...current, password: "", passwordConfirmation: "" }));
+        return;
+      }
+      if (!body.user || typeof body.user.id !== "string") { setError("Не удалось завершить вход. Попробуйте ещё раз."); return; }
+      finishAuthentication(body);
     } catch {
       setError("Не удалось связаться с сервером. Проверьте соединение и попробуйте ещё раз.");
     } finally { setPending(false); }
@@ -69,6 +85,10 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
       error={message} credentialError={credentialError} onChange={(value) => change(name, value)}
       onBlur={() => setTouched((current) => new Set(current).add(name))} />;
   }
+  if (confirmation) return <EmailConfirmation initial={confirmation} onAuthenticated={finishAuthentication} onBack={() => {
+    rememberEmailConfirmation(null); setValues((current) => ({ ...current, email: confirmation.email }));
+    setAttempted(false); setError("");
+  }} />;
   return <main className={`login-shell ${styles.screen}`}>
     <div className="login-decor decor-one" aria-hidden="true" /><div className="login-decor decor-two" aria-hidden="true" />
     <div className={`login-panel ${styles.panel}`}>

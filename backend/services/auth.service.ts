@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client
 import { findInvitationByToken } from "@/backend/services/network.service";
 import type { AuthUser } from "@/shared/domain/types";
 import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
+import { authenticateEmailAccount } from "@/backend/services/email-auth.service";
 
 type StoredAccount = { user: AuthUser; passwordHash: string };
 const demoAccounts = new Map<string, StoredAccount>();
@@ -107,7 +108,8 @@ export function validateRegistration(
   ) {
     return "Введите корректный email.";
   }
-  if (typeof password !== "string" || password.length < 6) {
+  if (typeof password !== "string" || password.length < 6 || password.length > 1024) {
+    if (typeof password === "string" && password.length > 1024) return "Пароль должен содержать не больше 1024 символов.";
     return "Пароль должен содержать минимум 6 символов.";
   }
   return null;
@@ -121,7 +123,8 @@ export function validateLoginCredentials(email: unknown, password: unknown) {
   ) {
     return "Введите корректный email.";
   }
-  if (typeof password !== "string" || password.length < 6) {
+  if (typeof password !== "string" || password.length < 6 || password.length > 1024) {
+    if (typeof password === "string" && password.length > 1024) return "Пароль должен содержать не больше 1024 символов.";
     return "Пароль должен содержать минимум 6 символов.";
   }
   return null;
@@ -221,27 +224,36 @@ export async function authenticateAccount(email: string, password: string) {
   if (supabase) {
     let data: Record<string, unknown> | null = null;
     let error: { message?: string } | null = null;
+    const accountFields = "id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash";
+    async function lookup(field: "email" | "login") {
+      const result = await supabase!.from("users").select(accountFields + ",auth_user_id").eq(field, normalizedEmail).maybeSingle();
+      // Rolling deployment before the additive migration is safe only while the
+      // new signup flow is disabled. Do not mask any other database error.
+      if (!serverEnv.emailVerificationEnabled && result.error?.code === "42703" && result.error.message.includes("auth_user_id")) {
+        return supabase!.from("users").select(accountFields).eq(field, normalizedEmail).maybeSingle();
+      }
+      return result;
+    }
 
-    const byEmail = await supabase
-      .from("users")
-      .select("id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
+    const byEmail = await lookup("email");
 
     data = byEmail.data as Record<string, unknown> | null;
     error = byEmail.error;
 
     if (!data && !error) {
-      const legacy = await supabase
-        .from("users")
-        .select("id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash")
-        .eq("login", normalizedEmail)
-        .maybeSingle();
+      const legacy = await lookup("login");
       data = legacy.data as Record<string, unknown> | null;
       error = legacy.error;
     }
 
-    if (error || !data || !verifyPassword(password, String(data.password_hash))) {
+    if (error) return { error: "Сервис авторизации временно недоступен.", status: 503 };
+    if (data?.auth_user_id || (!data && serverEnv.emailVerificationEnabled)) {
+      const result = await authenticateEmailAccount(normalizedEmail, password, data?.auth_user_id ? String(data.auth_user_id) : undefined);
+      if (!("accountId" in result)) return result;
+      const user = await findAccountById(result.accountId);
+      return user ? { user } : { error: "Сервис авторизации временно недоступен.", status: 503 };
+    }
+    if (!data || !verifyPassword(password, String(data.password_hash))) {
       return { error: "Неверный email или пароль." };
     }
     return { user: publicUser((await withAvatarUrls([data]))[0]) };
