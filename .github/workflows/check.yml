@@ -92,6 +92,7 @@ jobs:
         run: |
           psql -X -v ON_ERROR_STOP=1 -f tests/database-roles.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/realtime-fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/storage-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/bootstrap.sql
       - name: Database integration and concurrent requests
         run: |
