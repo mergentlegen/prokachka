@@ -35,6 +35,43 @@ test('crop coordinates stay within the source image for portrait, landscape and 
   assert.deepEqual(cropRegion(400, 800, { x: 9, y: -1, zoom: 3 }), { left: 400 - 400 / 3, top: 0, side: 400 / 3 });
 });
 
+function mockCanvasDocument(t, probe) {
+  const previous = global.document;
+  let probes = 0;
+  global.document = { createElement: () => { probes++; return probe; } };
+  t.after(() => { if (previous === undefined) delete global.document; else global.document = previous; });
+  return () => probes;
+}
+
+test('Safari PNG fallback is detected before photo encoding and replaced by bounded JPEG', async (t) => {
+  const requests = [];
+  const probes = mockCanvasDocument(t, { toBlob: callback => callback(new Blob(['png'], { type: 'image/png' })) });
+  const { encodeAvatarCanvas } = load('frontend/features/profile/avatar-encoding.ts');
+  const canvas = { toBlob: (callback, type, quality) => { requests.push([type, quality]); callback(new Blob([Buffer.alloc(type === 'image/png' ? 900_000 : 180_000)], { type })); } };
+  const photo = await encodeAvatarCanvas(canvas, 0.85, 512 * 1024);
+  assert.equal(photo.type, 'image/jpeg'); assert.ok(photo.size < 512 * 1024);
+  assert.deepEqual(requests, [['image/jpeg', 0.85]]);
+  await encodeAvatarCanvas(canvas, 0.92);
+  assert.equal(probes(), 1);
+});
+
+test('photo encoding reduces quality within a bounded number of attempts and never returns oversized PNG', async (t) => {
+  mockCanvasDocument(t, { toBlob: (callback, type) => callback(new Blob(['webp'], { type })) });
+  const { encodeAvatarCanvas } = load('frontend/features/profile/avatar-encoding.ts');
+  const qualities = [];
+  const photo = await encodeAvatarCanvas({ toBlob: (callback, type, quality) => { qualities.push(quality); callback(new Blob([Buffer.alloc(quality > 0.64 ? 600_000 : 160_000)], { type })); } }, 0.85, 512 * 1024);
+  assert.equal(photo.type, 'image/webp'); assert.deepEqual(qualities, [0.85, 0.76, 0.64]);
+  await assert.rejects(encodeAvatarCanvas({ toBlob: callback => callback(new Blob([Buffer.alloc(900_000)], { type: 'image/png' })) }, 0.85, 512 * 1024), /подготовить фотографию/);
+});
+
+test('failed WebP encoding safely falls back to JPEG; a null result produces a useful error', async (t) => {
+  mockCanvasDocument(t, { toBlob: (callback, type) => callback(new Blob(['webp'], { type })) });
+  const { encodeAvatarCanvas } = load('frontend/features/profile/avatar-encoding.ts');
+  const canvas = { toBlob: (callback, type) => callback(type === 'image/webp' ? null : new Blob(['jpeg'], { type })) };
+  assert.equal((await encodeAvatarCanvas(canvas, 0.85, 512 * 1024)).type, 'image/jpeg');
+  await assert.rejects(encodeAvatarCanvas({ toBlob: callback => callback(null) }, 0.85), /подготовить фотографию/);
+});
+
 test('phone photo limits allow exact iPhone 24/48 MP dimensions and larger originals without increasing Storage limits', () => {
   const config = load('shared/domain/profile.ts');
   assert.ok(4284 * 5712 < config.AVATAR_INPUT_MAX_PIXELS);

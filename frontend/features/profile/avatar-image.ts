@@ -1,5 +1,6 @@
 import { AVATAR_INPUT_MAX_BYTES, AVATAR_INPUT_MAX_PIXELS, AVATAR_PREVIEW_MAX_EDGE, AVATAR_SIZE, AVATAR_UPLOAD_MAX_BYTES } from "@/shared/domain/profile";
 import { avatarSourceFormat, heifMaxPixels } from "./avatar-source";
+import { encodeAvatarCanvas } from "./avatar-encoding";
 
 export type AvatarImage = { url: string; image: HTMLImageElement; width: number; height: number };
 export type AvatarCrop = { x: number; y: number; zoom: number };
@@ -27,11 +28,6 @@ async function browserImage(blob: Blob): Promise<AvatarImage> {
   }
 }
 
-async function canvasBlob(canvas: HTMLCanvasElement, quality: number) {
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-  if (!blob) throw new AvatarImageError("Не удалось подготовить фотографию. Выберите другой файл.");
-  return blob;
-}
 async function smallPreview(source: CanvasImageSource, width: number, height: number) {
   checkDimensions(width, height);
   const ratio = Math.min(1, AVATAR_PREVIEW_MAX_EDGE / Math.max(width, height));
@@ -40,8 +36,9 @@ async function smallPreview(source: CanvasImageSource, width: number, height: nu
   try {
     const context = canvas.getContext("2d");
     if (!context) throw new AvatarImageError("Не удалось подготовить фотографию.");
+    context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(source, 0, 0, canvas.width, canvas.height);
-    return await browserImage(await canvasBlob(canvas, 0.92));
+    return await browserImage(await encodeAvatarCanvas(canvas, 0.92));
   } finally { canvas.width = 1; canvas.height = 1; }
 }
 
@@ -86,11 +83,12 @@ export async function loadAvatarImage(file: File): Promise<AvatarImage> {
 
 export async function prepareAvatar(image: AvatarImage, crop: AvatarCrop): Promise<Blob> {
   const canvas = document.createElement("canvas"); canvas.width = AVATAR_SIZE; canvas.height = AVATAR_SIZE;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Не удалось подготовить фотографию.");
-  const region = cropRegion(image.width, image.height, crop);
-  context.drawImage(image.image, region.left, region.top, region.side, region.side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
-  const blob = await canvasBlob(canvas, 0.85);
-  if (!blob || blob.size > AVATAR_UPLOAD_MAX_BYTES) throw new Error("Не удалось уменьшить фотографию. Попробуйте другой файл.");
-  return blob;
+  try {
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Не удалось подготовить фотографию.");
+    const region = cropRegion(image.width, image.height, crop);
+    context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image.image, region.left, region.top, region.side, region.side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    return await encodeAvatarCanvas(canvas, 0.85, AVATAR_UPLOAD_MAX_BYTES);
+  } finally { canvas.width = 1; canvas.height = 1; }
 }

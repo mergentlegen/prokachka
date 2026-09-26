@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const sharp = require('sharp');
+const { randomBytes } = require('node:crypto');
 const { chromium } = require(process.env.PROKACHKA_PLAYWRIGHT_MODULE || 'playwright');
 const base = process.env.PROKACHKA_UI_BASE || 'http://127.0.0.1:3106';
 if (!/^http:\/\/(127\.0\.0\.1|localhost):3106$/.test(base)) throw new Error('Profile UI QA requires isolated localhost fixtures on 3106');
@@ -15,12 +16,21 @@ fs.mkdirSync(artifacts, { recursive: true });
   const browser = await chromium.launch({ headless: true, channel: process.env.PROKACHKA_BROWSER_CHANNEL || 'msedge' });
   try {
     const context = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
+    if (process.env.PROKACHKA_SIMULATE_SAFARI_ENCODER === '1') {
+      await context.addInitScript(() => {
+        const encode = HTMLCanvasElement.prototype.toBlob;
+        HTMLCanvasElement.prototype.toBlob = function(callback, type, quality) {
+          return encode.call(this, callback, type === 'image/webp' ? 'image/png' : type, quality);
+        };
+      });
+    }
     await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
     const page = await context.newPage();
     const errors = [], writes = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => { if (new URL(request.url()).pathname === '/api/profile') writes.push(request); });
     await page.goto(base);
+    await page.locator('.rank-row').first().waitFor({ state: 'attached' });
     await page.getByRole('button', { name: 'Открыть профиль', exact: true }).click();
     await page.getByRole('button', { name: 'Редактировать профиль', exact: true }).click();
     await page.getByLabel('Имя', { exact: true }).fill('Александра');
@@ -51,8 +61,20 @@ fs.mkdirSync(artifacts, { recursive: true });
       { input: await sharp({ create: { width: 480, height: 320, channels: 3, background: '#3255b3' } }).png().toBuffer(), top: 0, left: 0 },
       { input: await sharp({ create: { width: 480, height: 320, channels: 3, background: '#f7b330' } }).png().toBuffer(), top: 320, left: 480 },
     ]).jpeg().withMetadata({ orientation: 1 }).toBuffer();
-    await page.locator('input[type=file]').setInputFiles({ name: 'camera.jpg', mimeType: 'image/jpeg', buffer: photo });
+    // A detailed/noisy photo makes an uncompressed 512px PNG exceed the upload
+    // budget, reproducing the iPhone failure rather than just changing MIME.
+    const safariEncoder = process.env.PROKACHKA_SIMULATE_SAFARI_ENCODER === '1';
+    const uploadPhoto = safariEncoder ? await sharp(randomBytes(1024 * 1024 * 3), { raw: { width: 1024, height: 1024, channels: 3 } }).png().toBuffer() : photo;
+    await page.locator('input[type=file]').setInputFiles({ name: safariEncoder ? 'camera.png' : 'camera.jpg', mimeType: safariEncoder ? 'image/png' : 'image/jpeg', buffer: uploadPhoto });
     await page.getByRole('img', { name: 'Предпросмотр фотографии' }).waitFor();
+    if (safariEncoder) {
+      const pngBytes = await page.getByRole('img', { name: 'Предпросмотр фотографии' }).locator('img').evaluate(img => new Promise(resolve => {
+        const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+        canvas.getContext('2d').drawImage(img, 0, 0, 512, 512);
+        canvas.toBlob(blob => { resolve(blob.size); canvas.width = 1; canvas.height = 1; }, 'image/png');
+      }));
+      assert.ok(pngBytes > 512 * 1024, 'Regression fixture must exceed the former PNG upload budget');
+    }
     await page.getByLabel('Масштаб', { exact: true }).press('ArrowRight');
     await page.getByLabel('Влево — вправо', { exact: true }).press('ArrowRight');
     await page.screenshot({ path: path.join(artifacts, 'crop-375.png') });
@@ -60,6 +82,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     await page.getByRole('button', { name: 'Редактировать профиль', exact: true }).waitFor();
     assert.equal(writes.length, 1);
     assert.ok(writes[0].postDataBuffer().length < 512 * 1024);
+    if (process.env.PROKACHKA_SIMULATE_SAFARI_ENCODER === '1') assert.ok(writes[0].postDataBuffer().includes(Buffer.from('filename="avatar.jpg"')));
     const profileImage = page.locator('.profile-avatar img');
     await profileImage.waitFor();
     await page.waitForFunction(() => document.querySelector('.profile-avatar img')?.naturalWidth === 512);
