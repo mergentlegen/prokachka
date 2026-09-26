@@ -33,6 +33,20 @@ fs.mkdirSync(artifacts, { recursive: true });
       await page.screenshot({ path: path.join(artifacts, `editor-${width}.png`) });
     }
     await page.setViewportSize({ width: 375, height: 812 });
+    // Exact dimensions from the user's iPhone photo, also exceeding the former
+    // 5 MiB input limit. Trailing JPEG padding avoids checking a huge binary in.
+    const largeJpeg = await sharp({ create: { width: 4284, height: 5712, channels: 3, background: '#326396' } }).jpeg().toBuffer();
+    await page.locator('input[type=file]').setInputFiles({ name: 'IMG_9744.jpg', mimeType: 'image/jpeg', buffer: Buffer.concat([largeJpeg, Buffer.alloc(6 * 1024 * 1024)]) });
+    await page.getByRole('img', { name: 'Предпросмотр фотографии' }).waitFor();
+    assert.ok(await page.getByRole('img', { name: 'Предпросмотр фотографии' }).locator('img').evaluate(img => Math.max(img.naturalWidth, img.naturalHeight) <= 2048));
+    await page.getByRole('button', { name: 'Отменить изменение фото', exact: true }).click();
+    if (process.env.PROKACHKA_HEIC_FIXTURE) {
+      await page.locator('input[type=file]').setInputFiles(process.env.PROKACHKA_HEIC_FIXTURE);
+      await page.getByRole('img', { name: 'Предпросмотр фотографии' }).waitFor({ timeout: 60_000 });
+      assert.ok(await page.getByRole('img', { name: 'Предпросмотр фотографии' }).locator('img').evaluate(img => img.naturalWidth > 0 && Math.max(img.naturalWidth, img.naturalHeight) <= 2048));
+      await page.screenshot({ path: path.join(artifacts, 'heic-crop-375.png') });
+      await page.getByRole('button', { name: 'Отменить изменение фото', exact: true }).click();
+    }
     const photo = await sharp({ create: { width: 960, height: 640, channels: 3, background: '#28a6a5' } }).composite([
       { input: await sharp({ create: { width: 480, height: 320, channels: 3, background: '#3255b3' } }).png().toBuffer(), top: 0, left: 0 },
       { input: await sharp({ create: { width: 480, height: 320, channels: 3, background: '#f7b330' } }).png().toBuffer(), top: 320, left: 480 },
@@ -64,7 +78,7 @@ fs.mkdirSync(artifacts, { recursive: true });
 
     await page.getByRole('button', { name: 'Редактировать профиль', exact: true }).click();
     await page.locator('input[type=file]').setInputFiles({ name: 'unsafe.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') });
-    await page.getByRole('alert').filter({ hasText: 'JPG, PNG или WebP' }).waitFor();
+    await page.getByRole('alert').filter({ hasText: 'JPG, PNG, WebP, HEIC или HEIF' }).waitFor();
     assert.equal(writes.length, 2);
     // Another tab saves first; the editor must keep the user's input on conflict.
     const user = (await (await context.request.get(base + '/api/auth/session', { headers: { referer: base } })).json()).user;

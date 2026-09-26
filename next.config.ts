@@ -16,6 +16,8 @@ const contentSecurityPolicy = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
+  // The on-demand, eval-free HEIF decoder runs in a local Blob worker.
+  "worker-src 'self' blob:",
   `img-src 'self' data: blob: https://i.ytimg.com ${supabaseSources.join(" ")}`.trim(),
   `media-src 'self' blob: ${supabaseSources.join(" ")}`.trim(),
   "font-src 'self'",

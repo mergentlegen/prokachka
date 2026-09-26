@@ -1,10 +1,12 @@
 export const AVATAR_BUCKET = "profile-avatars";
-export const AVATAR_INPUT_MAX_BYTES = 5 * 1024 * 1024;
+export const AVATAR_INPUT_MAX_BYTES = 25 * 1024 * 1024;
 export const AVATAR_UPLOAD_MAX_BYTES = 512 * 1024;
 export const AVATAR_STORED_MAX_BYTES = 256 * 1024;
 export const AVATAR_SIZE = 512;
-export const AVATAR_INPUT_MAX_PIXELS = 24_000_000;
-export const AVATAR_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+// Advertised 24/48 MP phone images can slightly exceed 24/48 million pixels.
+export const AVATAR_INPUT_MAX_PIXELS = 60_000_000;
+export const AVATAR_PREVIEW_MAX_EDGE = 2048;
+export const AVATAR_FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 
 export function validateProfileNames(firstName: unknown, lastName: unknown): { error: string } | { firstName: string; lastName: string } {
   const normalize = (value: unknown) => typeof value === "string" ? value.trim().replace(/\s+/gu, " ") : "";

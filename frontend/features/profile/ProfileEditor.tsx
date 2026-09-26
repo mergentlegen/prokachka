@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { AuthUser } from "@/shared/domain/types";
-import { profileNames, validateProfileNames } from "@/shared/domain/profile";
+import { AVATAR_FILE_ACCEPT, profileNames, validateProfileNames } from "@/shared/domain/profile";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ApiError, refreshAuthSession } from "@/frontend/shared/api/client";
 import { updateProfile } from "@/frontend/shared/api/profile-client";
@@ -72,13 +72,13 @@ export function ProfileEditor({ user, onSaved, onCancel, onBusyChange }: {
     <section className={styles.photoSection} aria-label="Фотография профиля">
       <div className={styles.photoHeading}><div><h3>Фотография профиля</h3><p>Её увидят участники команды в рейтинге и других разделах.</p></div>{!image && <Avatar name={`${firstName} ${lastName}`} src={remove ? undefined : user.avatarUrl} className={styles.previewAvatar} eager />}</div>
       {image && <AvatarCropper image={image} crop={crop} onChange={setCrop} disabled={busy} />}
-      <input ref={input} className={styles.fileInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Выбрать фотографию профиля" disabled={busy || imageBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void selectFile(file); }} />
+      <input ref={input} className={styles.fileInput} type="file" accept={AVATAR_FILE_ACCEPT} aria-label="Выбрать фотографию профиля" disabled={busy || imageBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void selectFile(file); }} />
       <div className={styles.photoActions}>
         <button type="button" className="button button-edit" disabled={busy || imageBusy} onClick={() => input.current?.click()}>{imageBusy ? "Открываем фото…" : image || user.avatarUrl ? "Изменить фото" : "Добавить фото"}</button>
         {(image || user.avatarUrl) && !remove && <button type="button" className={styles.removeButton} disabled={busy || imageBusy} onClick={() => { setImage(null); setRemove(Boolean(user.avatarUrl)); setError(""); }}>Удалить фото</button>}
         {(image || remove) && <button type="button" className={styles.resetButton} disabled={busy || imageBusy} onClick={() => { setImage(null); setRemove(false); }}>Отменить изменение фото</button>}
       </div>
-      <p className={styles.hint}>{remove ? "Фотография удалится после сохранения. Вместо неё будут отображаться ваши инициалы." : "JPG, PNG или WebP до 5 МБ. Размер фотографии подстроится автоматически."}</p>
+      <p className={styles.hint}>{remove ? "Фотография удалится после сохранения. Вместо неё будут отображаться ваши инициалы." : "Фото с телефона: JPG, PNG, WebP, HEIC или HEIF до 25 МБ. Мы автоматически уменьшим его для аватарки."}</p>
     </section>
     <div className={styles.fields}>
       <label htmlFor="profile-first-name">Имя<input id="profile-first-name" autoComplete="given-name" value={firstName} maxLength={60} minLength={2} required disabled={busy} onChange={(event) => setFirstName(event.target.value)} /></label>

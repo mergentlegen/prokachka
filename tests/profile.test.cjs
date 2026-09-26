@@ -35,6 +35,35 @@ test('crop coordinates stay within the source image for portrait, landscape and 
   assert.deepEqual(cropRegion(400, 800, { x: 9, y: -1, zoom: 3 }), { left: 400 - 400 / 3, top: 0, side: 400 / 3 });
 });
 
+test('phone photo limits allow exact iPhone 24/48 MP dimensions and larger originals without increasing Storage limits', () => {
+  const config = load('shared/domain/profile.ts');
+  assert.ok(4284 * 5712 < config.AVATAR_INPUT_MAX_PIXELS);
+  assert.ok(6048 * 8064 < config.AVATAR_INPUT_MAX_PIXELS);
+  assert.equal(config.AVATAR_INPUT_MAX_BYTES, 25 * 1024 * 1024);
+  assert.equal(config.AVATAR_UPLOAD_MAX_BYTES, 512 * 1024);
+  assert.equal(config.AVATAR_STORED_MAX_BYTES, 256 * 1024);
+  assert.match(config.AVATAR_FILE_ACCEPT, /\.heic/);
+});
+
+test('photo detection uses real bytes, accepts unlabelled HEIF, and rejects SVG/AVIF spoofing', () => {
+  const { avatarSourceFormat, heifMaxPixels } = load('frontend/features/profile/avatar-source.ts');
+  const box = (name, data) => { const buffer = Buffer.alloc(8 + data.length); buffer.writeUInt32BE(buffer.length); buffer.write(name, 4); data.copy(buffer, 8); return buffer; };
+  const brand = name => box('ftyp', Buffer.concat([Buffer.from(name), Buffer.alloc(4), Buffer.from('mif1')]));
+  assert.equal(avatarSourceFormat(Buffer.from([0xff, 0xd8, 0xff])), 'jpeg');
+  assert.equal(avatarSourceFormat(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), 'png');
+  assert.equal(avatarSourceFormat(Buffer.from('RIFF0000WEBP')), 'webp');
+  assert.equal(avatarSourceFormat(brand('heic')), 'heif');
+  assert.equal(avatarSourceFormat(brand('mif1')), 'heif');
+  assert.equal(avatarSourceFormat(brand('avif')), null);
+  assert.equal(avatarSourceFormat(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')), null);
+  const dimensions = Buffer.alloc(12); dimensions.writeUInt32BE(4284, 4); dimensions.writeUInt32BE(5712, 8);
+  const properties = box('meta', Buffer.concat([Buffer.alloc(4), box('iprp', box('ipco', box('ispe', dimensions)))]));
+  assert.equal(heifMaxPixels(Buffer.concat([brand('heic'), properties])), 4284 * 5712);
+  assert.equal(heifMaxPixels(box('mdat', box('ispe', dimensions))), 0);
+  const invalid = Buffer.from(properties); invalid.writeUInt32BE(0xffffffff);
+  assert.equal(heifMaxPixels(invalid), 0);
+});
+
 test('multipart bodies without Content-Length are still bounded', async () => {
   const { readLimitedFormData, FormDataLimitError } = load('backend/http/form-data.ts');
   const body = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(100)); controller.enqueue(new Uint8Array(100)); controller.close(); } });
