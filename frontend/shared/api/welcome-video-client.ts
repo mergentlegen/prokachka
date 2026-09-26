@@ -2,9 +2,11 @@
 
 import * as tus from "tus-js-client";
 import { ApiError, authFetch } from "@/frontend/shared/api/client";
+import { WELCOME_VIDEO_BROWSER_CACHE_SECONDS } from "@/shared/domain/welcome-video";
+import type { WelcomeVideo, WelcomeVideoMetadata } from "@/shared/domain/welcome-video";
 
-export type WelcomeVideo = { fileName: string; sizeBytes: number; durationSeconds: number; width: number; height: number; url: string };
-export type VideoMetadata = Pick<WelcomeVideo, "fileName" | "sizeBytes" | "durationSeconds" | "width" | "height">;
+export type { WelcomeVideo } from "@/shared/domain/welcome-video";
+export type VideoMetadata = WelcomeVideoMetadata;
 type Api<T> = { ok: boolean; message?: string } & T;
 
 function describeTusError(cause: unknown): Error {
@@ -28,7 +30,7 @@ function describeTusError(cause: unknown): Error {
 }
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await authFetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
+  const response = await authFetch(url, { cache: "no-store", ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
   const body = await response.json().catch(() => ({})) as Api<T>;
   if (!response.ok) throw new ApiError(body.message || "Не удалось выполнить запрос.", response.status);
   return body;
@@ -47,32 +49,40 @@ export async function removeWelcomeVideo() {
   return call<{ storageCleanupWarning: boolean }>("/api/welcome-video/settings", { method: "DELETE", body: "{}" });
 }
 
-export async function uploadWelcomeVideo(file: File, metadata: VideoMetadata, onProgress: (percentage: number) => void, onUpload: (abort: () => void) => void) {
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!anonKey) throw new Error("Не настроен публичный ключ Supabase для загрузки.");
-  const intent = await call<{ path: string; token: string; bucket: string; endpoint: string }>("/api/welcome-video/upload", {
+export async function uploadWelcomeVideo(file: File, metadata: VideoMetadata, onProgress: (percentage: number) => void, onUpload: (abort: (() => void) | null) => void) {
+  const intent = await call<{ path: string; token: string; bucket: string; endpoint: string; apiKey: string }>("/api/welcome-video/upload", {
     method: "POST", body: JSON.stringify({ metadata }),
   });
-  await new Promise<void>((resolve, reject) => {
-    const upload = new tus.Upload(file, {
-      endpoint: intent.endpoint,
-      retryDelays: [0, 3000, 5000, 10000, 20000],
-      headers: {
-        authorization: `Bearer ${anonKey}`,
-        apikey: anonKey,
-        "x-signature": intent.token,
-      },
-      uploadDataDuringCreation: true,
-      removeFingerprintOnSuccess: true,
-      metadata: { bucketName: intent.bucket, objectName: intent.path, contentType: "video/mp4", cacheControl: "3600" },
-      chunkSize: 6 * 1024 * 1024,
-      onProgress: (sent, total) => onProgress(Math.round((sent / total) * 100)),
-      onError: (cause) => reject(describeTusError(cause)),
-      onSuccess: () => resolve(),
+  if (!intent.apiKey) throw new Error("Не настроен публичный ключ Supabase для загрузки.");
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const upload = new tus.Upload(file, {
+        endpoint: intent.endpoint,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          // Publishable keys are not JWTs and must never go into a Bearer header.
+          ...(intent.apiKey.startsWith("sb_publishable_") ? {} : { authorization: `Bearer ${intent.apiKey}` }),
+          apikey: intent.apiKey,
+          "x-signature": intent.token,
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: { bucketName: intent.bucket, objectName: intent.path, contentType: "video/mp4", cacheControl: String(WELCOME_VIDEO_BROWSER_CACHE_SECONDS) },
+        chunkSize: 6 * 1024 * 1024,
+        onProgress: (sent, total) => onProgress(Math.round((sent / total) * 100)),
+        onError: (cause) => reject(describeTusError(cause)),
+        // The publication transaction is not cancellable: stop exposing TUS abort
+        // once the upload is complete, before the backend registers the live file.
+        onSuccess: () => { onUpload(null); resolve(); },
+      });
+      onUpload(() => { void upload.abort(true).catch(() => undefined); reject(new Error("Загрузка отменена.")); });
+      upload.start();
     });
-    onUpload(() => { void upload.abort(true); reject(new Error("Загрузка отменена.")); });
-    void upload.start();
-  });
+  } catch (cause) {
+    // Best effort; the scheduled worker also cleans uploads with expired intents.
+    void call("/api/welcome-video/upload", { method: "DELETE", body: JSON.stringify({ path: intent.path }) }).catch(() => undefined);
+    throw cause;
+  }
   await call<{ ok: boolean }>("/api/welcome-video/finish", {
     method: "POST", body: JSON.stringify({ path: intent.path, metadata }),
   });

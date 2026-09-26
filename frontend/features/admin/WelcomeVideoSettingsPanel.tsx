@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { AuthUser } from "@/shared/domain/types";
 import { ApiError } from "@/frontend/shared/api/client";
 import { loadWelcomeVideoSettings, removeWelcomeVideo, uploadWelcomeVideo, type VideoMetadata, type WelcomeVideo } from "@/frontend/shared/api/welcome-video-client";
+import { WELCOME_VIDEO_MAX_BYTES, WELCOME_VIDEO_MAX_SECONDS } from "@/shared/domain/welcome-video";
 
-const MAX_BYTES = 50 * 1024 * 1024;
 const formatSize = (size: number) => size >= 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(1)} МБ` : `${Math.ceil(size / 1024)} КБ`;
 const formatDuration = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 
@@ -25,7 +25,7 @@ export function WelcomeVideoSettingsPanel({ user }: { user: AuthUser }) {
     <div className="welcome-video-settings-intro"><span className="welcome-video-settings-icon" aria-hidden="true">▶</span><div><h2>Видео, которое увидит новый участник</h2><p>Ролик показывается один раз после одобрения заявки. Участнику назначается видео ближайшего наставника выше по его ветке, который загрузил ролик.</p></div></div>
     {error && <p className="welcome-video-settings-error" role="alert">{error} <button type="button" onClick={() => void refresh()}>Повторить</button></p>}
     <VideoSettingsCard title={user.role === "admin" ? "Видео верхнего наставника" : "Моё видео для моей ветки"} description={user.role === "admin" ? "Будет приветствием по умолчанию для команды. Видео наставников ниже по сети заменит его только для участников их веток." : "Его увидят новые участники ниже вас по сети. Соседние ветки его не увидят и продолжат использовать ролик своего наставника выше."} video={videos.video} onSaved={refresh} />
-    <div className="welcome-video-specs"><strong>Рекомендации к файлу</strong><span>MP4 · любое разрешение и ориентация · до 3 минут · до 50 МБ</span><span>Для хорошего качества подойдёт 720p или сжатое 1080p (H.264, звук AAC).</span><small>Видео показывается целиком, без обрезки. Загрузка идёт в закрытое хранилище; учитывается фактический размер файла.</small><small>Если связь прервётся, загрузку можно повторить.</small></div>
+    <div className="welcome-video-specs"><strong>Качественное видео без лишнего веса</strong><span>MP4 · любая ориентация · до 3 минут · до 200 МБ</span><span>Рекомендуем 1080p, H.264, звук AAC и 3–5 Мбит/с: обычно 60–120 МБ за 3 минуты. Для медленного интернета — 720p.</span><small>Включите «Оптимизация для веба» (fast start) при экспорте, чтобы просмотр начинался быстрее. 4K для короткого приветствия не нужен.</small><small>Файл хранится в одном экземпляре. Замена и удаление отправляют старый файл в автоматическую очистку. Загрузка не сжимает видео автоматически.</small><small>Передача идёт напрямую через Supabase Storage и CDN, без видеотрафика через сервер сайта. Учитывается фактический размер файла.</small></div>
   </div>;
 }
 
@@ -39,7 +39,7 @@ function readMetadata(file: File): Promise<VideoMetadata> {
       const metadata = { fileName: file.name, sizeBytes: file.size, durationSeconds: video.duration, width: video.videoWidth, height: video.videoHeight };
       if (!Number.isFinite(video.duration) || video.duration <= 0) return reject(new Error("Не удалось определить длительность видео."));
       if (video.videoWidth < 1 || video.videoHeight < 1 || video.videoWidth > 7680 || video.videoHeight > 7680) return reject(new Error("Не удалось определить разрешение видео. Попробуйте сохранить его в MP4 и загрузить снова."));
-      if (video.duration > 180) return reject(new Error("Продолжительность видео не должна превышать 3 минуты."));
+      if (video.duration > WELCOME_VIDEO_MAX_SECONDS) return reject(new Error("Продолжительность видео не должна превышать 3 минуты."));
       resolve(metadata);
     };
     video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Не удалось прочитать видео. Проверьте, что это исправный MP4-файл.")); };
@@ -61,7 +61,7 @@ function VideoSettingsCard({ title, description, video, onSaved }: { title: stri
     setError(""); setFile(null); setMetadata(null); setPreviewUrl("");
     if (!candidate) return;
     if (!candidate.name.toLowerCase().endsWith(".mp4") || (candidate.type && candidate.type !== "video/mp4")) { setError("Поддерживается только видео в формате MP4."); return; }
-    if (candidate.size > MAX_BYTES) { setError("На бесплатном тарифе Supabase размер видео не должен превышать 50 МБ."); return; }
+    if (candidate.size > WELCOME_VIDEO_MAX_BYTES) { setError("Размер видео не должен превышать 200 МБ. Экспортируйте MP4 в 1080p с битрейтом 3–5 Мбит/с."); return; }
     if (candidate.size < 1024) { setError("Этот видеофайл слишком маленький или пустой."); return; }
     try {
       const info = await readMetadata(candidate);
@@ -95,8 +95,9 @@ function VideoSettingsCard({ title, description, video, onSaved }: { title: stri
 
   return <section className="welcome-video-card">
     <div className="welcome-video-card-heading"><div><h3>{title}</h3><p>{description}</p></div>{video && <span className="welcome-video-ready">Настроено</span>}</div>
-    {video && <div className="welcome-video-existing"><video src={video.url} controls playsInline preload="metadata" aria-label={title} /><div className="welcome-video-file-meta"><strong>{video.fileName}</strong><span>{formatSize(video.sizeBytes)} · {formatDuration(video.durationSeconds)} · {video.width}×{video.height}</span></div></div>}
+    {video && <div className="welcome-video-existing"><video src={video.url} poster="/welcome-video-poster.svg" controls playsInline preload="metadata" aria-label={title} /><div className="welcome-video-file-meta"><strong>{video.fileName}</strong><span>{formatSize(video.sizeBytes)} · {formatDuration(video.durationSeconds)} · {video.width}×{video.height}</span></div></div>}
     {previewUrl && metadata && <div className="welcome-video-preview"><video src={previewUrl} controls playsInline preload="metadata" aria-label="Предпросмотр выбранного видео" /><p>Проверьте видео перед публикацией: {formatSize(metadata.sizeBytes)} · {formatDuration(metadata.durationSeconds)} · {metadata.width}×{metadata.height}</p></div>}
+    {metadata && (metadata.sizeBytes > 120 * 1024 * 1024 || metadata.width > 1920 || metadata.height > 1920) && <p className="welcome-video-size-tip">Файл можно загрузить, но он тяжеловат для приветствия. Экспорт в 1080p, H.264, 3–5 Мбит/с уменьшит расход места и ускорит просмотр на телефоне.</p>}
     <div className="welcome-video-actions">
       <label className={`welcome-video-pick ${busy ? "is-disabled" : ""}`}>
         <input type="file" accept="video/mp4,.mp4" disabled={busy} onChange={(event) => { void selectFile(event.target.files?.[0]); event.currentTarget.value = ""; }} />
@@ -104,9 +105,9 @@ function VideoSettingsCard({ title, description, video, onSaved }: { title: stri
       </label>
       {file && <button type="button" className="primary-button" disabled={busy} onClick={() => void upload()}>{busy ? "Загружаем…" : "Загрузить видео"}</button>}
       {video && <button type="button" className="welcome-video-delete" disabled={busy} onClick={() => void remove()}>Удалить</button>}
-      {busy && <button type="button" className="welcome-video-cancel" onClick={() => abortUpload.current?.()}>Отменить</button>}
+      {busy && file && progress < 100 && <button type="button" className="welcome-video-cancel" onClick={() => abortUpload.current?.()}>Отменить</button>}
     </div>
-    {busy && <div className="welcome-video-progress" role="status"><div><span>Загрузка видео</span><strong>{progress}%</strong></div><progress max="100" value={progress} /></div>}
+    {busy && <div className="welcome-video-progress" role="status"><div><span>{progress === 100 ? "Проверяем и публикуем видео…" : "Загрузка видео"}</span><strong>{progress}%</strong></div><progress max="100" value={progress} /></div>}
     {error && <p className="welcome-video-settings-error" role="alert">{error}</p>}
   </section>;
 }

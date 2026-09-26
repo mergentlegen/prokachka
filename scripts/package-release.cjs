@@ -25,7 +25,7 @@ fs.cpSync(source, destination, { recursive: true, dereference: true });
 fs.cpSync(path.join(root, 'public'), path.join(destination, 'public'), { recursive: true });
 fs.cpSync(path.join(root, '.next/static'), path.join(destination, '.next/static'), { recursive: true });
 fs.mkdirSync(path.join(destination, 'scripts'));
-for (const file of ['start-release.cjs', 'smoke-test.cjs', 'deliver-telegram.cjs']) {
+for (const file of ['start-release.cjs', 'smoke-test.cjs', 'deliver-telegram.cjs', 'cleanup-welcome-videos.cjs']) {
   fs.copyFileSync(path.join(root, 'scripts', file), path.join(destination, 'scripts', file));
 }
 const metadata = {

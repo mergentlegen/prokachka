@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically clean Prokachka welcome video storage
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=30
+Unit=prokachka-video-cleanup.service
+
+[Install]
+WantedBy=timers.target

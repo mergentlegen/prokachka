@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
-import { completeWelcomeVideo, createWelcomeVideoUpload, deleteWelcomeVideo, finishWelcomeVideoUpload, getWelcomeVideo, getWelcomeVideoSettings } from "@/backend/services/welcome-video.service";
+import { cancelWelcomeVideoUpload, completeWelcomeVideo, createWelcomeVideoUpload, deleteWelcomeVideo, finishWelcomeVideoUpload, getWelcomeVideo, getWelcomeVideoSettings } from "@/backend/services/welcome-video.service";
 import type { AuthUser } from "@/shared/domain/types";
 
 async function authenticated(request: Request): Promise<AuthUser | Response> {
@@ -23,7 +23,9 @@ export async function readWelcomeVideo(request: Request) {
   const result = await getWelcomeVideo(user);
   if ("unavailable" in result) return failure("База данных пока не настроена.", 503);
   if ("error" in result) return failure("Не удалось загрузить приветственное видео.", 502);
-  return ok(result.data);
+  const response = ok(result.data);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
 }
 
 export async function markWelcomeVideoComplete(request: Request) {
@@ -64,4 +66,11 @@ export async function removeWelcomeVideo(request: Request) {
   const user = await authenticated(request);
   if (isResponse(user)) return user;
   return resultResponse(await deleteWelcomeVideo(user));
+}
+
+export async function cancelWelcomeVideo(request: Request) {
+  const user = await authenticated(request);
+  if (isResponse(user)) return user;
+  try { return resultResponse(await cancelWelcomeVideoUpload(user, (await request.json()).path)); }
+  catch { return failure("Не удалось прочитать данные отмены загрузки.", 400); }
 }

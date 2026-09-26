@@ -1,6 +1,9 @@
 // Local-only UI fixture. All /api/* requests are intercepted: NEVER forwards to a database.
 // Start the built Next app on 3105, then node tests/helpers/ui-fixture-server.cjs.
 const http = require('node:http');
+const fs = require('node:fs');
+const welcomeFile = process.env.PROKACHKA_TEST_WELCOME_FILE;
+let welcomeCompleted = false;
 const { READY_PROGRAMS } = require('./load-ts.cjs')('shared/domain/ready-programs.ts');
 const requests = {};
 const streams = new Set();
@@ -34,6 +37,15 @@ const announcements = [
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1:3106');
   const json = (value, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
+  if (url.pathname === '/__test/welcome.mp4' && welcomeFile) {
+    const size = fs.statSync(welcomeFile).size;
+    const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
+    const start = range ? Number(range[1]) : 0;
+    const end = range?.[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+    if (start >= size || end < start) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+    res.writeHead(range ? 206 : 200, { 'Content-Type': 'video/mp4', 'Content-Length': end - start + 1, 'Accept-Ranges': 'bytes', ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}) });
+    fs.createReadStream(welcomeFile, { start, end }).pipe(res); return;
+  }
   if (url.pathname === '/__test/stats') return json(requests);
   if (url.pathname === '/__test/change' && req.method === 'POST') {
     points += 5;
@@ -43,6 +55,7 @@ http.createServer((req, res) => {
   if (url.pathname === '/__test/delay' && req.method === 'POST') { delay = Number(url.searchParams.get('ms')) || 0; return json({ delay }); }
   if (url.pathname.startsWith('/api/')) {
     requests[req.url] = (requests[req.url] || 0) + 1;
+    if (url.pathname === '/api/welcome-video/complete' && req.method === 'POST') { welcomeCompleted = true; return json({ ok: true, completed: true }); }
     if (url.pathname === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
       res.write('event: ready\ndata: {}\n\n'); streams.add(res);
@@ -167,7 +180,7 @@ http.createServer((req, res) => {
         return { ...item, published, publishedProgramId: published ? program.id : undefined, publishedActive: published && program.is_active, publishedPinned: program.is_pinned, publishedPinnedAt: program.pinned_at, publishedCreatedAt: program.created_at, canManage: published };
       }) },
       '/api/stars': { awards: [] }, '/api/team-requests': { requests: [] }, '/api/announcements': { announcements },
-      '/api/welcome-video': { required: false }, '/api/telegram/link/status': { linked: false },
+      '/api/welcome-video': welcomeFile && !welcomeCompleted ? { required: true, video: { id: 'fixture-asset', fileName: 'fixture.mp4', sizeBytes: fs.statSync(welcomeFile).size, durationSeconds: 5, width: 960, height: 540, url: '/__test/welcome.mp4' } } : { required: false }, '/api/telegram/link/status': { linked: false },
     };
     const fixture = fixtures[url.pathname];
     if (!fixture) return json({ message: 'Unmocked API; not forwarded' }, 404);

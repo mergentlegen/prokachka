@@ -946,6 +946,10 @@ html, body { width:100%; max-width:100%; overflow-x:clip; }
 .welcome-video-copy h2 { margin:11px 0 8px; color:var(--navy); font:800 clamp(25px,4vw,36px)/1.15 Manrope,sans-serif; }
 .welcome-video-copy p { margin:0; color:#6f7e94; font-size:15px; line-height:1.6; }
 .welcome-video-player-wrap { width:min(100%,780px); margin:0 auto; }
+.welcome-video-stage { position:relative; }
+.welcome-video-buffering { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:12px; border-radius:16px; background:#101b2e99; color:white; pointer-events:none; font-size:14px; }
+.welcome-video-resume { margin:10px 0 0; color:var(--blue); font-size:13px; line-height:1.5; text-align:center; }
+.welcome-video-size-tip { margin:0; padding:12px 14px; border-radius:10px; background:#fff7e7; color:#755214; font-size:12px; line-height:1.5; }
 .welcome-video-player { display:block; width:100%; max-height:58dvh; aspect-ratio:16/9; border-radius:16px; background:#101b2e; object-fit:contain; }
 .welcome-video-note { margin:10px 0 0; color:#7f8ca0; font-size:12px; text-align:center; }
 .welcome-video-continue { display:flex; width:min(100%,780px); min-height:54px; align-items:center; justify-content:center; gap:12px; margin:22px auto 0; font-size:15px; }

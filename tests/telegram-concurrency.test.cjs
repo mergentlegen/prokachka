@@ -38,6 +38,31 @@ test('parallel ready publication retries are unique per audience, not across the
   assert.equal(query(`select count(*) from tasks where team_id='${team}' and interactive_kind='starter-rules'`),'3');
 });
 
+test('parallel first video viewers converge on one CDN token', { skip: !port }, async () => {
+  const { team, root } = fixture();
+  const path=`${team}/${root}/${randomUUID()}.mp4`;
+  query(`insert into welcome_video_upload_intents(storage_path,team_id,owner_user_id,expires_at)
+    values('${path}','${team}','${root}',now()+interval '2 hours');
+    select app_set_welcome_video('${team}','${root}','${path}','welcome.mp4',1000000,120,1920,1080);`);
+  const urls=await Promise.all(Array.from({length:6},(_,i)=>parallel(
+    `select app_cache_welcome_video_url('${path}','https://fixture.invalid/token-${i}',now()+interval '5 hours');`)));
+  assert.equal(new Set(urls).size,1);
+  assert.equal(query(`select count(*) from welcome_video_url_cache where storage_path='${path}'`),'1');
+});
+
+test('parallel welcome replacements retain only one live file and queue all retired versions', { skip: !port }, async () => {
+  const { team, root } = fixture();
+  const paths=Array.from({length:4},()=>`${team}/${root}/${randomUUID()}.mp4`);
+  query(`insert into welcome_video_upload_intents(storage_path,team_id,owner_user_id,expires_at) values
+    ${paths.map(p=>`('${p}','${team}','${root}',now()+interval '2 hours')`).join(',')};`);
+  await Promise.all(paths.map(p=>parallel(`select app_set_welcome_video('${team}','${root}','${p}','welcome.mp4',1000000,120,1920,1080);`)));
+  const live=query(`select storage_path from welcome_videos where owner_user_id='${root}'`);
+  assert.ok(paths.includes(live));
+  assert.equal(query(`select count(*) from welcome_video_cleanup_queue where storage_path in (${paths.map(p=>`'${p}'`).join(',')})`),'3');
+  assert.equal(query(`select count(*) from welcome_video_cleanup_queue where storage_path='${live}'`),'0');
+  assert.equal(query(`select count(*) from welcome_video_upload_intents where owner_user_id='${root}'`),'0');
+});
+
 test('concurrent attempts cannot bind one Telegram to two website accounts', { skip: !port }, async () => {
   const { alice, bob } = fixture();
   const tg = String(Date.now());

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0f2848"/><stop offset="1" stop-color="#224c86"/></linearGradient></defs>
+  <path fill="url(#bg)" d="M0 0h1280v720H0z"/>
+  <circle cx="1120" cy="70" r="330" fill="#fff" opacity=".04"/>
+  <circle cx="140" cy="690" r="260" fill="#fff" opacity=".04"/>
+  <text x="640" y="285" fill="#efbd59" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" letter-spacing="6">ПРОКАЧКА</text>
+  <text x="640" y="370" fill="#fff" text-anchor="middle" font-family="Arial,sans-serif" font-size="52" font-weight="700">Добро пожаловать в команду</text>
+  <text x="640" y="435" fill="#bacce3" text-anchor="middle" font-family="Arial,sans-serif" font-size="27">Короткое приветствие от твоего наставника</text>
+</svg>

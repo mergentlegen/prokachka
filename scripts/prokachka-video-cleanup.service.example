@@ -1,0 +1,17 @@
+[Unit]
+Description=Clean retired and abandoned Prokachka welcome videos
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=/var/www/prokachka/.env.production
+ExecStart=/usr/bin/node /var/www/prokachka-deploy/current/scripts/cleanup-welcome-videos.cjs
+TimeoutStartSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
