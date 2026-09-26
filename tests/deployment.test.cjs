@@ -7,6 +7,9 @@ const crypto = require('node:crypto');
 const { execFileSync, execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { validateRuntime } = require('../scripts/start-release.cjs');
+const { copyReleaseTree, assertPortableRelease } = require('../scripts/release-files.cjs');
+const { smoke } = require('../scripts/smoke-test.cjs');
+const http = require('node:http');
 const run = promisify(execFile);
 const oldId = 'a'.repeat(40) + '-1-1';
 const newId = 'b'.repeat(40) + '-2-1';
@@ -27,6 +30,80 @@ test('runtime rejects mismatched public configuration, dev auth and incompatible
   assert.throws(() => validateRuntime(metadata, { ...config, AUTH_SECRET: 'short' }), /AUTH_SECRET/);
   assert.throws(() => validateRuntime({ ...metadata, nodeMajor: 0 }, config), /Node.js/);
   assert.throws(() => validateRuntime({ ...metadata, arch: 'wrong-arch' }, config), /architecture/);
+});
+
+test('release packaging materializes Turbopack external aliases and survives removal of the build checkout', async (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'prokachka-portable-test-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const build = path.join(temp, 'checkout');
+  const source = path.join(build, '.next/standalone');
+  const alias = path.join(source, '.next/node_modules/sharp-testhash');
+  const dependency = path.join(source, 'node_modules/sharp');
+  fs.mkdirSync(dependency, { recursive: true });
+  fs.mkdirSync(path.dirname(alias), { recursive: true });
+  fs.writeFileSync(path.join(dependency, 'package.json'), JSON.stringify({ name: 'sharp', type: 'module', exports: './index.mjs' }));
+  fs.writeFileSync(path.join(dependency, 'index.mjs'), 'export default "portable-image-runtime";');
+  fs.symlinkSync(dependency, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  fs.mkdirSync(path.join(source, '.next/server/chunks'), { recursive: true });
+  fs.writeFileSync(path.join(source, '.next/server/chunks/probe.mjs'), 'import image from "sharp-testhash"; console.log(image);');
+  const moved = path.join(temp, 'different-machine/release');
+  copyReleaseTree(source, moved, build);
+  assertPortableRelease(moved);
+  assert.equal(fs.lstatSync(path.join(moved, '.next/node_modules/sharp-testhash')).isSymbolicLink(), false);
+  fs.rmSync(build, { recursive: true }); // Disposable fixture, not the actual checkout.
+  const output = execFileSync(process.execPath, [path.join(moved, '.next/server/chunks/probe.mjs')], { encoding: 'utf8' });
+  assert.match(output, /portable-image-runtime/);
+});
+
+test('release packaging rejects broken/external/circular links and hidden environment files', (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'prokachka-link-test-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const build = path.join(temp, 'checkout');
+  const source = path.join(build, 'source');
+  const outside = path.join(temp, 'outside');
+  fs.mkdirSync(source, { recursive: true }); fs.mkdirSync(outside);
+  const link = path.join(source, 'dependency');
+  const type = process.platform === 'win32' ? 'junction' : 'dir';
+  fs.symlinkSync(outside, link, type);
+  assert.throws(() => assertPortableRelease(source), /non-portable link/);
+  assert.throws(() => copyReleaseTree(source, path.join(temp, 'external-release'), build), /outside the build root/);
+  fs.unlinkSync(link);
+  fs.symlinkSync(source, link, type);
+  assert.throws(() => copyReleaseTree(source, path.join(temp, 'circular-release'), build), /Circular/);
+  fs.unlinkSync(link);
+  fs.symlinkSync(path.join(build, 'missing'), link, type);
+  assert.throws(() => copyReleaseTree(source, path.join(temp, 'broken-release'), build), /ENOENT/);
+  fs.unlinkSync(link);
+  const dependency = path.join(build, 'dependency'); fs.mkdirSync(dependency);
+  fs.writeFileSync(path.join(dependency, '.env.production'), 'NEVER_PACKAGE_ME=test-only');
+  fs.symlinkSync(dependency, link, type);
+  assert.throws(() => copyReleaseTree(source, path.join(temp, 'env-release'), build), /environment file/);
+});
+
+test('smoke checks exercise the actual profile PATCH route without a session or writes', async (t) => {
+  let profileStatus = 401, profileCalls = 0;
+  const server = http.createServer((req, res) => {
+    if (req.headers.host === 'untrusted.invalid') { res.writeHead(403); return res.end(); }
+    if (req.url === '/api/health') { res.setHeader('cache-control', 'no-store'); return res.end(JSON.stringify({ status: 'ok', release: newId })); }
+    if (req.url === '/api/auth/session') { res.writeHead(401); return res.end(); }
+    if (req.url === '/api/profile') {
+      profileCalls++; assert.equal(req.method, 'PATCH'); assert.equal(req.headers.cookie, undefined);
+      assert.equal(req.headers.origin, 'https://prokachka.kz');
+      res.writeHead(profileStatus, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: false }));
+    }
+    if (['/', '/admin', '/ceo'].includes(req.url)) {
+      res.setHeader('content-type', 'text/html'); return res.end('Прокачка <script src="/_next/static/test.js"></script>');
+    }
+    if (req.url === '/fonts/manrope-cyrillic.woff2') return res.end('wOF2test');
+    res.setHeader('content-type', 'application/javascript'); res.end('test');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  await smoke(base, newId);
+  profileStatus = 500;
+  await assert.rejects(smoke(base, newId), /Profile API must load successfully/);
+  assert.equal(profileCalls, 2);
 });
 
 // Execute the actual Bash orchestration against disposable directories and fake

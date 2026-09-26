@@ -2,9 +2,10 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
 
-function request(base, pathname, host = 'prokachka.kz') {
+function request(base, pathname, host = 'prokachka.kz', method = 'GET') {
   return new Promise((resolve, reject) => {
-    const req = http.get(new URL(pathname, base), { headers: { Host: host }, timeout: 3000 }, (res) => {
+    const headers = { Host: host, ...(method === 'GET' ? {} : { Origin: 'https://' + host }) };
+    const req = http.request(new URL(pathname, base), { method, headers, timeout: 3000 }, (res) => {
       const chunks = [];
       res.on('data', (data) => chunks.push(data));
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
@@ -12,6 +13,7 @@ function request(base, pathname, host = 'prokachka.kz') {
     });
     req.on('timeout', () => req.destroy(new Error('Request timed out')));
     req.on('error', reject);
+    req.end();
   });
 }
 
@@ -50,6 +52,16 @@ async function smoke(base, release) {
   assert.equal(font.body.subarray(0, 4).toString(), 'wOF2');
   assert.equal((await request(base, '/brand/logo.svg')).status, 200);
   assert.equal((await request(base, '/api/auth/session')).status, 401);
+  // Loading the actual profile route also loads its native image dependency.
+  // No session/body means no database or Storage operation can take place.
+  const profile = await request(base, '/api/profile', 'prokachka.kz', 'PATCH');
+  assert.equal(profile.status, 401, 'Profile API must load successfully before rejecting an unauthenticated request');
+  assert.match(profile.headers['content-type'] || '', /application\/json/);
+  assert.equal(JSON.parse(profile.body).ok, false);
+  // Exercise the native binary, not just module resolution, inside this artifact.
+  const sharp = require('sharp');
+  const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#3255b3' } }).resize(1, 1).webp().toBuffer();
+  assert.equal((await sharp(image).metadata()).format, 'webp', 'Packaged Sharp must encode and decode WebP');
   assert.equal((await request(base, '/', 'untrusted.invalid')).status, 403);
   console.log('Smoke checks passed for ' + release);
 }
