@@ -18,6 +18,11 @@ const rulesGame = { ...game, id: 'rules-game', title: rulesProgram.title, descri
 let rulesPublished = false;
 let rulesAttempt;
 const results = [];
+const heartDefinition = require('./load-ts.cjs')('shared/domain/heart-survey.ts').HEART_SURVEY;
+const heartProgram = { ...readyProgram, id: 'ready-heart', title: heartDefinition.title, template_key: 'heart-survey' };
+const heartGame = { ...game, id: 'heart-game', title: heartDefinition.title, description: READY_PROGRAMS.find(item => item.key === 'heart-survey').tasks[0].description, program_id: heartProgram.id, interactive_kind: 'heart-survey' };
+let heartPublished = false;
+let heartState = { definition: heartDefinition, questionIndex: 0, answers: [], earnedPoints: 0, completed: false, delivery: { total: 2, sent: 0, waiting: 1 } };
 let readyPublished = false;
 const programs = [{ id: 'program', title: 'Первый шаг в команде', team_id: 'team', publisher_id: 'mentor', deadline_hours: 72, is_active: true, is_pinned: false, created_at: '2026-09-20' }];
 const tasks = [task, { ...task, id: 'later-task', title: 'Следующее задание', created_at: '2026-09-22' },
@@ -50,6 +55,7 @@ http.createServer((req, res) => {
       req.on('data', chunk => { body += chunk; });
       req.on('end', () => {
         const { key } = JSON.parse(body);
+        if (key === 'heart-survey') { const alreadyPublished = heartPublished; heartPublished = true; heartProgram.is_active = true; return json({ ok: true, program: heartProgram, tasks: [heartGame], alreadyPublished }); }
         const rules = key === 'starter-rules';
         const alreadyPublished = rules ? rulesPublished : readyPublished;
         const program = rules ? rulesProgram : readyProgram;
@@ -86,13 +92,30 @@ http.createServer((req, res) => {
       });
       return;
     }
+    if (req.method === 'POST' && url.pathname === '/api/ready-programs/heart-game/survey') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        const input = JSON.parse(body);
+        if (input.action === 'answer') {
+          if (input.questionIndex !== heartState.questionIndex || heartState.completed) return json({ message: 'Stale question' }, 409);
+          points += 1;
+          heartState = { ...heartState, questionIndex: heartState.questionIndex + 1, earnedPoints: heartState.earnedPoints + 1, answers: [...heartState.answers, input.answer], completed: heartState.questionIndex === 4 };
+          heartState.submission = { id: 'heart-result', user_id: 'member', task_id: heartGame.id, status: 'accepted', points: heartState.earnedPoints, submission_source: 'interactive', interactive_completed: heartState.completed, submitted_at: new Date().toISOString() };
+          const previous = results.findIndex(item => item.id === 'heart-result');
+          if (previous < 0) results.push(heartState.submission); else results[previous] = heartState.submission;
+        }
+        json({ ok: true, survey: heartState });
+      });
+      return;
+    }
     if (req.method === 'PATCH' && /^\/api\/(programs|tasks|announcements)\/[^/]+$/.test(url.pathname)) {
       let body = '';
       req.on('data', (chunk) => { body += chunk; });
       req.on('end', () => {
         try {
           const [, , kind, id] = url.pathname.split('/');
-          const records = kind === 'programs' ? [readyProgram, rulesProgram, ...programs] : kind === 'tasks' ? tasks : announcements;
+          const records = kind === 'programs' ? [readyProgram, rulesProgram, heartProgram, ...programs] : kind === 'tasks' ? tasks : announcements;
           const record = records.find((item) => item.id === id);
           if (!record) return json({ message: 'Fixture not found' }, 404);
           const patch = JSON.parse(body);
@@ -124,15 +147,16 @@ http.createServer((req, res) => {
       return json({ ok: true, user: { id: admin ? 'mentor' : 'member', name: admin ? 'Тестовый наставник' : 'Тестовый участник', role: admin ? 'admin' : 'member', teamId: 'team' } });
     }
     const fixtures = {
-      '/api/users': { users: people }, '/api/network': { users: people }, '/api/tasks': { tasks: [...tasks, ...(readyPublished && (!url.searchParams.has('view') || readyProgram.is_active) ? [game] : []), ...(rulesPublished && (!url.searchParams.has('view') || rulesProgram.is_active) ? [rulesGame] : [])].map((item) => {
+      '/api/users': { users: people }, '/api/network': { users: people }, '/api/tasks': { tasks: [...tasks, ...(readyPublished && (!url.searchParams.has('view') || readyProgram.is_active) ? [game] : []), ...(rulesPublished && (!url.searchParams.has('view') || rulesProgram.is_active) ? [rulesGame] : []), ...(heartPublished && (!url.searchParams.has('view') || heartProgram.is_active) ? [heartGame] : [])].map((item) => {
         if (!url.searchParams.has('view') || !item.program_id) return item;
-        const program = [readyProgram, rulesProgram, ...programs].find((entry) => entry.id === item.program_id);
+        const program = [readyProgram, rulesProgram, heartProgram, ...programs].find((entry) => entry.id === item.program_id);
         return { ...item, is_pinned: Boolean(program?.is_pinned), program_title: program?.title };
       }) },
       '/api/submissions': url.searchParams.has('summary') ? { counts: { pending: 0, accepted: 1, requests: 0 } } : { submissions: results },
       '/api/ranking': { ranking: [{ id: 'member', name: people[1].name, points }], starRanking: [{ id: 'member', name: people[1].name, points: 3 }] },
-      '/api/programs': { programs: [...programs, ...(readyPublished ? [readyProgram] : []), ...(rulesPublished ? [rulesProgram] : [])] }, '/api/programs/history': { programs: [] }, '/api/publication-history': { history: [] },
+      '/api/programs': { programs: [...programs, ...(readyPublished ? [readyProgram] : []), ...(rulesPublished ? [rulesProgram] : []), ...(heartPublished ? [heartProgram] : [])] }, '/api/programs/history': { programs: [] }, '/api/publication-history': { history: [] },
       '/api/ready-programs': { readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...item }) => {
+        if (item.key === 'heart-survey') return { ...item, published: heartPublished, publishedProgramId: heartPublished ? heartProgram.id : undefined, publishedActive: heartPublished && heartProgram.is_active, canManage: heartPublished };
         const rules = item.key === 'starter-rules';
         const published = rules ? rulesPublished : readyPublished;
         const program = rules ? rulesProgram : readyProgram;

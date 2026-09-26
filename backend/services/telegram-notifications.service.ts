@@ -82,7 +82,7 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 }
 
 type NotificationJob = {
-  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission";
+  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission" | "survey";
   payload: { canReview?: boolean; canPublishTasks?: boolean }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
@@ -129,6 +129,16 @@ export async function deliverTelegramNotifications() {
           review ? "Новые и ожидающие проверки работы вашей ветки будут приходить сюда." : "",
           appUrl() ? "Панель наставника: " + appUrl() + "/admin" : "",
         ].filter(Boolean).join("\n"));
+      } else if (job.kind === "survey") {
+        const allowed = await supabase.rpc("tg_can_receive_survey", { p_recipient: user.id, p_submission: job.submission_id });
+        if (allowed.error) throw new Error("Cannot verify survey recipient access");
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const result = await supabase.from("submissions").select("answer_text").eq("id", job.submission_id).maybeSingle();
+        if (result.error || !result.data?.answer_text) throw new Error("Cannot load survey answers");
+        // One compact message fits Telegram's limit; no separate summary can duplicate.
+        const text = String(result.data.answer_text);
+        if (text.length > 4000) throw new Error("Survey message is too long");
+        delivery = await sendTelegramMessage(chatId, text);
       } else {
         const allowed = await supabase.rpc("tg_can_review", { p_reviewer: user.id, p_submission: job.submission_id });
         if (allowed.error) throw new Error("Cannot verify recipient access");

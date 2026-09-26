@@ -9,16 +9,19 @@ import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { TaskAttachments } from "@/frontend/shared/TaskAttachments";
 import { DreamPlanGame } from "./DreamPlanGame";
 import { StarterRulesGame } from "./StarterRulesGame";
+import { HeartSurvey } from "./HeartSurvey";
 import styles from "./TaskCard.module.css";
 
-export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onInteractiveComplete?: (submission: Submission) => void }) {
+export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const isInteractive = Boolean(task.interactiveKind);
+  const isSurvey = task.interactiveKind === "heart-survey";
+  const surveyInProgress = isSurvey && submission?.interactiveCompleted === false;
   const deadline = task.dueAt || task.deadlineAt;
   const expired = Boolean(deadline && new Date(deadline).getTime() <= Date.now());
   const status = submission?.status || (expired ? "missed" : "new");
-  const statusText = status === "accepted" ? "Принято" : status === "pending" ? "На проверке" : status === "revision" ? "На доработку" : status === "missed" ? "Срок истёк" : "Не начато";
+  const statusText = surveyInProgress ? `Сохранено ${submission?.points} из 5 ответов` : status === "accepted" ? "Принято" : status === "pending" ? "На проверке" : status === "revision" ? "На доработку" : status === "missed" ? "Срок истёк" : "Не начато";
   const resource = externalHref(task.resourceUrl);
   const canSubmit = task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   async function send() {
@@ -27,10 +30,11 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: 
     try { await onSubmit(task.id); } finally { setSending(false); }
   }
   function action(inDetail = false) {
+    if (surveyInProgress) return <button className={styles.submit} onClick={() => setOpen(true)}>Продолжить опросник</button>;
     if (status === "accepted") return <strong className={styles.accepted}>+{formatMiles(submission?.points || 0)}</strong>;
     if (status === "pending") return <span className={styles.waiting}>Ответ на проверке</span>;
     if (!canSubmit) return <span className={styles.waiting}>Приём завершён</span>;
-    if (isInteractive) return inDetail ? <span className={styles.waiting}>Заверши игру внутри блока выше</span> : <button className={styles.submit} onClick={() => setOpen(true)}>Начать игру</button>;
+    if (isInteractive) return inDetail ? <span className={styles.waiting}>Заверши игру внутри блока выше</span> : <button className={styles.submit} onClick={() => setOpen(true)}>{isSurvey ? "Начать опросник" : "Начать игру"}</button>;
     return <button className={styles.submit} disabled={sending} onClick={() => void send()}>{sending ? "Открываем..." : status === "revision" ? "Отправить повторно" : expired ? "Отправить с опозданием" : "Отправить ответ"}</button>;
   }
   return <>
@@ -41,7 +45,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: 
       <p className={styles.preview}>{task.description}</p>
       {Boolean(task.attachments?.length) && <p className={styles.attachmentHint}>PDF-материалы · {task.attachments?.length} {task.attachments?.length === 1 ? "файл" : "файла"}</p>}
       {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>}
-      <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
+      <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isSurvey ? "Открыть опросник" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
     </article>
     {open && <ModalSheet title={isInteractive ? task.title : "Задание"} variant={isInteractive ? "immersive" : "default"} onClose={() => setOpen(false)}>
       <div className={`${styles.detail} ${isInteractive ? styles.interactiveDetail : ""}`}>
@@ -50,6 +54,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: 
         <div className={styles.description}>{task.description}</div></>}
         {task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} />}
         {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}

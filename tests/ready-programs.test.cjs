@@ -29,7 +29,7 @@ function load(relative, overrides = {}) {
 
 test("ready program catalog contains a deadline-free interactive dream plan", () => {
   const { READY_PROGRAMS } = load("shared/domain/ready-programs.ts");
-  assert.equal(READY_PROGRAMS.length, 2);
+  assert.equal(READY_PROGRAMS.length, 3);
   assert.equal(READY_PROGRAMS[0].key, "dream-plan");
   assert.equal(READY_PROGRAMS[0].tasks[0].publicationType, "evergreen");
   assert.equal(READY_PROGRAMS[0].tasks[0].interactiveKind, "dream-plan");

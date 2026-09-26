@@ -6,7 +6,7 @@ export type SubmissionSource = "telegram" | "interactive";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
-export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules"] as const;
+export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules", "heart-survey"] as const;
 export type ReadyProgramKey = typeof READY_PROGRAM_KEYS[number];
 export type TaskInteractiveKind = ReadyProgramKey;
 export function isReadyProgramKey(value: unknown): value is ReadyProgramKey {
@@ -47,7 +47,7 @@ export type StarAward = {
 };
 export type Submission = {
   id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
-  source?: SubmissionSource; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
+  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 export type RankEntry = { id: string; name: string; points: number };
