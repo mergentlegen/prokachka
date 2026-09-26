@@ -16,7 +16,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await request.json() as { action?: ReadyAttemptAction; step?: unknown; answer?: unknown; restart?: unknown };
+    const body = await request.json() as { action?: ReadyAttemptAction; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown };
     const action = body?.action;
     if (action !== "start" && action !== "advance" && action !== "answer" && action !== "restart-quiz" && action !== "complete") return failure("Неизвестное действие программы.", 400);
     if (action === "start") {
@@ -29,7 +29,8 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
     }
     if (action === "answer") {
       if (!Number.isInteger(body.answer) || Number(body.answer) < 0 || Number(body.answer) > 2) return failure("Некорректный ответ программы.", 400);
-      return resultResponse(await answerReadyProgramAttempt(user.id, taskId, Number(body.answer)));
+      if (body.questionIndex !== undefined && (!Number.isInteger(body.questionIndex) || Number(body.questionIndex) < 0 || Number(body.questionIndex) > 4)) return failure("Некорректный вопрос программы.", 400);
+      return resultResponse(await answerReadyProgramAttempt(user.id, taskId, Number(body.answer), body.questionIndex === undefined ? undefined : Number(body.questionIndex)));
     }
     if (action === "restart-quiz") return resultResponse(await restartReadyProgramQuizAttempt(user.id, taskId));
     return resultResponse(await completeReadyProgramAttempt(user.id, taskId));

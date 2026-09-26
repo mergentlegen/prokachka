@@ -12,6 +12,12 @@ const people = [
 const task = { id: 'task', title: 'Тестовое задание', description: 'Описание для проверки обновлений интерфейса.', max_points: 10, team_id: 'team', publisher_id: 'mentor', is_active: true, is_pinned: false, publication_type: 'evergreen', created_at: '2026-09-19' };
 const readyProgram = { id: 'ready', title: 'Мечта с планом', team_id: 'team', publisher_id: 'mentor', template_key: 'dream-plan', is_active: true, created_at: '2026-09-25' };
 const game = { ...task, id: 'game', title: readyProgram.title, description: READY_PROGRAMS[0].tasks[0].description, max_points: 5, program_id: readyProgram.id, publisher_id: 'mentor', interactive_kind: 'dream-plan', created_at: readyProgram.created_at };
+const rulesDefinition = READY_PROGRAMS.find(item => item.key === 'starter-rules');
+const rulesProgram = { ...readyProgram, id: 'ready-rules', title: rulesDefinition.title, template_key: 'starter-rules' };
+const rulesGame = { ...game, id: 'rules-game', title: rulesProgram.title, description: rulesDefinition.tasks[0].description, program_id: rulesProgram.id, interactive_kind: 'starter-rules' };
+let rulesPublished = false;
+let rulesAttempt;
+const results = [];
 let readyPublished = false;
 const programs = [{ id: 'program', title: 'Первый шаг в команде', team_id: 'team', publisher_id: 'mentor', deadline_hours: 72, is_active: true, is_pinned: false, created_at: '2026-09-20' }];
 const tasks = [task, { ...task, id: 'later-task', title: 'Следующее задание', created_at: '2026-09-22' },
@@ -40,8 +46,45 @@ http.createServer((req, res) => {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/ready-programs') {
-      const alreadyPublished = readyPublished; readyPublished = true; readyProgram.is_active = true;
-      return json({ ok: true, program: readyProgram, tasks: [game], alreadyPublished }, alreadyPublished ? 200 : 201);
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        const { key } = JSON.parse(body);
+        const rules = key === 'starter-rules';
+        const alreadyPublished = rules ? rulesPublished : readyPublished;
+        const program = rules ? rulesProgram : readyProgram;
+        if (rules) rulesPublished = true; else readyPublished = true;
+        program.is_active = true;
+        json({ ok: true, program, tasks: [rules ? rulesGame : game], alreadyPublished }, alreadyPublished ? 200 : 201);
+      });
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/ready-programs/rules-game/attempt') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        if (!rulesPublished || !rulesProgram.is_active) return json({ message: 'Game unavailable' }, 409);
+        const input = JSON.parse(body);
+        if (!rulesAttempt) rulesAttempt = { attemptId: 'rules-attempt', step: 0, status: 'active', attemptNumber: 1, earnedPoints: 0, maxPoints: 5, questionIndex: 0, completed: false };
+        if (input.action === 'advance') rulesAttempt.step = 1;
+        if (input.action === 'answer') {
+          if (rulesAttempt.failed || rulesAttempt.step !== 1 || input.questionIndex !== rulesAttempt.questionIndex) return json({ message: 'Invalid question state' }, 409);
+          rulesAttempt.lastAnswer = input.answer;
+          rulesAttempt.failed = [1,1,0,1,2][rulesAttempt.questionIndex] !== input.answer;
+          if (!rulesAttempt.failed) { rulesAttempt.questionIndex += 1; rulesAttempt.earnedPoints += 1; rulesAttempt.ready = rulesAttempt.questionIndex === 5; }
+        }
+        if (input.action === 'restart-quiz') Object.assign(rulesAttempt, { questionIndex: 0, earnedPoints: 0, lastAnswer: null, failed: false, ready: false, attemptNumber: rulesAttempt.attemptNumber + 1 });
+        if (input.action === 'complete') {
+          if (!rulesAttempt.ready) return json({ message: 'Quiz incomplete' }, 409);
+          if (!rulesAttempt.completed) {
+            rulesAttempt.completed = true; rulesAttempt.status = 'completed'; points += 5;
+            rulesAttempt.submission = { id: 'rules-result', user_id: 'member', task_id: rulesGame.id, status: 'accepted', points: 5, submission_source: 'interactive', created_at: new Date().toISOString() };
+            results.push(rulesAttempt.submission);
+          }
+        }
+        json({ ok: true, attempt: rulesAttempt });
+      });
+      return;
     }
     if (req.method === 'PATCH' && /^\/api\/(programs|tasks|announcements)\/[^/]+$/.test(url.pathname)) {
       let body = '';
@@ -49,7 +92,7 @@ http.createServer((req, res) => {
       req.on('end', () => {
         try {
           const [, , kind, id] = url.pathname.split('/');
-          const records = kind === 'programs' ? [readyProgram, ...programs] : kind === 'tasks' ? tasks : announcements;
+          const records = kind === 'programs' ? [readyProgram, rulesProgram, ...programs] : kind === 'tasks' ? tasks : announcements;
           const record = records.find((item) => item.id === id);
           if (!record) return json({ message: 'Fixture not found' }, 404);
           const patch = JSON.parse(body);
@@ -81,15 +124,20 @@ http.createServer((req, res) => {
       return json({ ok: true, user: { id: admin ? 'mentor' : 'member', name: admin ? 'Тестовый наставник' : 'Тестовый участник', role: admin ? 'admin' : 'member', teamId: 'team' } });
     }
     const fixtures = {
-      '/api/users': { users: people }, '/api/network': { users: people }, '/api/tasks': { tasks: [...tasks, ...(readyPublished && (!url.searchParams.has('view') || readyProgram.is_active) ? [game] : [])].map((item) => {
+      '/api/users': { users: people }, '/api/network': { users: people }, '/api/tasks': { tasks: [...tasks, ...(readyPublished && (!url.searchParams.has('view') || readyProgram.is_active) ? [game] : []), ...(rulesPublished && (!url.searchParams.has('view') || rulesProgram.is_active) ? [rulesGame] : [])].map((item) => {
         if (!url.searchParams.has('view') || !item.program_id) return item;
-        const program = [readyProgram, ...programs].find((entry) => entry.id === item.program_id);
+        const program = [readyProgram, rulesProgram, ...programs].find((entry) => entry.id === item.program_id);
         return { ...item, is_pinned: Boolean(program?.is_pinned), program_title: program?.title };
       }) },
-      '/api/submissions': url.searchParams.has('summary') ? { counts: { pending: 0, accepted: 1, requests: 0 } } : { submissions: [] },
+      '/api/submissions': url.searchParams.has('summary') ? { counts: { pending: 0, accepted: 1, requests: 0 } } : { submissions: results },
       '/api/ranking': { ranking: [{ id: 'member', name: people[1].name, points }], starRanking: [{ id: 'member', name: people[1].name, points: 3 }] },
-      '/api/programs': { programs: [...programs, ...(readyPublished ? [readyProgram] : [])] }, '/api/programs/history': { programs: [] }, '/api/publication-history': { history: [] },
-      '/api/ready-programs': { readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...item }) => ({ ...item, published: readyPublished, publishedProgramId: readyPublished ? readyProgram.id : undefined, publishedActive: readyPublished && readyProgram.is_active, publishedPinned: readyProgram.is_pinned, publishedCreatedAt: readyProgram.created_at, canManage: readyPublished })) },
+      '/api/programs': { programs: [...programs, ...(readyPublished ? [readyProgram] : []), ...(rulesPublished ? [rulesProgram] : [])] }, '/api/programs/history': { programs: [] }, '/api/publication-history': { history: [] },
+      '/api/ready-programs': { readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...item }) => {
+        const rules = item.key === 'starter-rules';
+        const published = rules ? rulesPublished : readyPublished;
+        const program = rules ? rulesProgram : readyProgram;
+        return { ...item, published, publishedProgramId: published ? program.id : undefined, publishedActive: published && program.is_active, publishedPinned: program.is_pinned, publishedCreatedAt: program.created_at, canManage: published };
+      }) },
       '/api/stars': { awards: [] }, '/api/team-requests': { requests: [] }, '/api/announcements': { announcements },
       '/api/welcome-video': { required: false }, '/api/telegram/link/status': { linked: false },
     };

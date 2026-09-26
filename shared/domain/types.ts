@@ -6,8 +6,12 @@ export type SubmissionSource = "telegram" | "interactive";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
-export type ReadyProgramKey = "dream-plan";
-export type TaskInteractiveKind = "dream-plan";
+export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules"] as const;
+export type ReadyProgramKey = typeof READY_PROGRAM_KEYS[number];
+export type TaskInteractiveKind = ReadyProgramKey;
+export function isReadyProgramKey(value: unknown): value is ReadyProgramKey {
+  return typeof value === "string" && (READY_PROGRAM_KEYS as readonly string[]).includes(value);
+}
 export type TaskAttachment = { id: string; fileName: string; contentType: "application/pdf"; sizeBytes: number; createdAt: string };
 
 export type Team = {

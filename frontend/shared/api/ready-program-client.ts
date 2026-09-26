@@ -49,6 +49,6 @@ async function mutate(taskId: string, body: Record<string, unknown>) {
 
 export function startReadyProgram(taskId: string, restart = false) { return mutate(taskId, { action: "start", restart }); }
 export function advanceReadyProgram(taskId: string, step: number) { return mutate(taskId, { action: "advance", step }); }
-export function answerReadyProgram(taskId: string, answer: number) { return mutate(taskId, { action: "answer", answer }); }
+export function answerReadyProgram(taskId: string, answer: number, questionIndex?: number) { return mutate(taskId, { action: "answer", answer, questionIndex }); }
 export function restartReadyProgramQuiz(taskId: string) { return mutate(taskId, { action: "restart-quiz" }); }
 export function completeReadyProgram(taskId: string) { return mutate(taskId, { action: "complete" }); }

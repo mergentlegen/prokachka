@@ -1,0 +1,42 @@
+.game { --game-ink:var(--navy); --game-muted:#66758b; --game-teal:var(--blue); }
+.intro { display:grid; gap:16px; }
+.hero { position:relative; overflow:hidden; padding:24px; border-radius:18px; background:linear-gradient(130deg,#1c365b,#3457a6); color:white; }
+.heroTop { display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; }
+.heroTop span { padding:5px 9px; border:1px solid #ffffff35; border-radius:7px; font-size:11px; }
+.ship { width:48px; height:48px; margin-top:16px; color:#f3c765; }
+.hero h4 { max-width:440px; margin:10px 0; color:white; font-size:32px; font-weight:800; line-height:1.15; letter-spacing:-.03em; text-wrap:balance; }
+.hero p { max-width:540px; margin:0; color:#e6edff; font-size:15px; line-height:1.65; }
+.rewards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.card { min-width:0; padding:20px; border:1px solid var(--line); border-radius:16px; background:white; }
+.card h5,.start h5 { margin:6px 0 10px; font-size:20px; line-height:1.3; font-weight:750; letter-spacing:-.02em; }
+.card p,.start p { margin:0; color:var(--game-muted); font-size:14px; line-height:1.65; overflow-wrap:anywhere; }
+.card .kicker,.start .kicker { margin:0 0 7px; color:var(--blue); font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; }
+.miles { background:#f1f5ff; border-color:#dbe4fb; }
+.stars { background:#fff9e9; border-color:#f0e1b6; }
+.icon { display:grid; place-items:center; width:32px; height:32px; margin-bottom:12px; border-radius:9px; background:#dfe8ff; color:var(--blue); font-weight:800; }
+.stars .icon { background:#ffebba; color:#9b731b; }
+.rewards .card { display:flex; flex-direction:column; }
+.rewards h5 { margin-top:0; }
+.rewards strong { display:block; margin-top:auto; padding-top:14px; font-size:13px; }
+.tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:16px; }
+.tabs > div { padding:14px; border-radius:12px; background:#f7f8fc; }
+.tabs span { display:inline-flex; padding:5px 9px; border-radius:6px; background:#e7edfb; color:var(--blue); font-size:12px; font-weight:700; }
+.tabs p { margin-top:10px; }
+.prize { position:relative; background:#fffbf1; border-color:#eadbb9; }
+.prize .kicker { color:#946c1b; }
+.prizeIcon { float:right; margin-left:10px; color:#b88727; font-size:28px; }
+.prize .note { margin-top:12px; padding-top:12px; border-top:1px solid #ede3cf; font-size:12px; }
+.start { display:grid; gap:16px; padding:20px 0 0; border-top:1px solid var(--line); }
+.noDeadline { color:var(--game-muted); text-align:center; font-size:12px; line-height:1.6; }
+@media(max-width:600px) {
+  .hero { padding:20px; border-radius:16px; }
+  .hero h4 { font-size:28px; }
+  .heroTop span { font-size:10px; }
+  .rewards { gap:10px; }
+  .card { padding:18px; }
+  .rewards .card { padding:16px 12px; }
+  .rewards p { font-size:13px; }
+  .rewards strong { font-size:12px; }
+  .tabs { grid-template-columns:minmax(0,1fr); gap:10px; }
+}
+@media(max-width:360px) { .hero { padding:18px; } .hero h4 { font-size:26px; } .rewards h5 { font-size:18px; } }

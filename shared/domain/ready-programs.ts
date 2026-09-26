@@ -36,6 +36,21 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
       },
     ],
   },
+  {
+    key: "starter-rules",
+    title: "Правила игры",
+    eyebrow: "Старт новичка",
+    description: "Разберись, как устроены задания, мили, звёзды и поддержка наставника. Пять вопросов помогут закрепить правила старта.",
+    badge: "Без дедлайна",
+    taskCount: 1,
+    tasks: [{
+      title: "Правила игры",
+      description: "Познакомься с правилами «Старта новичка» и ответь на пять вопросов. Пройди тест без ошибок и получи 5 миль автоматически.",
+      maxPoints: 5,
+      publicationType: "evergreen",
+      interactiveKind: "starter-rules",
+    }],
+  },
 ];
 
 export function readyProgramByKey(key: unknown) {

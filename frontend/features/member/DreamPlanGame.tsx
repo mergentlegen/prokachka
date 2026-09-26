@@ -140,7 +140,7 @@ export function DreamPlanGame({ taskId, onCompleted }: { taskId: string; onCompl
     if (busy || attemptStatus !== "active" || !finished || answeredCorrectly || answeredIncorrectly) return;
     setBusy(true); setSyncError(""); setQuizError(""); setSelectedAnswer(index);
     try {
-      const result = await answerReadyProgram(taskId, index);
+      const result = await answerReadyProgram(taskId, index, questionIndex);
       setMaxPoints(result.maxPoints || maxPoints); setEarnedPoints(result.earnedPoints);
       setSelectedAnswer(index);
       if (result.failed) { setAnsweredIncorrectly(true); setReadyForCompletion(false); setNextQuestionIndex(null); setQuizError(result.message || "Этот вариант неверный. Пройди тест заново, чтобы набрать все 5 миль."); }
