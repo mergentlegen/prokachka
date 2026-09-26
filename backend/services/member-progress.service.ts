@@ -1,6 +1,6 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import { findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { ancestors, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 
 function addHours(value: string, hours: number) { return new Date(new Date(value).getTime() + hours * 60 * 60 * 1000).toISOString(); }
 
@@ -38,14 +38,40 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
   }
   const programsById = new Map(programs.map((program) => [String(program.id), program]));
   const programIds = new Set(programsById.keys());
-  return { data: tasks.filter((task) => {
+  const eligible = tasks.filter((task) => {
     if (task.program_id && !programIds.has(String(task.program_id))) return false;
     if (task.publication_type === "evergreen") return true;
     if (task.publication_type === "fixed") return !task.deadline_at || !joinedAt || new Date(task.deadline_at).getTime() >= new Date(joinedAt).getTime();
     if (!programIds.has(String(task.program_id))) return false;
     const progress = existing.get(String(task.program_id));
     return progress?.status === "active" && progress.current_task_id === task.id;
-  }).map((task) => {
+  });
+  // The same built-in game may be published by the root and by branch mentors.
+  // Show one card, keeping the participant's saved attempt whenever possible.
+  const games = new Map<string, typeof eligible>();
+  for (const task of eligible) {
+    if (!task.interactive_kind) continue;
+    const group = games.get(String(task.interactive_kind)) || [];
+    group.push(task); games.set(String(task.interactive_kind), group);
+  }
+  const duplicates = [...games.values()].filter((group) => group.length > 1);
+  const excluded = new Set<string>();
+  if (duplicates.length) {
+    const attempts = await readPages(supabase.from("ready_program_attempts").select("task_id,status,started_at").eq("user_id", userId).order("id"));
+    if (attempts.error) return { error: attempts.error };
+    const saved = new Map((attempts.data || []).map((attempt) => [String(attempt.task_id), attempt]));
+    const chain = [...ancestors(network.data, userId)];
+    const rank = (task: typeof eligible[number]) => {
+      const attempt = saved.get(String(task.id));
+      const root = programsById.get(String(task.program_id))?.audience_root_id;
+      return [attempt?.status === "completed" ? 0 : attempt ? 1 : 2, root ? chain.indexOf(String(root)) : chain.length];
+    };
+    for (const group of duplicates) {
+      group.sort((a, b) => { const x = rank(a), y = rank(b); return x[0] - y[0] || x[1] - y[1] || String(a.id).localeCompare(String(b.id)); });
+      group.slice(1).forEach((task) => excluded.add(String(task.id)));
+    }
+  }
+  return { data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
     const program = programsById.get(String(task.program_id));
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned) };
     if (task.publication_type !== "sequential") return publication;

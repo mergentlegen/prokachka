@@ -16,3 +16,4 @@
 \ir 20260927-publication-pins.sql
 \ir 20260927-starter-rules.sql
 \ir 20260927-heart-survey.sql
+\ir 20260928-publication-audiences.sql

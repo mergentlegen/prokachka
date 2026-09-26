@@ -14,6 +14,7 @@ begin
     (member_id,'Survey Member','Survey','Member',member_id||'@test.invalid',member_id::text,'test','member',team,no_review,false,null),
     (sibling,'Other admin','Other','Admin',sibling||'@test.invalid',sibling::text,'test','admin',team,root_id,false,'123001'),
     (foreign_id,'Foreign','Foreign','Member',foreign_id||'@test.invalid',foreign_id::text,'test','member',other_team,null,true,'123002');
+  update users set can_publish_tasks=true where id=mentor;
   result:=app_create_program(jsonb_build_object('teamId',team,'publisherId',mentor,'audienceRootId',mentor,'title','Heart survey','templateKey','heart-survey','deadlineHours',720,
     'tasks',jsonb_build_array(jsonb_build_object('title','Heart survey','description','Five personal questions.','maxPoints',5,'publicationType','evergreen','interactiveKind','heart-survey'))));
   task_id:=(result->'tasks'->0->>'id')::uuid; program_id:=(result->'program'->>'id')::uuid;

@@ -30,10 +30,11 @@ export async function createProgram(input: ProgramInput) {
   return result.error ? { error: result.error } : { data: result.data as { program: Record<string, unknown>; tasks: Record<string, unknown>[] } };
 }
 
-export async function findReadyProgramPublications(teamId: string) {
+export async function findReadyProgramPublications(teamId: string, audienceRootId: string | null = null) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await readPages(supabase.from("task_programs").select("id,template_key,is_active,publisher_id,is_pinned,created_at").eq("team_id", teamId).not("template_key", "is", null).order("id"));
+  const query = supabase.from("task_programs").select("id,template_key,is_active,publisher_id,audience_root_id,is_pinned,created_at").eq("team_id", teamId).not("template_key", "is", null);
+  const result = await readPages((audienceRootId ? query.eq("audience_root_id", audienceRootId) : query.is("audience_root_id", null)).order("id"));
   return result.error ? { error: result.error } : { data: result.data || [] };
 }
 
@@ -42,12 +43,26 @@ export async function publishReadyProgram(input: { teamId: string; key: ReadyPro
   if (!template) return { validationError: "Готовая программа не найдена." };
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const existing = await supabase.from("task_programs").select("*").eq("team_id", input.teamId).eq("template_key", template.key).maybeSingle();
+  // A publication belongs to an audience, not just a template/team. A sibling's
+  // publication must never be reported as a successful publication for this branch.
+  const lookup = () => {
+    const query = supabase.from("task_programs").select("*").eq("team_id", input.teamId).eq("template_key", template.key);
+    return input.audienceRootId ? query.eq("audience_root_id", input.audienceRootId) : query.is("audience_root_id", null);
+  };
+  const reuse = async (publication: Record<string, unknown>) => {
+    const activated = await supabase.rpc("app_update_program", { p_id: publication.id, p_patch: { isActive: true }, p_actor: input.publisherId || null, p_ceo: !input.publisherId });
+    if (activated.error) return { error: activated.error };
+    if (activated.data?.forbidden || !activated.data?.data) return { validationError: "У вас нет доступа к публикации в этой области." };
+    const program = activated.data.data as Record<string, unknown>;
+    const tasks = await supabase.from("tasks").select("*").eq("program_id", program.id).order("position", { ascending: true }).order("id");
+    if (tasks.error) return { error: tasks.error };
+    if (!tasks.data?.length) return { validationError: "Публикация игры повреждена: нет задания. Обратитесь к администратору." };
+    return { alreadyPublished: true as const, data: { program, tasks: tasks.data } };
+  };
+  const existing = await lookup().maybeSingle();
   if (existing.error) return { error: existing.error };
   if (existing.data) {
-    const tasks = await supabase.from("tasks").select("*").eq("program_id", existing.data.id).order("position", { ascending: true }).order("id");
-    if (tasks.error) return { error: tasks.error };
-    return { alreadyPublished: true as const, data: { program: existing.data, tasks: tasks.data || [] } };
+    return reuse(existing.data);
   }
   const result = await createProgram({
     teamId: input.teamId,
@@ -59,12 +74,12 @@ export async function publishReadyProgram(input: { teamId: string; key: ReadyPro
     tasks: template.tasks.map((task) => ({ ...task })),
   });
   if ("error" in result && result.error?.code === "23505") {
-    const retry = await supabase.from("task_programs").select("*").eq("team_id", input.teamId).eq("template_key", template.key).maybeSingle();
+    const retry = await lookup().maybeSingle();
     if (!retry.error && retry.data) {
-      const tasks = await supabase.from("tasks").select("*").eq("program_id", retry.data.id).order("position", { ascending: true }).order("id");
-      if (tasks.error) return { error: tasks.error };
-      return { alreadyPublished: true as const, data: { program: retry.data, tasks: tasks.data || [] } };
+      return reuse(retry.data);
     }
+    if (retry.error) return { error: retry.error };
+    return { validationError: "Примените миграцию областей публикации готовых заданий: 20260928-publication-audiences.sql." };
   }
   return result;
 }
@@ -83,10 +98,11 @@ export async function updateProgram(id: string, input: { title?: string; deadlin
 export async function deleteProgram(id: string, actor?: ProgramViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const current = await supabase.from("task_programs").select("id,team_id,publisher_id").eq("id", id).maybeSingle();
+  const current = await supabase.from("task_programs").select("id,team_id,publisher_id,template_key").eq("id", id).maybeSingle();
   if (current.error || !current.data) return { forbidden: true as const };
   const canDelete = actor?.role === "ceo" || (Boolean(actor?.teamId) && current.data.team_id === actor?.teamId && (actor?.role === "admin" || (actor?.canPublishTasks === true && current.data.publisher_id === actor.id)));
   if (!canDelete) return { forbidden: true as const };
+  if (current.data.template_key) return { validationError: "Используйте «Убрать из заданий» в каталоге: результаты готовой игры не удаляются." };
   const taskRows = await supabase.from("tasks").select("id").eq("program_id", id);
   if (taskRows.error) return { error: taskRows.error };
   const attachments = taskRows.data?.length ? await supabase.from("task_attachments").select("storage_path").in("task_id", taskRows.data.map((row) => String(row.id))) : { data: [], error: null };

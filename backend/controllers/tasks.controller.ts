@@ -112,6 +112,7 @@ export async function deleteTask(request: Request, id: string) {
   const result = await deleteTaskRecord(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этому заданию.", 403);
+  if ("validationError" in result) return failure(result.validationError || "Используйте каталог готовых заданий.", 409);
   if (result.error) return failure("Не удалось удалить задание.");
   return ok({ storageCleanupWarning: result.storageCleanupWarning });
 }

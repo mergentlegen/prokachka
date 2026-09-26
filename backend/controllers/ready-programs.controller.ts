@@ -17,7 +17,7 @@ export async function listReadyPrograms(request: Request) {
   const user = await currentUser(request);
   if (!user || !canMentor(user)) return failure("Недостаточно прав.", user ? 403 : 401);
   if (user.role !== "ceo" && !user.teamId) return ok({ readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...program }) => ({ ...program, published: false })) });
-  const result = await findReadyProgramPublications(user.role === "ceo" ? "" : user.teamId || "");
+  const result = await findReadyProgramPublications(user.role === "ceo" ? "" : user.teamId || "", user.role === "member" ? user.id : null);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("error" in result) return failure("Не удалось загрузить готовые программы.");
   const published = new Map(result.data.map((row) => [String(row.template_key), row]));

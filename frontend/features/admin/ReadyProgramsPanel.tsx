@@ -49,7 +49,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
     return () => { cancelled = true; };
   }, [programs, reload]);
 
-  const publications = new Map(programs.filter((program) => program.templateKey).map((program) => [program.templateKey, program]));
+  const publications = new Map(programs.filter((program) => program.templateKey && (canManageAll ? !program.audienceRootId : program.publisherId === actorId && (!program.audienceRootId || program.audienceRootId === actorId))).map((program) => [program.templateKey, program]));
   const catalog = readyPrograms.map((item) => {
     const program = publications.get(item.key);
     return program ? {
@@ -110,7 +110,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
       <div className={styles.heading}>
         <p className="eyebrow">Быстрый старт</p>
         <h2 id="ready-programs-title">Готовые задания</h2>
-        <p className={styles.intro}>Тесты и игры с автоматическим начислением миль. Добавьте их участникам одним нажатием — без настройки шагов и дедлайнов.</p>
+        <p className={styles.intro}>Тесты и игры с автоматическим начислением миль. {canManageAll ? "Публикации здесь доступны всей команде." : "Публикации здесь доступны вам и участникам ниже по вашей ветке."} Без настройки шагов и дедлайнов.</p>
       </div>
       <span className={styles.summary}>Добавлено {catalog.filter((item) => item.publishedActive).length} из {catalog.length}</span>
     </div>

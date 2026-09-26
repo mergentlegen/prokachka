@@ -41,6 +41,7 @@ test("ready program publication sends an evergreen interactive step to the atomi
   const query = {
     select() { return this; },
     eq() { return this; },
+    is() { return this; },
     not() { return this; },
     order() { return this; },
     async maybeSingle() { return { data: null, error: null }; },

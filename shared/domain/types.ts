@@ -28,7 +28,7 @@ export type User = {
 export type AuthUser = Pick<User, "id" | "name" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
 
 export type TaskProgram = {
-  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; publisherId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
+  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; publisherId?: string; audienceRootId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
 };
 export type MemberProgramProgress = {
   id: string; userId: string; programId: string; currentTaskId?: string; unlockedAt: string; dueAt: string; status: ProgramStatus; completedAt?: string;

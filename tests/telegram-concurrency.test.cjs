@@ -7,7 +7,7 @@ const { promisify } = require('node:util');
 const { randomUUID } = require('node:crypto');
 const port = process.env.PROKACHKA_TEST_PG_PORT;
 const psql = process.env.PROKACHKA_TEST_PSQL || 'psql';
-const args = ['-X', '-h', '127.0.0.1', '-p', port || '55439', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-Atq'];
+const args = ['-X', '-h', '127.0.0.1', '-p', port || '55439', '-U', 'postgres', '-d', process.env.PROKACHKA_TEST_PG_DATABASE || 'postgres', '-v', 'ON_ERROR_STOP=1', '-Atq'];
 const query = (sql) => execFileSync(psql, [...args, '-c', sql], { encoding: 'utf8' }).trim();
 const parallel = async (sql) => (await promisify(execFile)(psql, [...args, '-c', sql], { encoding: 'utf8' })).stdout.trim();
 function fixture() {
@@ -21,6 +21,22 @@ function fixture() {
     insert into telegram_link_tokens(token,user_id,expires_at) values('${alice}','${alice}',now()+interval '1 hour'),('${bob}','${bob}',now()+interval '1 hour');`);
   return { team, root, alice, bob, task };
 }
+
+test('parallel ready publication retries are unique per audience, not across the whole team', { skip: !port }, async () => {
+  const { team, root, alice, bob } = fixture();
+  query(`update users set can_publish_tasks=true,parent_user_id='${root}' where id in ('${alice}','${bob}');`);
+  const publish = (publisher, audience) => `select app_create_program('${JSON.stringify({
+    teamId:team,publisherId:publisher,audienceRootId:audience,title:'Concurrent ready game',deadlineHours:720,templateKey:'starter-rules',
+    tasks:[{title:'Rules game',description:'Read and answer the questions.',maxPoints:5,publicationType:'evergreen',interactiveKind:'starter-rules'}]
+  })}'::jsonb);`;
+  const same = await Promise.allSettled(Array.from({length:4},()=>parallel(publish(alice,alice))));
+  assert.equal(same.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal(query(`select count(*) from task_programs where team_id='${team}' and template_key='starter-rules' and audience_root_id='${alice}'`),'1');
+  const others = await Promise.all([parallel(publish(bob,bob)),parallel(publish(root,null))]);
+  assert.equal(others.length,2);
+  assert.equal(query(`select count(*) from task_programs where team_id='${team}' and template_key='starter-rules'`),'3');
+  assert.equal(query(`select count(*) from tasks where team_id='${team}' and interactive_kind='starter-rules'`),'3');
+});
 
 test('concurrent attempts cannot bind one Telegram to two website accounts', { skip: !port }, async () => {
   const { alice, bob } = fixture();

@@ -91,6 +91,7 @@ export async function deleteProgramController(request: Request, id: string) {
   const result = await deleteProgram(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
+  if ("validationError" in result) return failure(result.validationError || "Используйте каталог готовых заданий.", 409);
   if (result.error) return failure("Не удалось удалить программу.");
   return ok({ storageCleanupWarning: result.storageCleanupWarning });
 }
