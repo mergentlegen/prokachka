@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { comparePublications } from "@/shared/domain/publication-order";
+import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { createAdminAnnouncement, deleteAdminAnnouncement, updateAdminAnnouncement } from "@/frontend/shared/api/admin-client";
 import type { Announcement } from "@/shared/domain/types";
@@ -51,7 +53,7 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
         onChange(announcements.map((item) => (item.id === updated.id ? updated : item)));
       } else {
         const created = await createAdminAnnouncement({ title, content, resourceUrl: draft.resourceUrl.trim() || null });
-        onChange([created, ...announcements]);
+        onChange([...announcements, created]);
       }
       setEditorOpen(false);
       setEditing(null);
@@ -79,10 +81,11 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
     }
   }
 
-  async function toggle(announcement: Announcement) {
+  async function toggle(announcement: Announcement, pin = false) {
+    if (busy) return;
     setBusy(true);
     try {
-      const updated = await updateAdminAnnouncement(announcement.id, { isActive: !announcement.isActive });
+      const updated = await updateAdminAnnouncement(announcement.id, pin ? { isPinned: !announcement.isPinned } : { isActive: !announcement.isActive });
       onChange(announcements.map((item) => (item.id === updated.id ? updated : item)));
     } catch (error) {
       onError(error instanceof Error ? error.message : "Не удалось изменить статус объявления.");
@@ -105,7 +108,7 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
         {announcements.length === 0 ? (
           <div className="empty-admin"><span>✦</span><p>Пока нет объявлений. Создай первое для команды.</p></div>
         ) : (
-          announcements.map((announcement) => {
+          [...announcements].sort(comparePublications).map((announcement) => {
             const canManage = canManageAll || announcement.authorId === actorId;
             return <article className="announcement-admin-row" key={announcement.id}>
               <div className="announcement-admin-copy">
@@ -115,16 +118,18 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
                   </span>
                   <time>{formatDateTime(announcement.createdAt)}</time>
                 </div>
+                {announcement.isPinned && <PinBadge />}
                 <h3>{announcement.title}</h3>
                 <p>{announcement.content}</p>
                 {announcement.resourceUrl && <a className="admin-resource-link" href={announcement.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть ссылку ↗</a>}
               </div>
               {canManage && <div className="announcement-admin-actions">
-                <button className="button button-edit" onClick={() => openEdit(announcement)}>Изменить</button>
-                <button className="button button-warning" onClick={() => void toggle(announcement)}>
+                <PinButton pinned={announcement.isPinned} title={announcement.title} disabled={busy} onClick={() => void toggle(announcement, true)} />
+                <button className="button button-edit" disabled={busy} onClick={() => openEdit(announcement)}>Изменить</button>
+                <button className="button button-warning" disabled={busy} onClick={() => void toggle(announcement)}>
                   {announcement.isActive ? "Скрыть" : "Опубликовать"}
                 </button>
-                <button className="button button-danger" onClick={() => setDeleteTarget(announcement)}>Удалить</button>
+                <button className="button button-danger" disabled={busy} onClick={() => setDeleteTarget(announcement)}>Удалить</button>
               </div>}
             </article>
           })

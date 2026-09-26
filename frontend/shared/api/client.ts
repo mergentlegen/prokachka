@@ -96,7 +96,7 @@ export function mapTaskAttachment(row: ApiRow): TaskAttachment {
 }
 export function mapTask(row: ApiRow): Task {
   return { id: String(row.id), title: String(row.title || ""), description: String(row.description || ""), maxPoints: Number(row.max_points || 0),
-    deadlineAt: row.deadline_at ? String(row.deadline_at) : undefined, isActive: Boolean(row.is_active), teamId: row.team_id ? String(row.team_id) : undefined,
+    deadlineAt: row.deadline_at ? String(row.deadline_at) : undefined, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), teamId: row.team_id ? String(row.team_id) : undefined,
     publicationType: row.publication_type === "sequential" || row.publication_type === "evergreen" ? row.publication_type : "fixed",
     programId: row.program_id ? String(row.program_id) : undefined, position: row.position ? Number(row.position) : undefined,
     deadlineHours: row.deadline_hours ? Number(row.deadline_hours) : undefined, unlockedAt: row.unlocked_at ? String(row.unlocked_at) : undefined,
@@ -108,9 +108,9 @@ export function mapTask(row: ApiRow): Task {
     attachments: Array.isArray(row.attachments) ? row.attachments.filter((item): item is ApiRow => Boolean(item && typeof item === "object")).map(mapTaskAttachment) : [] };
 }
 export function mapProgram(row: ApiRow): TaskProgram {
-  return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), publisherId: row.publisher_id ? String(row.publisher_id) : undefined, templateKey: row.template_key === "dream-plan" ? row.template_key : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
+  return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), publisherId: row.publisher_id ? String(row.publisher_id) : undefined, templateKey: row.template_key === "dream-plan" ? row.template_key : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
 }
-export function mapAnnouncement(row: ApiRow): Announcement { return { id: String(row.id), teamId: String(row.team_id), authorId: row.author_id ? String(row.author_id) : undefined, title: String(row.title || ""), content: String(row.content || ""), resourceUrl: row.resource_url ? String(row.resource_url) : undefined, isActive: Boolean(row.is_active), createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) }; }
+export function mapAnnouncement(row: ApiRow): Announcement { return { id: String(row.id), teamId: String(row.team_id), authorId: row.author_id ? String(row.author_id) : undefined, title: String(row.title || ""), content: String(row.content || ""), resourceUrl: row.resource_url ? String(row.resource_url) : undefined, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) }; }
 export function mapStarAward(row: ApiRow): StarAward {
   const mentor = Array.isArray(row.mentor) ? row.mentor[0] : row.mentor;
   return {

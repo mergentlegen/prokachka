@@ -169,12 +169,12 @@ test("announcement editor preserves title, description, material and preview DOM
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 test("empty program presents add-step before a disabled next button; no immediate publish", () => {
-  const { ProgramsPanel } = loadTs("frontend/features/admin/ProgramsPanel.tsx", {
+  const { ProgramEditorModal } = loadTs("frontend/features/admin/ProgramEditorModal.tsx", {
     "@/frontend/shared/api/admin-client": {},
     "@/frontend/shared/ConfirmModal": { ConfirmModal: () => null },
   });
-  const markup = renderToStaticMarkup(React.createElement(ProgramsPanel, {
-    programs: [], tasks: [], actorId: "mentor", canManageAll: true, onChange() {}, onError() {},
+  const markup = renderToStaticMarkup(React.createElement(ProgramEditorModal, {
+    onCreated() {}, onClose() {}, onError() {},
   }));
   const form = markup.slice(markup.indexOf("<form"), markup.indexOf("</form>"));
   assert.ok(form.indexOf("Название программы") < form.indexOf("Добавить первый шаг"));

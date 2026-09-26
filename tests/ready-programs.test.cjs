@@ -120,7 +120,11 @@ test("removing a ready publication removes its task from member feed without cha
   assert.deepEqual((await getMemberTaskFeed("member", "team")).data.map((row) => row.id), ["ordinary"]);
   assert.equal(JSON.stringify(tasks), originalTasks, "unpublishing does not delete or alter the underlying tasks");
   programs[0].is_active = true;
+  programs[0].is_pinned = true;
   assert.deepEqual((await getMemberTaskFeed("member", "team")).data.map((row) => row.id), ["game", "ordinary"]);
+  const pinnedFeed = (await getMemberTaskFeed("member", "team")).data;
+  assert.equal(pinnedFeed.find((row) => row.id === "game").is_pinned, true);
+  assert.equal(pinnedFeed.find((row) => row.id === "ordinary").is_pinned, false);
 });
 
 test("catalog add/remove/re-add reuses the publication and preserves task identity without deletion", async () => {

@@ -37,7 +37,7 @@ export async function loadAdminPublicationHistory(): Promise<PublicationHistoryI
   return response.history || [];
 }
 type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };
-type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive">, "resourceUrl"> & { resourceUrl?: string | null }>;
+type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive" | "isPinned">, "resourceUrl"> & { resourceUrl?: string | null }>;
 export async function createAdminTask(input: AdminTaskInput): Promise<Task> {
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks", { method: "POST", body: JSON.stringify(input) }); return mapTask(response.task);
 }
@@ -49,7 +49,7 @@ export async function reviewAdminSubmission(id: string, input: { status: "accept
   const response = await request<ApiResponse<{ submission: ApiRow }>>("/api/submissions/" + id + "/review", { method: "PATCH", body: JSON.stringify(input) }); return mapSubmission(response.submission);
 }
 type AdminAnnouncementInput = Omit<Pick<Announcement, "title" | "content" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };
-type AdminAnnouncementPatch = Partial<Omit<Pick<Announcement, "title" | "content" | "resourceUrl" | "isActive">, "resourceUrl"> & { resourceUrl?: string | null }>;
+type AdminAnnouncementPatch = Partial<Omit<Pick<Announcement, "title" | "content" | "resourceUrl" | "isActive" | "isPinned">, "resourceUrl"> & { resourceUrl?: string | null }>;
 export async function createAdminAnnouncement(input: AdminAnnouncementInput): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements", { method: "POST", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function updateAdminAnnouncement(id: string, input: AdminAnnouncementPatch): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function deleteAdminAnnouncement(id: string) { await request<ApiResponse<Record<string, never>>>("/api/announcements/" + id, { method: "DELETE" }); }
@@ -60,11 +60,11 @@ export async function createAdminProgram(input: ProgramCreateInput): Promise<{ p
   const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[] }>>("/api/programs", { method: "POST", body: JSON.stringify(input) });
   return { program: mapProgram(response.program), tasks: response.tasks.map(mapTask) };
 }
-export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean }): Promise<TaskProgram> {
+export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean }): Promise<TaskProgram> {
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
 export async function deleteAdminProgram(id: string): Promise<boolean> { const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>("/api/programs/" + id, { method: "DELETE" }); return Boolean(response.storageCleanupWarning); }
-export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; canManage?: boolean };
+export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; publishedPinned?: boolean; publishedCreatedAt?: string; canManage?: boolean };
 export async function loadReadyPrograms(): Promise<ReadyProgramStatus[]> {
   const response = await request<ApiResponse<{ readyPrograms: ReadyProgramStatus[] }>>("/api/ready-programs");
   return response.readyPrograms || [];

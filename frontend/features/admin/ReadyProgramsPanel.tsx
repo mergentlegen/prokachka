@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { loadReadyPrograms, publishReadyProgram, updateAdminProgram, type ReadyProgramStatus } from "@/frontend/shared/api/admin-client";
+import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
+import { comparePublications } from "@/shared/domain/publication-order";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { READY_PROGRAMS } from "@/shared/domain/ready-programs";
 import type { Task, TaskProgram } from "@/shared/domain/types";
@@ -28,6 +30,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
   const [readyPrograms, setReadyPrograms] = useState<ReadyProgramStatus[]>(() => READY_PROGRAMS.map(({ tasks: _tasks, ...program }) => ({ ...program, published: false })));
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState("");
+  const [pinning, setPinning] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState<{ key: string; message: string } | null>(null);
   const [query, setQuery] = useState("");
@@ -50,10 +53,13 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
   const catalog = readyPrograms.map((item) => {
     const program = publications.get(item.key);
     return program ? {
-      ...item, published: true, publishedProgramId: program.id, publishedActive: program.isActive,
+      ...item, published: true, publishedProgramId: program.id, publishedActive: program.isActive, publishedPinned: program.isPinned, publishedCreatedAt: program.createdAt,
       canManage: canManageAll || program.publisherId === actorId,
     } : item;
-  });
+  }).sort((a, b) => comparePublications(
+    { id: a.key, createdAt: a.publishedCreatedAt || "9999", isPinned: a.publishedActive && a.publishedPinned },
+    { id: b.key, createdAt: b.publishedCreatedAt || "9999", isPinned: b.publishedActive && b.publishedPinned },
+  ));
   const normalizedQuery = query.trim().toLocaleLowerCase("ru");
   const visibleItems = catalog.filter((item) =>
     (!normalizedQuery || (item.title + " " + item.description).toLocaleLowerCase("ru").includes(normalizedQuery)) &&
@@ -78,12 +84,24 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
       const taskIds = new Set(addedTasks.map((task) => task.id));
       onChange([updated, ...programs.filter((program) => program.id !== updated.id)], [...addedTasks, ...tasks.filter((task) => !taskIds.has(task.id))]);
       setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? {
-        ...entry, published: true, publishedActive: updated.isActive, publishedProgramId: updated.id, canManage: true,
+        ...entry, published: true, publishedActive: updated.isActive, publishedProgramId: updated.id, publishedPinned: updated.isPinned, publishedCreatedAt: updated.createdAt, canManage: true,
       } : entry));
       onError(updated.isActive ? "«" + item.title + "» добавлено в задания участников." : "«" + item.title + "» убрано из заданий. Результаты и мили сохранены.");
     } catch (error) {
       setActionError({ key: item.key, message: error instanceof Error ? error.message : "Не удалось изменить публикацию. Попробуйте ещё раз." });
     } finally { setBusyKey(""); }
+  }
+
+  async function pin(item: ReadyProgramStatus) {
+    if (busyKey || !item.publishedProgramId || !item.canManage) return;
+    setBusyKey(item.key); setPinning(true); setActionError(null);
+    try {
+      const updated = await updateAdminProgram(item.publishedProgramId, { isPinned: !item.publishedPinned });
+      onChange([...programs.filter((program) => program.id !== updated.id), updated], tasks);
+      setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? { ...entry, publishedPinned: updated.isPinned } : entry));
+    } catch (error) {
+      setActionError({ key: item.key, message: error instanceof Error ? error.message : "Не удалось изменить закрепление." });
+    } finally { setBusyKey(""); setPinning(false); }
   }
 
   return <section className={styles.panel} aria-labelledby="ready-programs-title">
@@ -120,15 +138,16 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
           <p className={styles.eyebrow}>{item.eyebrow}</p>
           <h3>{item.title}</h3>
           <p className={styles.description}>{item.description}</p>
-          <div className={styles.meta}><span>{item.badge}</span><span className={styles.reward}>+{formatMiles(rewards.get(item.key) ?? 0)}</span></div>
+          <div className={styles.meta}>{active && item.publishedPinned && <PinBadge />}<span>{item.badge}</span><span className={styles.reward}>+{formatMiles(rewards.get(item.key) ?? 0)}</span></div>
           <div className={styles.actions}>
             {managedByAnother ? <p className={styles.ownerNote}>Публикацией управляет другой наставник.</p> :
               <button type="button" className={active ? styles.removeButton : "button button-primary"}
                 aria-label={(active ? "Убрать из заданий: " : "Добавить в задания: ") + item.title}
                 disabled={Boolean(busyKey) || statusPending || Boolean(loadError && !publications.has(item.key))}
                 onClick={() => void changePublication(item)}>
-                {busy ? active ? "Убираем…" : "Добавляем…" : statusPending ? "Проверяем статус…" : active ? "Убрать из заданий" : "Добавить в задания"}
+                {busy && !pinning ? active ? "Убираем…" : "Добавляем…" : statusPending ? "Проверяем статус…" : active ? "Убрать из заданий" : "Добавить в задания"}
               </button>}
+            {active && !managedByAnother && <div className={styles.pinAction}><PinButton pinned={item.publishedPinned} title={item.title} disabled={Boolean(busyKey)} onClick={() => void pin(item)} /></div>}
             {actionError?.key === item.key && <p className={styles.error} role="alert">{actionError.message}</p>}
           </div>
         </article>;

@@ -74,7 +74,8 @@ export async function patchProgram(request: Request, id: string) {
     if (body.title !== undefined && !validText(body.title, 160)) return failure("Некорректное название.", 400);
     if (body.deadlineHours !== undefined && (!Number.isInteger(Number(body.deadlineHours)) || Number(body.deadlineHours) < 1 || Number(body.deadlineHours) > 720)) return failure("Интервал должен быть от 1 до 720 часов.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус.", 400);
-    const result = await updateProgram(id, { title: body.title, deadlineHours: body.deadlineHours === undefined ? undefined : Number(body.deadlineHours), isActive: body.isActive }, user);
+    if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
+    const result = await updateProgram(id, { title: body.title, deadlineHours: body.deadlineHours === undefined ? undefined : Number(body.deadlineHours), isActive: body.isActive, isPinned: body.isPinned }, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
     if (result.error) return failure("Не удалось обновить программу.");

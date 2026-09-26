@@ -99,6 +99,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/telegram-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/architecture-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/live-updates.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20260927-publication-pins.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/publication-pins.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

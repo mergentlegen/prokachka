@@ -24,19 +24,19 @@ export type User = {
 export type AuthUser = Pick<User, "id" | "name" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
 
 export type TaskProgram = {
-  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; publisherId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
+  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; publisherId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
 };
 export type MemberProgramProgress = {
   id: string; userId: string; programId: string; currentTaskId?: string; unlockedAt: string; dueAt: string; status: ProgramStatus; completedAt?: string;
 };
 export type Task = {
-  id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; teamId?: string;
+  id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; createdAt: string; updatedAt: string;
   attachments?: TaskAttachment[];
 };
 export type Announcement = {
-  id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; createdAt: string; updatedAt: string;
+  id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; isPinned?: boolean; createdAt: string; updatedAt: string;
 };
 export type StarAward = {
   id: string; userId: string; teamId: string; mentorId?: string; mentorName?: string; kind?: StarAwardKind; stars: number; comment: string; createdAt: string;

@@ -14,6 +14,7 @@ import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
+import { ProgramEditorModal } from "./ProgramEditorModal";
 import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { WelcomeVideoSettingsPanel } from "@/frontend/features/admin/WelcomeVideoSettingsPanel";
@@ -54,6 +55,8 @@ export function AdminApp() {
   const { store, setStore, requests, setRequests, programHistory, publicationHistory, ranking, counts, networkUsers, setNetworkUsers, dataError, dataLoading, refreshData } = useAdminData(authUser, section);
   const [modal, setModal] = useState<AdminModal>(null);
   const [modalBusy, setModalBusy] = useState(false);
+  const [programEditorOpen, setProgramEditorOpen] = useState(false);
+  const [taskActionBusy, setTaskActionBusy] = useState("");
   const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "" });
   const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([]);
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
@@ -278,13 +281,13 @@ export function AdminApp() {
         } catch (error) {
           const remaining = taskFiles.slice(index);
           setTaskFiles(remaining);
-          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [saved, ...current.tasks] }));
+          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [...current.tasks, saved] }));
           setModal({ type: "task", task: saved });
           setToast(`Задание сохранено, но PDF «${taskFiles[index].name}» не загрузился. ${error instanceof Error ? error.message : "Повторите загрузку."}`);
           return;
         }
       }
-      setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [saved, ...current.tasks] }));
+      setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [...current.tasks, saved] }));
       setTaskFiles([]);
       setModal(null);
       setToast("Задание сохранено.");
@@ -311,14 +314,25 @@ export function AdminApp() {
 
   async function toggleTask(id: string) {
     const task = store.tasks.find((item) => item.id === id);
-    if (!task) return;
+    if (!task || taskActionBusy) return;
+    setTaskActionBusy(id);
     try {
       const updated = await updateAdminTask(id, { isActive: !task.isActive });
-      setStore((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === id ? updated : item) }));
+      setStore((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === id ? { ...updated, attachments: item.attachments } : item) }));
       setToast(updated.isActive ? "Задание активировано." : "Задание скрыто.");
     } catch {
       setToast("Не удалось изменить статус задания.");
-    }
+    } finally { setTaskActionBusy(""); }
+  }
+
+  async function pinTask(task: Task) {
+    if (taskActionBusy) return;
+    setTaskActionBusy(task.id);
+    try {
+      const updated = await updateAdminTask(task.id, { isPinned: !task.isPinned });
+      setStore((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === updated.id ? { ...updated, attachments: item.attachments } : item) }));
+    } catch (error) { setToast(error instanceof Error ? error.message : "Не удалось изменить закрепление."); }
+    finally { setTaskActionBusy(""); }
   }
 
   async function confirmDeleteTask() {
@@ -348,8 +362,8 @@ export function AdminApp() {
   const canPublishContent = authUser.role === "admin" || Boolean(authUser.canPublishTasks);
   const canReview = authUser.role === "admin" || Boolean(authUser.canReview);
   const sections: Array<[AdminSection, string, string]> = [
-    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"],
-    ["announcements", "Объявления", "✦"], ["programs", "Программы", "▤"], ["welcome-video", "Приветственное видео", "▶"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
+    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["programs", "Программы", "▤"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"],
+    ["announcements", "Объявления", "✦"], ["welcome-video", "Приветственное видео", "▶"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
   ];
   const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements" || id === "welcome-video") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
 
@@ -360,15 +374,15 @@ export function AdminApp() {
         {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
         {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav></aside>
-      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}</div></div>
+      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
         <SectionBoundary loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
           <ReadyProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />
-          <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />
+          <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
         </div>}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
         {section === "welcome-video" && canPublishContent && <WelcomeVideoSettingsPanel user={authUser} />}
@@ -383,6 +397,7 @@ export function AdminApp() {
       </nav>
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
     </MobileDrawer>
+    {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}

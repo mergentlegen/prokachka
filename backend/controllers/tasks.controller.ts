@@ -86,6 +86,7 @@ export async function updateTask(request: Request, id: string) {
     if (body.description !== undefined && (typeof body.description !== "string" || body.description.trim().length < 2 || body.description.trim().length > 5000)) return failure("Описание задания должно быть от 2 до 5000 символов.", 400);
     if (body.maxPoints !== undefined && (!Number.isFinite(Number(body.maxPoints)) || Number(body.maxPoints) < 0 || Number(body.maxPoints) > 100)) return failure("Некорректное количество миль.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус задания.", 400);
+    if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
     const deadline = Object.prototype.hasOwnProperty.call(body, "deadlineAt") ? parseDeadline(body.deadlineAt) : { value: undefined as string | null | undefined };
     if ("error" in deadline) return failure(deadline.error, 400);
     const resourceUrl = Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? parseExternalUrl(body.resourceUrl) : { value: undefined as string | null | undefined };
@@ -96,6 +97,7 @@ export async function updateTask(request: Request, id: string) {
     const result = await patchTask(id, input, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этому заданию.", 403);
+    if ("validationError" in result) return failure(result.validationError || "Некорректное изменение задания.", 400);
     if (result.error) return failure("Не удалось обновить задание.");
     return ok({ task: result.data });
   } catch { return failure("Некорректные данные.", 400); }

@@ -13,3 +13,4 @@
 \ir 20260926-welcome-videos.sql
 \ir 20260926-welcome-video-branch-model.sql
 \ir 20260926-welcome-video-tus-auth.sql
+\ir 20260927-publication-pins.sql

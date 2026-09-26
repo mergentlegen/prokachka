@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { comparePublications } from "@/shared/domain/publication-order";
+import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import type { Store, Submission, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 import type { AdminSection } from "./admin-sections";
@@ -11,22 +13,39 @@ function isTaskExpired(task: Task) { return Boolean(task.deadlineAt && new Date(
 export function AccessDenied({ onLogout }: { onLogout: () => void }) { return <main className="admin-login"><div className="admin-login-card"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><p className="eyebrow">Доступ ограничен</p><h1>Это раздел наставника</h1><p>Твой аккаунт участника не может открыть админ-панель.</p><button className="primary-button full" onClick={() => { void onLogout(); }}>Выйти</button><a className="back-link" href="/">Вернуться к заданиям</a></div></main>; }
 export function Dashboard({ store, pending, ranking, onNavigate }: { store: Store; pending: Submission[]; ranking: { id: string; name: string; points: number }[]; onNavigate: (section: AdminSection) => void }) { return <><div className="metric-grid"><Metric label="Участники" value={store.users.length} note="в команде" icon="♙" /><Metric label="Активные задания" value={store.tasks.filter((task) => task.isActive && !isTaskExpired(task)).length} note={"из " + store.tasks.length + " всего"} icon="☷" /><Metric label="На проверке" value={pending.length} note="ждут внимания" icon="◷" /><Metric label="Принято работ" value={store.submissions.filter((submission) => submission.status === "accepted").length} note="за всё время" icon="✓" /></div><div className="dashboard-grid"><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Сейчас</p><h2>Нужна проверка</h2></div><button className="text-button" onClick={() => onNavigate("review")}>Все работы →</button></div>{pending.length === 0 ? <EmptyAdmin text="Все работы проверены." /> : pending.slice(0, 3).map((submission) => <SubmissionRow key={submission.id} submission={submission} store={store} />)}</div><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Лидеры рейтинга</h2></div><button className="text-button" onClick={() => onNavigate("history")}>История →</button></div>{ranking.slice(0, 4).map((member, index) => <div className="leader-row" key={member.id}><span>{index + 1}</span><div className="rank-avatar">{initials(member.name)}</div><strong>{member.name}</strong><b>{member.points}</b></div>)}</div></div></>; }
 function Metric({ label, value, note, icon }: { label: string; value: number; note: string; icon: string }) { return <div className="metric-card"><span className="metric-icon">{icon}</span><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></div>; }
-function TaskKindSwitch({ value, onChange }: { value: "regular" | "programs"; onChange: (value: "regular" | "programs") => void }) {
-  return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button></div>;
-}
 function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" | "publications"; onChange: (value: "regular" | "programs" | "publications") => void }) {
   return <div className="task-kind-switch"><button className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button><button className={value === "publications" ? "active" : ""} onClick={() => onChange("publications")}>Публикации</button></div>;
 }
-export function TasksView({ store, actorId, canManageAll, onToggle, onEdit, onRemove }: { store: Store; actorId: string; canManageAll: boolean; onToggle: (id: string) => void; onEdit: (task?: Task) => void; onRemove: (task: Task) => void }) {
-  const [kind, setKind] = useState<"regular" | "programs">("regular");
+type TaskRowsProps = {
+  tasks: Task[]; submissions?: Submission[]; actorId: string; canManageAll: boolean; busyId?: string;
+  onToggle: (id: string) => void; onEdit: (task: Task) => void; onRemove: (task: Task) => void; onPin?: (task: Task) => void;
+};
+
+export function TasksView({ store, ...props }: Omit<TaskRowsProps, "tasks" | "submissions"> & { store: Store }) {
   const readyProgramIds = new Set(store.programs.filter((program) => program.templateKey).map((program) => program.id));
-  const tasks = [...store.tasks].filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && (kind === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential")).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return <><TaskKindSwitch value={kind} onChange={setKind} /><div className="admin-panel table-panel">{tasks.length === 0 ? <EmptyAdmin text={kind === "programs" ? "Программ пока нет." : "Обычных заданий пока нет."} /> : tasks.map((task) => {
+  const tasks = store.tasks.filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && task.publicationType !== "sequential").sort(comparePublications);
+  return <div className="admin-panel table-panel"><TaskRows tasks={tasks} submissions={store.submissions} {...props} /></div>;
+}
+
+export function TaskRows({ tasks, submissions = [], actorId, canManageAll, onToggle, onEdit, onRemove, onPin, busyId }: TaskRowsProps) {
+  return <>{tasks.length === 0 ? <EmptyAdmin text="Заданий пока нет." /> : tasks.map((task) => {
     const status = !task.isActive ? "inactive" : isTaskExpired(task) ? "expired" : "active";
-    const taskMeta = task.publicationType === "sequential" ? "Программа · шаг " + (task.position || "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";
+    const taskMeta = task.publicationType === "sequential" ? "Шаг " + (task.position || "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";
     const canManage = canManageAll || task.publisherId === actorId;
-    return <div className="task-admin-row" key={task.id}><div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div><strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta} · {store.submissions.filter((submission) => submission.taskId === task.id).length} отправлений</span></div></div><span className={"admin-status " + status}>{status === "active" ? "Активно" : status === "expired" ? "Просрочено" : "Скрыто"}</span><span className="task-max">до {formatMiles(task.maxPoints)}</span>{canManage && <div className="row-actions"><button className="button button-edit" onClick={() => onEdit(task)}>Изменить</button><button className={"button " + (task.isActive ? "button-warning" : "button-success")} onClick={() => onToggle(task.id)}>{task.isActive ? "Скрыть" : "Активировать"}</button><button className="button button-danger" onClick={() => onRemove(task)}>Удалить</button></div>}</div>;
-  })}</div></>;
+    return <div className="task-admin-row" key={task.id}>
+      <div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div>
+        {task.isPinned && <PinBadge />}<strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta}{submissions.length > 0 ? " · " + submissions.filter((submission) => submission.taskId === task.id).length + " отправлений" : ""}</span>
+      </div></div>
+      <span className={"admin-status " + status}>{status === "active" ? "Активно" : status === "expired" ? "Просрочено" : "Скрыто"}</span>
+      <span className="task-max">до {formatMiles(task.maxPoints)}</span>
+      {canManage && <div className="row-actions">
+        {onPin && <PinButton pinned={task.isPinned} title={task.title} disabled={Boolean(busyId)} onClick={() => onPin(task)} />}
+        <button type="button" className="button button-edit" disabled={Boolean(busyId)} onClick={() => onEdit(task)}>Изменить</button>
+        <button type="button" className={"button " + (task.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => onToggle(task.id)}>{task.isActive ? "Скрыть" : "Активировать"}</button>
+        <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => onRemove(task)}>Удалить</button>
+      </div>}
+    </div>;
+  })}</>;
 }
 export function ReviewView({ store, submissions, onReview }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) {
   return <div className="submission-review-list">{submissions.length === 0 ? <div className="admin-panel"><EmptyAdmin text="Нет работ, ожидающих проверки." /></div> : submissions.map((submission) =>

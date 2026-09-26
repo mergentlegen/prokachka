@@ -9,9 +9,10 @@ export type AnnouncementInput = {
   content?: string;
   resourceUrl?: string | null;
   isActive?: boolean;
+  isPinned?: boolean;
 };
 
-const announcementSelect = "id,team_id,author_id,audience_root_id,title,content,resource_url,is_active,created_at,updated_at";
+const announcementSelect = "id,team_id,author_id,audience_root_id,title,content,resource_url,is_active,is_pinned,created_at,updated_at";
 
 export async function findAnnouncements(options: { teamId?: string; includeInactive?: boolean; viewer?: AnnouncementViewer } = {}) {
   const supabase = getSupabaseAdmin();
@@ -20,7 +21,7 @@ export async function findAnnouncements(options: { teamId?: string; includeInact
   let query = supabase
     .from("announcements")
     .select(announcementSelect)
-    .order("created_at", { ascending: false });
+    .order("is_pinned", { ascending: false }).order("created_at", { ascending: true });
 
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (!options.includeInactive) query = query.eq("is_active", true);
@@ -80,6 +81,7 @@ export async function patchAnnouncement(
   if (input.content !== undefined) patch.content = input.content;
   if (input.resourceUrl !== undefined) patch.resource_url = input.resourceUrl || null;
   if (input.isActive !== undefined) patch.is_active = input.isActive;
+  if (input.isPinned !== undefined) patch.is_pinned = input.isPinned;
 
   let query = supabase.from("announcements").update(patch).eq("id", id);
   if (actor?.role !== "ceo" && actor?.teamId) query = query.eq("team_id", actor.teamId);

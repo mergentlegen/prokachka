@@ -8,8 +8,8 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const [tasksResult, programsResult, progressResult] = await Promise.all([
-    readPages(supabase.from("tasks").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: false }).order("id")),
-    readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: false }).order("id")),
+    readPages(supabase.from("tasks").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
+    readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
     readPages(supabase.from("member_program_progress").select("*").eq("user_id", userId).order("id")),
   ]);
   if (tasksResult.error || programsResult.error || progressResult.error) return { error: tasksResult.error || programsResult.error || progressResult.error };
@@ -36,7 +36,8 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
       refreshed.data?.forEach((row) => existing.set(String(row.program_id), row));
     }
   }
-  const programIds = new Set(programs.map((program) => String(program.id)));
+  const programsById = new Map(programs.map((program) => [String(program.id), program]));
+  const programIds = new Set(programsById.keys());
   return { data: tasks.filter((task) => {
     if (task.program_id && !programIds.has(String(task.program_id))) return false;
     if (task.publication_type === "evergreen") return true;
@@ -45,8 +46,10 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     const progress = existing.get(String(task.program_id));
     return progress?.status === "active" && progress.current_task_id === task.id;
   }).map((task) => {
-    if (task.publication_type !== "sequential") return task;
+    const program = programsById.get(String(task.program_id));
+    const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned) };
+    if (task.publication_type !== "sequential") return publication;
     const progress = existing.get(String(task.program_id));
-    return { ...task, unlocked_at: progress?.unlocked_at, due_at: progress?.due_at };
+    return { ...publication, unlocked_at: progress?.unlocked_at, due_at: progress?.due_at };
   }) };
 }

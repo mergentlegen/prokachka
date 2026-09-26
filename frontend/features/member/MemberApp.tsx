@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { TaskCard } from "./TaskCard";
+import { comparePublications } from "@/shared/domain/publication-order";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { Toast } from "@/frontend/shared/Toast";
 import { NetworkTree } from "@/frontend/shared/NetworkTree";
@@ -124,7 +125,7 @@ export function MemberApp() {
   const currentRank = user ? teamRanking.findIndex((member) => member.id === user.id) + 1 : 0;
   const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
-  const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort(comparePublications);
   const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" && !task.interactiveKind : task.publicationType !== "sequential" || Boolean(task.interactiveKind));
 
   async function hydrateUser(nextUser: AuthUser) {

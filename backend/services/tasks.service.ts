@@ -6,7 +6,7 @@ import { removeAttachmentPaths } from "@/backend/services/task-attachments.servi
 type TaskViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
 
 type TaskInput = {
-  title?: string; description?: string; maxPoints?: number; deadlineAt?: string | null; isActive?: boolean; teamId?: string;
+  title?: string; description?: string; maxPoints?: number; deadlineAt?: string | null; isActive?: boolean; isPinned?: boolean; teamId?: string;
   publicationType?: "evergreen" | "fixed" | "sequential"; programId?: string; position?: number; deadlineHours?: number; resourceUrl?: string | null;
   publisherId?: string; audienceRootId?: string | null;
 };
@@ -14,7 +14,7 @@ type TaskInput = {
 export async function findTasks(teamId?: string, viewer?: TaskViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("tasks").select("*").order("created_at", { ascending: false });
+  let query = supabase.from("tasks").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: true });
   if (teamId) query = query.eq("team_id", teamId);
   const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };
@@ -52,16 +52,18 @@ export async function insertTask(input: Required<Pick<TaskInput, "title" | "desc
 export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const current = await supabase.from("tasks").select("id,team_id,publisher_id").eq("id", id).maybeSingle();
+  const current = await supabase.from("tasks").select("id,team_id,publisher_id,program_id").eq("id", id).maybeSingle();
   if (current.error || !current.data) return { forbidden: true as const };
   const canEdit = actor?.role === "ceo" || (Boolean(actor?.teamId) && current.data.team_id === actor?.teamId && (actor?.role === "admin" || (actor?.canPublishTasks === true && current.data.publisher_id === actor.id)));
   if (!canEdit) return { forbidden: true as const };
+  if (input.isPinned !== undefined && current.data.program_id) return { validationError: "Закрепляйте программу целиком." };
   const patch: Record<string, unknown> = {};
   if (typeof input.title === "string") patch.title = input.title.trim();
   if (typeof input.description === "string") patch.description = input.description.trim();
   if (input.maxPoints !== undefined) patch.max_points = Math.min(100, Math.max(0, Number(input.maxPoints) || 0));
   if (input.deadlineAt !== undefined) patch.deadline_at = input.deadlineAt || null;
   if (input.isActive !== undefined) patch.is_active = Boolean(input.isActive);
+  if (input.isPinned !== undefined) patch.is_pinned = input.isPinned;
   if (input.deadlineHours !== undefined) patch.deadline_hours = input.deadlineHours;
   if (input.resourceUrl !== undefined) patch.resource_url = input.resourceUrl || null;
   let query = supabase.from("tasks").update(patch).eq("id", id);

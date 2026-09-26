@@ -85,6 +85,7 @@ export async function updateAnnouncement(request: Request, id: string) {
       return failure("Некорректный статус объявления.", 400);
     }
 
+    if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
     const resourceUrl = Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? parseExternalUrl(body.resourceUrl) : { value: undefined as string | null | undefined };
     if ("error" in resourceUrl) return failure(resourceUrl.error, 400);
     const result = await patchAnnouncement(
@@ -94,6 +95,7 @@ export async function updateAnnouncement(request: Request, id: string) {
         content: body.content === undefined ? undefined : body.content.trim(),
         resourceUrl: Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? resourceUrl.value : undefined,
         isActive: body.isActive,
+        isPinned: body.isPinned,
       },
       user,
     );

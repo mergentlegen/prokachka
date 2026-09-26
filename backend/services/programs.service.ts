@@ -12,7 +12,7 @@ export type ProgramInput = { teamId: string; title: string; deadlineHours: numbe
 export async function findPrograms(teamId?: string, viewer?: ProgramViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("task_programs").select("*").order("created_at", { ascending: false });
+  let query = supabase.from("task_programs").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: true });
   if (teamId) query = query.eq("team_id", teamId);
   const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };
@@ -33,7 +33,7 @@ export async function createProgram(input: ProgramInput) {
 export async function findReadyProgramPublications(teamId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await readPages(supabase.from("task_programs").select("id,template_key,is_active,publisher_id").eq("team_id", teamId).not("template_key", "is", null).order("id"));
+  const result = await readPages(supabase.from("task_programs").select("id,template_key,is_active,publisher_id,is_pinned,created_at").eq("team_id", teamId).not("template_key", "is", null).order("id"));
   return result.error ? { error: result.error } : { data: result.data || [] };
 }
 
@@ -68,7 +68,7 @@ export async function publishReadyProgram(input: { teamId: string; key: ReadyPro
   }
   return result;
 }
-export async function updateProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean }, actor?: ProgramViewer) {
+export async function updateProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean }, actor?: ProgramViewer) {
   if (!actor || (actor.role !== "ceo" && !actor.teamId)) return { forbidden: true as const };
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Submission, Task } from "@/shared/domain/types";
 import { externalHref, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
+import { PinBadge } from "@/frontend/shared/PublicationPin";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { TaskAttachments } from "@/frontend/shared/TaskAttachments";
@@ -33,6 +34,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: 
   }
   return <>
     <article className={styles.card}>
+      {task.isPinned && <PinBadge />}
       <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
       <h3><button className={styles.title} onClick={() => setOpen(true)} aria-haspopup="dialog">{task.title}</button></h3>
       <p className={styles.preview}>{task.description}</p>

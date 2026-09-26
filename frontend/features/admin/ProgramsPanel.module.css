@@ -2,3 +2,14 @@
 .selectedFiles li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#4e5e76; font-size:12px; }
 .selectedFiles li span { min-width:0; overflow-wrap:anywhere; }
 .selectedFiles li button { flex:none; border:0; background:transparent; color:#ad4141; font:inherit; cursor:pointer; }
+.modalBuilder { border:0; border-radius:0; margin:0; }
+.program { min-width:0; border-bottom:1px solid var(--line); }
+.program:last-child { border-bottom:0; }
+.programTitle { display:flex; align-items:center; gap:10px; min-height:44px; max-width:100%; padding:4px 0; border:0; background:none; color:var(--navy); text-align:left; font:inherit; font-size:14px; font-weight:700; overflow-wrap:anywhere; cursor:pointer; }
+.programTitle span { flex-shrink:0; margin:0 !important; color:var(--blue) !important; font-size:18px !important; }
+.programTitle:focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:4px; }
+.steps { padding:0 14px 14px; background:#f8faff; }
+.stepsHeading { display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; padding:16px 8px; color:var(--navy); font-size:13px; font-weight:600; }
+.stepsHeading span { color:#7b879a; font-size:11px; font-weight:400; }
+.steps > div { background:white; border:1px solid var(--line); border-radius:9px; }
+@media(max-width:560px) { .steps { padding:0 8px 8px; } }

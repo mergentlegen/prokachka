@@ -27,6 +27,7 @@
 .meta span { padding:6px 8px; border-radius:7px; background:#f5f7fb; color:#64748b; font-size:11px; }
 .meta .reward { background:#fff3d7; color:#916621; font-weight:700; }
 .actions { margin-top:auto; }
+.pinAction { display:flex; justify-content:center; margin-top:8px; }
 .actions > button { width:100%; min-height:46px; }
 .removeButton { padding:10px 12px; border:1px solid #d5deed; border-radius:9px; background:white; color:#53637b; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 .removeButton:hover:not(:disabled) { border-color:#9aaaca; background:#f5f7fc; }
