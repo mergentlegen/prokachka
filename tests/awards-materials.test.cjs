@@ -30,7 +30,7 @@ function load(relative, overrides = {}) {
 
 const kinds = load('shared/domain/star-awards.ts');
 test('named awards have exactly three stable server-owned values', () => {
-  assert.deepEqual(kinds.STAR_AWARD_OPTIONS.map(({ label, stars }) => [label, stars]), [['Starter', 1], ['Classic', 2], ['Premium', 3]]);
+  assert.deepEqual(kinds.STAR_AWARD_OPTIONS.map(({ label, stars }) => [label, stars]), [['Starter', 1], ['Classic', 2], ['Premium', 5]]);
   for (const bad of ['Premium', 'unknown', 4, null, {}, '__proto__']) assert.equal(kinds.starAwardOption(bad), undefined);
 });
 
@@ -106,7 +106,7 @@ test('service inserts independent awards and derives stars from kind, not caller
   const service = load('backend/services/stars.service.ts', { [dbKey]: { getSupabaseAdmin: () => db }, [networkKey]: {} });
   for (const kind of ['starter', 'premium']) await service.insertStarAward({ userId: 'member', mentorId: 'mentor', teamId: 'team', kind, stars: 99, comment: '' });
   const values = db.calls.map((call) => call.ops.find(([op]) => op === 'insert')[1]);
-  assert.deepEqual(values.map((value) => value.stars), [1, 3]);
+  assert.deepEqual(values.map((value) => value.stars), [1, 5]);
   assert.deepEqual(values.map((value) => value.award_kind), ['starter', 'premium']);
   assert.ok(!db.calls.some(({ ops }) => ops.some(([op]) => op === 'upsert' || op === 'update')));
   assert.equal((await service.insertStarAward({ userId: 'self', mentorId: 'self', kind: 'premium' })).forbidden, true);
@@ -133,7 +133,7 @@ test('controller rejects arbitrary amounts, old clients and tampering before ins
     '@/backend/services/stars.service': { insertStarAward: async (value) => { inserted.push(value); return { data: value }; } },
     [dbKey]: { getSupabaseAdmin: () => db },
   });
-  for (const body of [{ stars: 5 }, { kind: 'unknown' }, { kind: 'premium', stars: 5 }, { kind: 'classic', stars: '2' }]) {
+  for (const body of [{ stars: 5 }, { kind: 'unknown' }, { kind: 'premium', stars: 3 }, { kind: 'classic', stars: '2' }]) {
     const response = await controller.createStarAward(new Request('http://localhost/api/stars', { method: 'POST', body: JSON.stringify({ userId: memberId, ...body }) }));
     assert.equal(response.status, 400);
   }

@@ -126,7 +126,7 @@ create table public.star_awards (
   award_kind text,
   constraint star_awards_kind_stars_check check (
     award_kind is null or (award_kind = 'starter' and stars = 1) or
-    (award_kind = 'classic' and stars = 2) or (award_kind = 'premium' and stars = 3)
+    (award_kind = 'classic' and stars = 2) or (award_kind = 'premium' and stars in (3, 5))
   ),
   comment text not null default '',
   created_at timestamptz not null default now()

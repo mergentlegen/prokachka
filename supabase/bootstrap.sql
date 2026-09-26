@@ -4,6 +4,7 @@
 \ir schema.sql
 \ir telegram-integrity-migration.sql
 \ir star-award-kinds-migration.sql
+\ir 20260926-premium-five-stars.sql
 \ir 20260917-architecture-integrity.sql
 \ir 20260919-live-updates.sql
 \ir 20260925-ready-programs.sql
