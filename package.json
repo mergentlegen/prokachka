@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
-    "test": "node --test tests/mobile-interface.test.cjs tests/backend-telegram.test.cjs tests/awards-materials.test.cjs tests/architecture.test.cjs tests/live-updates.test.cjs tests/ready-programs.test.cjs tests/publications.test.cjs tests/starter-rules.test.cjs tests/heart-survey.test.cjs tests/publication-audiences.test.cjs tests/welcome-video.test.cjs tests/profile.test.cjs",
+    "test": "node --test tests/mobile-interface.test.cjs tests/backend-telegram.test.cjs tests/awards-materials.test.cjs tests/architecture.test.cjs tests/live-updates.test.cjs tests/ready-programs.test.cjs tests/publications.test.cjs tests/starter-rules.test.cjs tests/heart-survey.test.cjs tests/publication-audiences.test.cjs tests/welcome-video.test.cjs tests/profile.test.cjs tests/email-auth.test.cjs",
     "test:architecture": "node --test tests/architecture.test.cjs",
     "test:concurrency": "node --test tests/telegram-concurrency.test.cjs",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",

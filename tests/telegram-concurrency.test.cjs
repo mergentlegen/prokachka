@@ -22,6 +22,29 @@ function fixture() {
   return { team, root, alice, bob, task };
 }
 
+test('parallel email completion produces one account and one mentor request', { skip: !port }, async () => {
+  const { team, root } = fixture();
+  const authId = randomUUID(), inviteId = randomUUID();
+  query(`insert into auth.users(id,email,email_confirmed_at) values('${authId}','${authId}@fixture.test',now());
+    insert into team_invitation_links(id,team_id,inviter_user_id,token_hash) values('${inviteId}','${team}','${root}','${inviteId}');
+    insert into email_registration_drafts(auth_user_id,email,first_name,last_name,invitation_id)
+      values('${authId}','${authId}@fixture.test','Email','Member','${inviteId}');`);
+  const accounts = await Promise.all(Array.from({ length: 6 }, () => parallel(`select app_complete_email_registration('${authId}');`)));
+  assert.equal(new Set(accounts).size, 1);
+  assert.equal(query(`select count(*) from users where auth_user_id='${authId}'`), '1');
+  assert.equal(query(`select count(*) from team_join_requests where user_id='${accounts[0]}' and status='pending'`), '1');
+  assert.equal(query(`select count(*) from users where id='${accounts[0]}' and team_id is not null`), '0');
+});
+
+test('parallel email OTP attempts obey the shared per-address verification limit', { skip: !port }, async () => {
+  const authId = randomUUID(), email = `${authId}@fixture.test`;
+  query(`insert into auth.users(id,email) values('${authId}','${email}');
+    insert into email_registration_drafts(auth_user_id,email,first_name,last_name) values('${authId}','${email}','Email','Member');`);
+  const results = await Promise.all(Array.from({ length: 16 }, () => parallel(`select app_email_auth_limit('${email}','verify');`)));
+  assert.equal(results.filter(value => JSON.parse(value).allowed).length, 10);
+  assert.equal(query(`select verify_count from email_registration_drafts where auth_user_id='${authId}'`), '10');
+});
+
 test('parallel ready publication retries are unique per audience, not across the whole team', { skip: !port }, async () => {
   const { team, root, alice, bob } = fixture();
   query(`update users set can_publish_tasks=true,parent_user_id='${root}' where id in ('${alice}','${bob}');`);

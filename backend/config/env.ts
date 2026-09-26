@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+const runtimeEnv = process.env;
 
 export const serverEnv = {
   ceoPassword: process.env.CEO_PASSWORD || process.env.ADMIN_PASSWORD || "",
@@ -11,7 +12,10 @@ export const serverEnv = {
   telegramDeliverySecret: process.env.TELEGRAM_DELIVERY_SECRET,
   appUrl: process.env.NEXT_PUBLIC_APP_URL,
   authDevMode: process.env.AUTH_DEV_MODE === "true",
+  emailVerificationEnabled: process.env.AUTH_EMAIL_VERIFICATION_ENABLED === "true",
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  // Read at server startup, not baked into the GitHub-built release.
+  supabaseAnonKey: runtimeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
 };
 
