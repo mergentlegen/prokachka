@@ -73,7 +73,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
   }
   return { data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
     const program = programsById.get(String(task.program_id));
-    const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned) };
+    const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;
     const progress = existing.get(String(task.program_id));
     return { ...publication, unlocked_at: progress?.unlocked_at, due_at: progress?.due_at };

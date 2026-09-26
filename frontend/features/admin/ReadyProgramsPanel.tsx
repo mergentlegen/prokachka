@@ -53,12 +53,12 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
   const catalog = readyPrograms.map((item) => {
     const program = publications.get(item.key);
     return program ? {
-      ...item, published: true, publishedProgramId: program.id, publishedActive: program.isActive, publishedPinned: program.isPinned, publishedCreatedAt: program.createdAt,
+      ...item, published: true, publishedProgramId: program.id, publishedActive: program.isActive, publishedPinned: program.isPinned, publishedPinnedAt: program.pinnedAt, publishedCreatedAt: program.createdAt,
       canManage: canManageAll || program.publisherId === actorId,
     } : item;
   }).sort((a, b) => comparePublications(
-    { id: a.key, createdAt: a.publishedCreatedAt || "9999", isPinned: a.publishedActive && a.publishedPinned },
-    { id: b.key, createdAt: b.publishedCreatedAt || "9999", isPinned: b.publishedActive && b.publishedPinned },
+    { id: a.key, createdAt: a.publishedCreatedAt || "9999", isPinned: a.publishedActive && a.publishedPinned, pinnedAt: a.publishedPinnedAt },
+    { id: b.key, createdAt: b.publishedCreatedAt || "9999", isPinned: b.publishedActive && b.publishedPinned, pinnedAt: b.publishedPinnedAt },
   ));
   const normalizedQuery = query.trim().toLocaleLowerCase("ru");
   const visibleItems = catalog.filter((item) =>
@@ -84,7 +84,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
       const taskIds = new Set(addedTasks.map((task) => task.id));
       onChange([updated, ...programs.filter((program) => program.id !== updated.id)], [...addedTasks, ...tasks.filter((task) => !taskIds.has(task.id))]);
       setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? {
-        ...entry, published: true, publishedActive: updated.isActive, publishedProgramId: updated.id, publishedPinned: updated.isPinned, publishedCreatedAt: updated.createdAt, canManage: true,
+        ...entry, published: true, publishedActive: updated.isActive, publishedProgramId: updated.id, publishedPinned: updated.isPinned, publishedPinnedAt: updated.pinnedAt, publishedCreatedAt: updated.createdAt, canManage: true,
       } : entry));
       onError(updated.isActive ? "«" + item.title + "» добавлено в задания участников." : "«" + item.title + "» убрано из заданий. Результаты и мили сохранены.");
     } catch (error) {
@@ -98,7 +98,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
     try {
       const updated = await updateAdminProgram(item.publishedProgramId, { isPinned: !item.publishedPinned });
       onChange([...programs.filter((program) => program.id !== updated.id), updated], tasks);
-      setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? { ...entry, publishedPinned: updated.isPinned } : entry));
+      setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? { ...entry, publishedPinned: updated.isPinned, publishedPinnedAt: updated.pinnedAt } : entry));
     } catch (error) {
       setActionError({ key: item.key, message: error instanceof Error ? error.message : "Не удалось изменить закрепление." });
     } finally { setBusyKey(""); setPinning(false); }

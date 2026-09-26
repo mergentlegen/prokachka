@@ -12,7 +12,7 @@ export type ProgramInput = { teamId: string; title: string; deadlineHours: numbe
 export async function findPrograms(teamId?: string, viewer?: ProgramViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("task_programs").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: true });
+  let query = supabase.from("task_programs").select("*").order("is_pinned", { ascending: false }).order("pinned_at", { ascending: true }).order("created_at", { ascending: true });
   if (teamId) query = query.eq("team_id", teamId);
   const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };
@@ -33,7 +33,7 @@ export async function createProgram(input: ProgramInput) {
 export async function findReadyProgramPublications(teamId: string, audienceRootId: string | null = null) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const query = supabase.from("task_programs").select("id,template_key,is_active,publisher_id,audience_root_id,is_pinned,created_at").eq("team_id", teamId).not("template_key", "is", null);
+  const query = supabase.from("task_programs").select("id,template_key,is_active,publisher_id,audience_root_id,is_pinned,pinned_at,created_at").eq("team_id", teamId).not("template_key", "is", null);
   const result = await readPages((audienceRootId ? query.eq("audience_root_id", audienceRootId) : query.is("audience_root_id", null)).order("id"));
   return result.error ? { error: result.error } : { data: result.data || [] };
 }

@@ -14,7 +14,7 @@ type TaskInput = {
 export async function findTasks(teamId?: string, viewer?: TaskViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("tasks").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: true });
+  let query = supabase.from("tasks").select("*").order("is_pinned", { ascending: false }).order("pinned_at", { ascending: true }).order("created_at", { ascending: true });
   if (teamId) query = query.eq("team_id", teamId);
   const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };

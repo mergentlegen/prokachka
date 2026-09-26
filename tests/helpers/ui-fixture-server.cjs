@@ -120,7 +120,11 @@ http.createServer((req, res) => {
           if (!record) return json({ message: 'Fixture not found' }, 404);
           const patch = JSON.parse(body);
           if ('isActive' in patch) record.is_active = patch.isActive;
-          if ('isPinned' in patch) record.is_pinned = patch.isPinned;
+          if ('isPinned' in patch) {
+            if (patch.isPinned && !record.is_pinned) record.pinned_at = new Date().toISOString();
+            if (!patch.isPinned) record.pinned_at = null;
+            record.is_pinned = patch.isPinned;
+          }
           json({ ok: true, [kind === 'announcements' ? 'announcement' : kind === 'programs' ? 'program' : 'task']: record });
         }
         catch { json({ message: 'Invalid fixture request' }, 400); }
@@ -150,17 +154,17 @@ http.createServer((req, res) => {
       '/api/users': { users: people }, '/api/network': { users: people }, '/api/tasks': { tasks: [...tasks, ...(readyPublished && (!url.searchParams.has('view') || readyProgram.is_active) ? [game] : []), ...(rulesPublished && (!url.searchParams.has('view') || rulesProgram.is_active) ? [rulesGame] : []), ...(heartPublished && (!url.searchParams.has('view') || heartProgram.is_active) ? [heartGame] : [])].map((item) => {
         if (!url.searchParams.has('view') || !item.program_id) return item;
         const program = [readyProgram, rulesProgram, heartProgram, ...programs].find((entry) => entry.id === item.program_id);
-        return { ...item, is_pinned: Boolean(program?.is_pinned), program_title: program?.title };
+        return { ...item, is_pinned: Boolean(program?.is_pinned), pinned_at: program?.pinned_at || null, program_title: program?.title };
       }) },
       '/api/submissions': url.searchParams.has('summary') ? { counts: { pending: 0, accepted: 1, requests: 0 } } : { submissions: results },
       '/api/ranking': { ranking: [{ id: 'member', name: people[1].name, points }], starRanking: [{ id: 'member', name: people[1].name, points: 3 }] },
       '/api/programs': { programs: [...programs, ...(readyPublished ? [readyProgram] : []), ...(rulesPublished ? [rulesProgram] : []), ...(heartPublished ? [heartProgram] : [])] }, '/api/programs/history': { programs: [] }, '/api/publication-history': { history: [] },
       '/api/ready-programs': { readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...item }) => {
-        if (item.key === 'heart-survey') return { ...item, published: heartPublished, publishedProgramId: heartPublished ? heartProgram.id : undefined, publishedActive: heartPublished && heartProgram.is_active, canManage: heartPublished };
+        if (item.key === 'heart-survey') return { ...item, published: heartPublished, publishedProgramId: heartPublished ? heartProgram.id : undefined, publishedActive: heartPublished && heartProgram.is_active, publishedPinned: heartProgram.is_pinned, publishedPinnedAt: heartProgram.pinned_at, publishedCreatedAt: heartProgram.created_at, canManage: heartPublished };
         const rules = item.key === 'starter-rules';
         const published = rules ? rulesPublished : readyPublished;
         const program = rules ? rulesProgram : readyProgram;
-        return { ...item, published, publishedProgramId: published ? program.id : undefined, publishedActive: published && program.is_active, publishedPinned: program.is_pinned, publishedCreatedAt: program.created_at, canManage: published };
+        return { ...item, published, publishedProgramId: published ? program.id : undefined, publishedActive: published && program.is_active, publishedPinned: program.is_pinned, publishedPinnedAt: program.pinned_at, publishedCreatedAt: program.created_at, canManage: published };
       }) },
       '/api/stars': { awards: [] }, '/api/team-requests': { requests: [] }, '/api/announcements': { announcements },
       '/api/welcome-video': { required: false }, '/api/telegram/link/status': { linked: false },
