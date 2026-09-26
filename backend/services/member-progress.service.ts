@@ -38,6 +38,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
   }
   const programIds = new Set(programs.map((program) => String(program.id)));
   return { data: tasks.filter((task) => {
+    if (task.program_id && !programIds.has(String(task.program_id))) return false;
     if (task.publication_type === "evergreen") return true;
     if (task.publication_type === "fixed") return !task.deadline_at || !joinedAt || new Date(task.deadline_at).getTime() >= new Date(joinedAt).getTime();
     if (!programIds.has(String(task.program_id))) return false;

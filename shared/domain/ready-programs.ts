@@ -22,7 +22,7 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
   {
     key: "dream-plan",
     title: "Мечта с планом",
-    eyebrow: "Интерактивная программа",
+    eyebrow: "Игра и тест",
     description: "Мини-игра о двух путях к круизу и пять вопросов о привычках, которые помогают увидеть силу плана.",
     badge: "Без дедлайна",
     taskCount: 1,

@@ -19,7 +19,8 @@ function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" 
 }
 export function TasksView({ store, actorId, canManageAll, onToggle, onEdit, onRemove }: { store: Store; actorId: string; canManageAll: boolean; onToggle: (id: string) => void; onEdit: (task?: Task) => void; onRemove: (task: Task) => void }) {
   const [kind, setKind] = useState<"regular" | "programs">("regular");
-  const tasks = [...store.tasks].filter((task) => kind === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const readyProgramIds = new Set(store.programs.filter((program) => program.templateKey).map((program) => program.id));
+  const tasks = [...store.tasks].filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && (kind === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential")).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return <><TaskKindSwitch value={kind} onChange={setKind} /><div className="admin-panel table-panel">{tasks.length === 0 ? <EmptyAdmin text={kind === "programs" ? "Программ пока нет." : "Обычных заданий пока нет."} /> : tasks.map((task) => {
     const status = !task.isActive ? "inactive" : isTaskExpired(task) ? "expired" : "active";
     const taskMeta = task.publicationType === "sequential" ? "Программа · шаг " + (task.position || "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";

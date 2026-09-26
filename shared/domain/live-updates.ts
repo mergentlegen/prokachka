@@ -17,6 +17,7 @@ export function resourceTopics(url: string): ChangeTopic[] {
   if (path === "/api/programs/history") return ["programs", "tasks", "submissions", "users", "network"];
   if (path === "/api/publication-history") return ["programs", "tasks", "announcements", "users", "network"];
   if (path === "/api/programs") return ["programs", "tasks", "network"];
+  if (path === "/api/ready-programs") return ["programs", "tasks", "network"];
   if (path === "/api/announcements") return ["announcements", "network"];
   if (path === "/api/stars") return ["stars", "users", "network"];
   if (path === "/api/users") return ["users", "network"];
@@ -35,6 +36,7 @@ export function mutationTopics(url: string, method: string): ChangeTopic[] {
   if (url.startsWith("/api/stars")) return ["stars"];
   if (url.startsWith("/api/announcements")) return ["announcements"];
   if (url.startsWith("/api/ready-programs/")) return ["submissions", "tasks", "programs"];
+  if (url === "/api/ready-programs") return ["tasks", "programs"];
   // Preparing a Telegram answer does not yet create a submission.
   if (url.startsWith("/api/submissions/") && method !== "GET") return ["submissions", "tasks"];
   return [];

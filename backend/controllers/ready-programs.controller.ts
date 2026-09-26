@@ -23,7 +23,8 @@ export async function listReadyPrograms(request: Request) {
   const published = new Map(result.data.map((row) => [String(row.template_key), row]));
   return ok({ readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...program }) => {
     const row = published.get(program.key);
-    return { ...program, published: Boolean(row), publishedProgramId: row ? String(row.id) : undefined, publishedActive: row ? Boolean(row.is_active) : undefined };
+    return { ...program, published: Boolean(row), publishedProgramId: row ? String(row.id) : undefined, publishedActive: row ? Boolean(row.is_active) : undefined,
+      canManage: Boolean(row && canPublish(user) && (user.role === "admin" || user.role === "ceo" || row.publisher_id === user.id)) };
   }) });
 }
 

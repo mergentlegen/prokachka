@@ -73,6 +73,8 @@ test('mutation dependency graph covers ranking/history/queue without invalidatin
   assert.ok(resourceTopics('/api/submissions?summary=1').includes('requests'));
   assert.ok(resourceTopics('/api/programs/history').includes('submissions'));
   assert.ok(resourceTopics('/api/publication-history').includes('announcements'));
+  assert.deepEqual(mutationTopics('/api/ready-programs', 'POST'), ['tasks', 'programs']);
+  assert.ok(resourceTopics('/api/ready-programs').includes('programs'));
   assert.deepEqual(mutationTopics('/api/submissions', 'POST'), [], 'opening Telegram is not submitting a completed answer');
 });
 

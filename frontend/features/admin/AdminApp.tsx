@@ -14,6 +14,7 @@ import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
+import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { WelcomeVideoSettingsPanel } from "@/frontend/features/admin/WelcomeVideoSettingsPanel";
 import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
@@ -362,7 +363,10 @@ export function AdminApp() {
       <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}</div></div>
         <SectionBoundary loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
-        {section === "tasks" && <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />}
+        {section === "tasks" && <div className="programs-panel">
+          <ReadyProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />
+          <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} />
+        </div>}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
         {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}

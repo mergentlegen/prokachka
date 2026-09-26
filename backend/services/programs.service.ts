@@ -33,7 +33,7 @@ export async function createProgram(input: ProgramInput) {
 export async function findReadyProgramPublications(teamId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await supabase.from("task_programs").select("id,template_key,is_active").eq("team_id", teamId).not("template_key", "is", null);
+  const result = await readPages(supabase.from("task_programs").select("id,template_key,is_active,publisher_id").eq("team_id", teamId).not("template_key", "is", null).order("id"));
   return result.error ? { error: result.error } : { data: result.data || [] };
 }
 

@@ -64,7 +64,7 @@ export async function updateAdminProgram(id: string, input: { title?: string; de
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
 export async function deleteAdminProgram(id: string): Promise<boolean> { const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>("/api/programs/" + id, { method: "DELETE" }); return Boolean(response.storageCleanupWarning); }
-export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean };
+export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; canManage?: boolean };
 export async function loadReadyPrograms(): Promise<ReadyProgramStatus[]> {
   const response = await request<ApiResponse<{ readyPrograms: ReadyProgramStatus[] }>>("/api/ready-programs");
   return response.readyPrograms || [];
