@@ -9,3 +9,6 @@
 \ir 20260925-ready-programs.sql
 \ir 20260925-ready-program-quiz-retry.sql
 \ir 20260926-task-attachments.sql
+\ir 20260926-welcome-videos.sql
+\ir 20260926-welcome-video-branch-model.sql
+\ir 20260926-welcome-video-tus-auth.sql

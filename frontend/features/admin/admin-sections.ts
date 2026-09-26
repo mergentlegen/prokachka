@@ -1,6 +1,6 @@
 import type { AdminDataset } from "@/frontend/shared/api/admin-client";
 
-export type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars" | "network";
+export type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "requests" | "announcements" | "stars" | "network" | "welcome-video";
 
 export const sectionDatasets: Record<AdminSection, readonly AdminDataset[]> = {
   dashboard: ["users", "tasks", "submissions"],
@@ -12,4 +12,5 @@ export const sectionDatasets: Record<AdminSection, readonly AdminDataset[]> = {
   announcements: ["announcements"],
   stars: ["users", "starAwards"],
   network: [],
+  "welcome-video": [],
 };

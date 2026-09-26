@@ -29,8 +29,75 @@ create table public.users (
   can_review boolean not null default false,
   can_publish_tasks boolean not null default false,
   can_invite_members boolean not null default false,
+  welcome_video_completed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+create table public.welcome_videos (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams(id) on delete cascade,
+  owner_user_id uuid not null references public.users(id) on delete cascade,
+  storage_path text not null unique,
+  file_name text not null check (char_length(file_name) between 1 and 180),
+  size_bytes bigint not null check (size_bytes between 1024 and 52428800),
+  duration_seconds numeric(7,2) not null check (duration_seconds > 0 and duration_seconds <= 180),
+  width integer not null,
+  height integer not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint welcome_video_dimensions_sane check (width between 1 and 7680 and height between 1 and 7680)
+);
+create unique index welcome_videos_owner_unique_idx on public.welcome_videos(team_id, owner_user_id);
+alter table public.welcome_videos enable row level security;
+revoke all on public.welcome_videos from anon, authenticated, public;
+grant select, insert, update, delete on public.welcome_videos to service_role;
+create table public.welcome_video_upload_intents (
+  storage_path text primary key,
+  team_id uuid not null references public.teams(id) on delete cascade,
+  owner_user_id uuid not null references public.users(id) on delete cascade,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+create index welcome_video_upload_intents_expiry_idx on public.welcome_video_upload_intents(expires_at);
+alter table public.welcome_video_upload_intents enable row level security;
+revoke all on public.welcome_video_upload_intents from public, anon, authenticated;
+grant select, insert, update, delete on public.welcome_video_upload_intents to service_role;
+create function public.welcome_video_upload_path_allowed(p_storage_path text)
+returns boolean language sql stable security definer set search_path = public, pg_temp as $$
+  select exists (select 1 from public.welcome_video_upload_intents i
+    where i.storage_path = p_storage_path and i.expires_at > statement_timestamp());
+$$;
+revoke all on function public.welcome_video_upload_path_allowed(text) from public;
+grant execute on function public.welcome_video_upload_path_allowed(text) to anon, authenticated, service_role;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('welcome-videos', 'welcome-videos', false, 52428800, array['video/mp4'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+create policy welcome_video_upload_insert_guard on storage.objects as restrictive for insert to anon, authenticated
+  with check (bucket_id <> 'welcome-videos' or public.welcome_video_upload_path_allowed(name));
+create policy welcome_video_upload_insert_intent on storage.objects as permissive for insert to anon, authenticated
+  with check (bucket_id = 'welcome-videos' and public.welcome_video_upload_path_allowed(name));
+create policy welcome_videos_select_server_only on storage.objects as restrictive for select to anon, authenticated
+  using (bucket_id <> 'welcome-videos');
+create policy welcome_videos_update_server_only on storage.objects as restrictive for update to anon, authenticated
+  using (bucket_id <> 'welcome-videos') with check (bucket_id <> 'welcome-videos');
+create policy welcome_videos_delete_server_only on storage.objects as restrictive for delete to anon, authenticated
+  using (bucket_id <> 'welcome-videos');
+create or replace function public.app_set_welcome_video(
+  p_team_id uuid, p_owner_user_id uuid, p_storage_path text, p_file_name text,
+  p_size_bytes bigint, p_duration_seconds numeric, p_width integer, p_height integer
+) returns text language plpgsql security definer set search_path = public as $$
+declare previous_path text;
+begin
+  select storage_path into previous_path from public.welcome_videos where team_id = p_team_id and owner_user_id = p_owner_user_id for update;
+  insert into public.welcome_videos(team_id, owner_user_id, storage_path, file_name, size_bytes, duration_seconds, width, height)
+  values (p_team_id, p_owner_user_id, p_storage_path, p_file_name, p_size_bytes, p_duration_seconds, p_width, p_height)
+  on conflict (team_id, owner_user_id) do update set storage_path=excluded.storage_path, file_name=excluded.file_name,
+    size_bytes=excluded.size_bytes, duration_seconds=excluded.duration_seconds, width=excluded.width, height=excluded.height;
+  return previous_path;
+end;
+$$;
+revoke all on function public.app_set_welcome_video(uuid,uuid,text,text,bigint,numeric,integer,integer) from public, anon, authenticated;
+grant execute on function public.app_set_welcome_video(uuid,uuid,text,text,bigint,numeric,integer,integer) to service_role;
 
 create unique index users_email_lower_unique_idx on public.users (lower(email));
 create table public.announcements (
@@ -147,6 +214,7 @@ create or replace function public.touch_updated_at() returns trigger language pl
 begin new.updated_at = now(); return new; end; $$;
 create trigger tasks_touch_updated_at before update on public.tasks for each row execute procedure public.touch_updated_at();
 create trigger announcements_touch_updated_at before update on public.announcements for each row execute procedure public.touch_updated_at();
+create trigger welcome_videos_touch_updated_at before update on public.welcome_videos for each row execute function public.touch_updated_at();
 
 -- All database access currently goes through server routes and service role.
 -- Never expose SUPABASE_SERVICE_ROLE_KEY to the browser.

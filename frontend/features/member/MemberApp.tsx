@@ -10,6 +10,7 @@ import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { userScope } from "@/shared/domain/live-updates";
 import { useMemberData, type MemberTab } from "./use-member-data";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
+import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
 import { TeamSelectionScreen } from "@/frontend/features/teams/TeamSelectionScreen";
 import { formatDate, formatMiles, milesUnit } from "@/frontend/shared/lib/format";
 import { ApiError, authFetch, clearDevSession, createMemberSubmission, createTelegramLink, loadTelegramLinkStatus, mapAuthUserToUser, refreshAuthSession } from "@/frontend/shared/api/client";
@@ -230,7 +231,7 @@ export function MemberApp() {
   }} />;
   if (!user) return <AuthScreen onAuthenticated={handleAuthenticated} />;
 
-  return <main className={`app-shell member-shell member-tab-${tab === "profile" ? previousTab : tab}`}>
+  return <><main className={`app-shell member-shell member-tab-${tab === "profile" ? previousTab : tab}`}>
     <header className="topbar"><a className="brand" href="/" aria-label="На главную"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="topbar-actions">{hasMentorAccess(user) && <a className="mentor-link" href="/admin">Панель наставника</a>}<button className="logout-link" onClick={logout}>Выйти</button><button className="avatar-button" onClick={() => navigate("profile")} aria-label="Открыть профиль">{initials(user.name)}</button></div></header>
     <div className="member-layout"><MemberSidebar tab={tab} onChange={navigate} /><div className="member-main">
     <section className="welcome-section page-width"><div><h1>Привет, {user.name.split(" ")[0]} <span className="wave">⌁</span></h1></div><div className="score-card"><span className="score-label">Общий результат</span><div className={"score-value " + (ratingType === "stars" ? "is-stars" : "")}><strong>{ratingType === "stars" ? currentStars : currentPoints}</strong><span className="score-unit">{ratingType === "stars" ? "★ звёзд" : milesUnit(currentPoints)}</span></div><span className="rank-line">{currentRank ? `${currentRank} место в рейтинге` : "Пока нет места в рейтинге"} <i>↗</i></span></div></section>
@@ -242,7 +243,7 @@ export function MemberApp() {
     {tab === "profile" && <ProfileModal loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onClose={closeProfile} onLogout={logout} />}
     {showLogin && <div className="modal-backdrop" onClick={() => setShowLogin(false)}><div className="simple-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}>×</button><p className="eyebrow">Нужна идентификация</p><h2>Сначала представься</h2><p>Войди или создай аккаунт, чтобы отправить работу.</p><button className="primary-button full" onClick={() => { setShowLogin(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Перейти ко входу</button></div></div>}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
-  </main>;
+  </main><WelcomeVideoGate user={user} /></>;
 }
 
 function EmptyState({ text }: { text: string }) { return <div className="empty-state"><span>◌</span><p>{text}</p></div>; }

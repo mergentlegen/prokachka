@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const supabaseUrl = (() => {
+  try { return process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL) : null; }
+  catch { return null; }
+})();
+const supabaseSources = supabaseUrl ? [supabaseUrl.origin] : [];
+if (supabaseUrl) {
+  const project = supabaseUrl.hostname.match(/^([^.]+)\.supabase\.co$/)?.[1];
+  if (project) supabaseSources.push(`https://${project}.storage.supabase.co`);
+}
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -8,11 +17,11 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "object-src 'none'",
   "img-src 'self' data: blob: https://i.ytimg.com",
-  "media-src 'self' blob:",
+  `media-src 'self' blob: ${supabaseSources.join(" ")}`.trim(),
   "font-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline'" + (isDevelopment ? " 'unsafe-eval'" : ""),
-  "connect-src 'self' ws: wss:",
+  `connect-src 'self' ws: wss: ${supabaseSources.join(" ")}`.trim(),
 ].join("; ");
 
 const securityHeaders = [
