@@ -136,6 +136,7 @@ export async function session(request: Request) {
 
   const currentUser = user.id === "ceo" ? user : await findAccountById(user.id);
   if (!currentUser) return failure("Пользователь не найден.", 401);
+  if ((currentUser.sessionVersion || 0) !== (user.sessionVersion || 0)) return failure("Пароль изменён. Войдите в аккаунт заново.", 401);
 
   return ok({
     user: currentUser,

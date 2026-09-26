@@ -2,9 +2,10 @@ import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { createTeam, deleteTeam, findTeams, removeTeam, updateTeam } from "@/backend/services/teams.service";
+import { getCurrentUser } from "@/backend/http/current-user";
 
 export async function listTeams(request: Request) {
-  const user = getRequestUser(request);
+  const user = await getCurrentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   const result = await findTeams(user.role === "ceo");
   if ("unavailable" in result) return failure("База данных не настроена.", 503);

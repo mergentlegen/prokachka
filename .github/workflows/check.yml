@@ -98,6 +98,7 @@ jobs:
       - name: Database integration and concurrent requests
         run: |
           psql -X -v ON_ERROR_STOP=1 -f tests/email-auth.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/password-recovery.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/telegram-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/architecture-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/live-updates.sql

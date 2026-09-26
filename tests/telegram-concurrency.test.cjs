@@ -22,6 +22,32 @@ function fixture() {
   return { team, root, alice, bob, task };
 }
 
+test('parallel recovery submissions have exactly one active claim and revoke old sessions once', { skip: !port }, async () => {
+  const { alice } = fixture();
+  const authId = randomUUID(), tokenHash = require('node:crypto').createHash('sha256').update(randomUUID()).digest('hex');
+  query(`insert into auth.users(id,email,email_confirmed_at) values('${authId}','${alice}@fixture.test',now());
+    select app_issue_password_recovery('${alice}','${authId}','${tokenHash}',repeat('encrypted-fixture',4));`);
+  const leases = Array.from({ length: 8 }, () => randomUUID());
+  const results = await Promise.all(leases.map(lease => parallel(`select app_claim_password_recovery('${tokenHash}','${lease}');`)));
+  const statuses = results.map(value => JSON.parse(value).status);
+  assert.equal(statuses.filter(status => status === 'ok').length, 1);
+  assert.equal(statuses.filter(status => status === 'busy').length, 7);
+  const winner = leases[statuses.indexOf('ok')];
+  const finished = await Promise.allSettled(Array.from({ length: 4 }, () => parallel(`select app_finish_password_recovery('${tokenHash}','${winner}');`)));
+  assert.equal(finished.filter(result => result.status === 'fulfilled').length, 1);
+  assert.equal(query(`select session_version from users where id='${alice}'`), '1');
+  assert.equal(query(`select count(*) from password_recovery_grants where account_id='${alice}'`), '0');
+});
+
+test('parallel recovery requests enforce persistent email limits', { skip: !port }, async () => {
+  const emailHash = require('node:crypto').createHash('sha256').update(randomUUID()).digest('hex');
+  const sent = await Promise.all(Array.from({ length: 8 }, () => parallel(`select app_password_recovery_limit('${emailHash}','send');`)));
+  assert.equal(sent.filter(value => JSON.parse(value).allowed).length, 1);
+  const verified = await Promise.all(Array.from({ length: 16 }, () => parallel(`select app_password_recovery_limit('${emailHash}','verify');`)));
+  assert.equal(verified.filter(value => JSON.parse(value).allowed).length, 10);
+  assert.equal(query(`select verify_count from password_recovery_limits where email_hash='${emailHash}'`), '10');
+});
+
 test('parallel email completion produces one account and one mentor request', { skip: !port }, async () => {
   const { team, root } = fixture();
   const authId = randomUUID(), inviteId = randomUUID();

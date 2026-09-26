@@ -25,7 +25,7 @@ export type User = {
   id: string; name: string; firstName?: string; lastName?: string; avatarUrl?: string; profileVersion?: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string;
   parentUserId?: string; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean; createdAt: string;
 };
-export type AuthUser = Pick<User, "id" | "name" | "firstName" | "lastName" | "avatarUrl" | "profileVersion" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers">;
+export type AuthUser = Pick<User, "id" | "name" | "firstName" | "lastName" | "avatarUrl" | "profileVersion" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers"> & { sessionVersion?: number };
 
 export type TaskProgram = {
   id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; pinnedAt?: string; publisherId?: string; audienceRootId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;

@@ -37,6 +37,7 @@ export async function updateOwnProfile(request: Request) {
   if ("error" in result) return failure("Не удалось сохранить профиль. Попробуйте ещё раз.", 500);
   const updated = await findAccountById(user.id);
   if (!updated) return failure("Профиль сохранён, но не удалось обновить данные. Обновите страницу.", 503);
+  if ((updated.sessionVersion || 0) !== (user.sessionVersion || 0)) return failure("Пароль изменён. Войдите в аккаунт заново.", 401);
   const session = createSession(updated);
   const response = ok({ user: updated, ...(serverEnv.authDevMode ? { session } : {}) });
   if (!serverEnv.authDevMode) response.headers.set("Set-Cookie", sessionCookie(session));

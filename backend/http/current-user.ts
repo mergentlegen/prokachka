@@ -19,6 +19,6 @@ async function resolveUser(request: Request): Promise<AuthUser | null> {
   if (!session) return null;
   if (session.id === "ceo" && session.role === "ceo") return session;
   const current = await findAccountById(session.id);
-  if (current) return current;
+  if (current) return (current.sessionVersion || 0) === (session.sessionVersion || 0) ? current : null;
   return process.env.NODE_ENV !== "production" && !process.env.NEXT_PUBLIC_SUPABASE_URL ? session : null;
 }

@@ -140,6 +140,19 @@ test('profile API uses the fresh authenticated account and never accepts caller 
   assert.equal(calls.length, 1);
 });
 
+test('an in-flight profile update cannot renew a session revoked by a password reset', async () => {
+  const api = controller({ id: ownId, sessionVersion: 0 }, {
+    '@/backend/services/profile.service': { saveOwnProfile: async () => ({ data: true }) },
+    '@/backend/services/auth.service': {
+      findAccountById: async () => ({ id: ownId, sessionVersion: 1 }),
+      createSession: () => assert.fail('revoked session was renewed'),
+    },
+  });
+  const result = await api.updateOwnProfile(profileRequest());
+  assert.equal(result.status, 401);
+  assert.equal(result.headers.get('set-cookie'), null);
+});
+
 test('concurrent edits return a conflict; a lost RPC response never deletes a possibly active photo', async () => {
   const steps = [];
   const query = new Proxy({}, { get: (_, key) => key === 'then' ? resolve => resolve({ error: null }) : (...args) => { steps.push([key, ...args]); return query; } });

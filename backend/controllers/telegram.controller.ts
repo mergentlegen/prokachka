@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { failure, ok } from "@/backend/http/api-response";
-import { getRequestUser } from "@/backend/http/auth-guard";
+import { getCurrentUser } from "@/backend/http/current-user";
 import { isValidTelegramSecret, serverEnv } from "@/backend/config/env";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { attachTelegramSubmission, beginTelegramSubmission } from "@/backend/services/telegram-submission.service";
@@ -21,7 +21,7 @@ const telegramLinkWelcomeMessage = [
 
 
 export async function createTelegramLink(request: Request) {
-  const user = getRequestUser(request);
+  const user = await getCurrentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   if (user.role === "ceo") return failure("Для CEO привязка Telegram пока не требуется.", 400);
   if (!botUsername() || !serverEnv.telegramBotToken) return failure("Telegram-бот пока не настроен.", 503);
@@ -34,7 +34,7 @@ export async function createTelegramLink(request: Request) {
 }
 
 export async function telegramLinkStatus(request: Request) {
-  const user = getRequestUser(request);
+  const user = await getCurrentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   if (user.role === "ceo") return ok({ linked: false });
   const supabase = getSupabaseAdmin();
@@ -45,8 +45,8 @@ export async function telegramLinkStatus(request: Request) {
 }
 
 /** Old task-only deep links cannot prove which website account selected the task. */
-export function startTelegram(request: Request) {
-  if (!getRequestUser(request)) return failure("Сначала войдите в аккаунт.", 401);
+export async function startTelegram(request: Request) {
+  if (!await getCurrentUser(request)) return failure("Сначала войдите в аккаунт.", 401);
   return failure("Обновите страницу сайта и нажмите «Отправить работу» ещё раз.", 410);
 }
 

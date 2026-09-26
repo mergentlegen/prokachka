@@ -14,6 +14,12 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+export function validatePassword(password: unknown) {
+  if (typeof password !== "string" || password.length < 6) return "Пароль должен содержать минимум 6 символов.";
+  if (password.length > 1024) return "Пароль должен содержать не больше 1024 символов.";
+  return null;
+}
+
 function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -57,18 +63,24 @@ export function publicUser(row: Record<string, unknown>): AuthUser {
     canReview: Boolean(row.can_review),
     canPublishTasks: Boolean(row.can_publish_tasks),
     canInviteMembers: Boolean(row.can_invite_members),
+    sessionVersion: Number(row.session_version) || 0,
   };
 }
 
 export async function findAccountById(id: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase || !/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const { data, error } = await supabase
+  const fields = "id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members";
+  let result = await supabase
     .from("users")
-    .select("id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members")
+    .select(fields + ",session_version")
     .eq("id", id)
     .maybeSingle();
-  return error || !data ? null : publicUser((await withAvatarUrls([data]))[0]);
+  if (result.error?.code === "42703" && result.error.message.includes("session_version")) {
+    result = await supabase.from("users").select(fields).eq("id", id).maybeSingle();
+  }
+  const { data, error } = result;
+  return error || !data ? null : publicUser((await withAvatarUrls([data as unknown as Record<string, unknown>]))[0]);
 }
 
 export function getSessionToken(request: Request) {
@@ -108,11 +120,7 @@ export function validateRegistration(
   ) {
     return "Введите корректный email.";
   }
-  if (typeof password !== "string" || password.length < 6 || password.length > 1024) {
-    if (typeof password === "string" && password.length > 1024) return "Пароль должен содержать не больше 1024 символов.";
-    return "Пароль должен содержать минимум 6 символов.";
-  }
-  return null;
+  return validatePassword(password);
 }
 
 export function validateLoginCredentials(email: unknown, password: unknown) {
@@ -123,11 +131,7 @@ export function validateLoginCredentials(email: unknown, password: unknown) {
   ) {
     return "Введите корректный email.";
   }
-  if (typeof password !== "string" || password.length < 6 || password.length > 1024) {
-    if (typeof password === "string" && password.length > 1024) return "Пароль должен содержать не больше 1024 символов.";
-    return "Пароль должен содержать минимум 6 символов.";
-  }
-  return null;
+  return validatePassword(password);
 }
 
 export async function registerAccount(
@@ -226,7 +230,12 @@ export async function authenticateAccount(email: string, password: string) {
     let error: { message?: string } | null = null;
     const accountFields = "id,name,first_name,last_name,avatar_path,profile_updated_at,email,login,telegram_id,role,team_id,team_joined_at,parent_user_id,can_review,can_publish_tasks,can_invite_members,password_hash";
     async function lookup(field: "email" | "login") {
-      const result = await supabase!.from("users").select(accountFields + ",auth_user_id").eq(field, normalizedEmail).maybeSingle();
+      let fields = accountFields + ",auth_user_id,session_version";
+      let result = await supabase!.from("users").select(fields).eq(field, normalizedEmail).maybeSingle();
+      if (result.error?.code === "42703" && result.error.message.includes("session_version")) {
+        fields = accountFields + ",auth_user_id";
+        result = await supabase!.from("users").select(fields).eq(field, normalizedEmail).maybeSingle();
+      }
       // Rolling deployment before the additive migration is safe only while the
       // new signup flow is disabled. Do not mask any other database error.
       if (!serverEnv.emailVerificationEnabled && result.error?.code === "42703" && result.error.message.includes("auth_user_id")) {
