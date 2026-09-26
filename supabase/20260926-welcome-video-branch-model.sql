@@ -50,6 +50,7 @@ alter table public.welcome_videos add constraint welcome_videos_size_bytes_check
 alter table public.welcome_videos drop constraint if exists welcome_video_landscape_16_9;
 alter table public.welcome_videos drop constraint if exists welcome_videos_width_check;
 alter table public.welcome_videos drop constraint if exists welcome_videos_height_check;
+alter table public.welcome_videos drop constraint if exists welcome_video_dimensions_sane;
 alter table public.welcome_videos add constraint welcome_video_dimensions_sane
   check (width between 1 and 7680 and height between 1 and 7680);
 
