@@ -8,6 +8,7 @@ export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
 export type ReadyProgramKey = "dream-plan";
 export type TaskInteractiveKind = "dream-plan";
+export type TaskAttachment = { id: string; fileName: string; contentType: "application/pdf"; sizeBytes: number; createdAt: string };
 
 export type Team = {
   id: string; name: string; description: string; isActive: boolean; createdAt: string;
@@ -32,6 +33,7 @@ export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; createdAt: string; updatedAt: string;
+  attachments?: TaskAttachment[];
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; createdAt: string; updatedAt: string;

@@ -1,0 +1,15 @@
+.section { display:grid; gap:10px; margin:4px 0; padding:14px; border:1px solid #dfe6f0; border-radius:12px; background:#fafbfd; }
+.section>div strong { color:#172944; font-size:14px; }
+.section>div p { margin:4px 0 0; color:#758198; font-size:12px; line-height:1.5; }
+.input { display:none; }
+.section>button { justify-self:start; min-height:40px; }
+.warning { margin:0; color:#aa3f3f; font-size:12px; }
+.files { display:grid; gap:7px; margin:0; padding:0; list-style:none; }
+.files li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:8px; padding:9px; border:1px solid #e3e9f1; border-radius:9px; background:white; }
+.files li>span { display:flex; align-items:center; gap:9px; min-width:0; }
+.files li>span>b { display:grid; place-items:center; width:34px; height:36px; flex:none; border-radius:7px; background:#fff0ed; color:#bd493b; font-size:9px; }
+.files li>span>span { display:grid; min-width:0; gap:3px; }
+.files li strong { overflow:hidden; color:#263751; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.files li small { color:#7a879a; font-size:10px; }
+.files li button { padding:7px; flex:none; border:0; background:transparent; color:#b24343; font:inherit; font-size:11px; cursor:pointer; }
+@media(max-width:560px) { .files li { grid-template-columns:minmax(0,1fr) auto; } .files li>span { grid-column:1/-1; } }

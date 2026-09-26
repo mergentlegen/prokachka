@@ -8,3 +8,4 @@
 \ir 20260919-live-updates.sql
 \ir 20260925-ready-programs.sql
 \ir 20260925-ready-program-quiz-retry.sql
+\ir 20260926-task-attachments.sql

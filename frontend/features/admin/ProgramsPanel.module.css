@@ -1,0 +1,4 @@
+.selectedFiles { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.selectedFiles li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#4e5e76; font-size:12px; }
+.selectedFiles li span { min-width:0; overflow-wrap:anywhere; }
+.selectedFiles li button { flex:none; border:0; background:transparent; color:#ad4141; font:inherit; cursor:pointer; }

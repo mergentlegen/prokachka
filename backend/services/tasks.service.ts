@@ -1,6 +1,7 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { removeAttachmentPaths } from "@/backend/services/task-attachments.service";
 
 type TaskViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
 
@@ -76,8 +77,12 @@ export async function deleteTask(id: string, actor?: TaskViewer) {
   if (current.error || !current.data) return { forbidden: true as const };
   const canDelete = actor?.role === "ceo" || (Boolean(actor?.teamId) && current.data.team_id === actor?.teamId && (actor?.role === "admin" || (actor?.canPublishTasks === true && current.data.publisher_id === actor.id)));
   if (!canDelete) return { forbidden: true as const };
+  const attachments = await supabase.from("task_attachments").select("storage_path").eq("task_id", id);
+  if (attachments.error) return { error: attachments.error };
   let query = supabase.from("tasks").delete().eq("id", id);
   if (actor?.role !== "ceo" && actor?.teamId) query = query.eq("team_id", actor.teamId);
-  const result = await query;
-  return result.error ? { error: result.error } : { data: true };
+  const result = await query.select("id");
+  if (result.error) return { error: result.error };
+  const cleanup = await removeAttachmentPaths((attachments.data || []).map((row) => String(row.storage_path)));
+  return { data: true, storageCleanupWarning: cleanup.warning };
 }

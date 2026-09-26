@@ -3,6 +3,7 @@ import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
 import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from "@/backend/services/tasks.service";
+import { listTaskAttachments } from "@/backend/services/task-attachments.service";
 
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
@@ -27,13 +28,19 @@ export async function listTasks(request: Request) {
     const result = await getMemberTaskFeed(user.id, teamId, user.teamJoinedAt);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("error" in result) return failure("Не удалось загрузить задания.");
-    return ok({ tasks: result.data });
+    const attachments = await listTaskAttachments(result.data.map((task) => String(task.id)));
+    if ("unavailable" in attachments) return failure("База данных не настроена.", 503);
+    if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
+    return ok({ tasks: result.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [] })) });
   }
   if ((user.role === "admin" || user.role === "member") && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "ceo" ? undefined : user.teamId, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("error" in result) return failure("Не удалось загрузить задания.");
-  return ok({ tasks: result.data });
+  const attachments = await listTaskAttachments(result.data.map((task) => String(task.id)));
+  if ("unavailable" in attachments) return failure("База данных не настроена.", 503);
+  if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
+  return ok({ tasks: result.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [] })) });
 }
 
 export async function createTask(request: Request) {
@@ -104,5 +111,5 @@ export async function deleteTask(request: Request, id: string) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этому заданию.", 403);
   if (result.error) return failure("Не удалось удалить задание.");
-  return ok({});
+  return ok({ storageCleanupWarning: result.storageCleanupWarning });
 }

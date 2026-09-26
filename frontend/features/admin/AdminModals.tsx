@@ -1,12 +1,13 @@
 "use client";
 import type { FormEvent } from "react";
-import type { Task } from "@/shared/domain/types";
+import type { Task, TaskAttachment } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
+import { TaskFilePicker } from "./TaskFilePicker";
 import { formatMiles } from "@/frontend/shared/lib/format";
 export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 export type ReviewDraft = { points: string; comment: string };
 
-export function TaskEditorModal({ draft, editing, busy, onChange, onClose, onSubmit }: { draft: TaskDraft; editing: boolean; busy: boolean; onChange: (key: keyof TaskDraft, value: string | boolean) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+export function TaskEditorModal({ taskId, draft, editing, busy, attachments, files, onFilesChange, onRemoveAttachment, onChange, onClose, onSubmit }: { taskId?: string; draft: TaskDraft; editing: boolean; busy: boolean; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void; onChange: (key: keyof TaskDraft, value: string | boolean) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return <div className="modal-backdrop" onMouseDown={onClose}><form className="editor-modal admin-form-modal" onSubmit={onSubmit} onMouseDown={(event) => event.stopPropagation()}>
     <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
     <p className="eyebrow">{editing ? "Редактирование" : "Новое задание"}</p>
@@ -15,6 +16,7 @@ export function TaskEditorModal({ draft, editing, busy, onChange, onClose, onSub
     <label>Описание<textarea value={draft.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Что нужно сделать участнику" rows={4} /></label>
     <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
     <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
+    <TaskFilePicker taskId={taskId} attachments={attachments} files={files} disabled={busy} onFilesChange={onFilesChange} onRemove={onRemoveAttachment} />
     <div className="form-two-columns">
     <label>Максимум миль<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
       <label className="deadline-toggle"><span>Дедлайн</span><span className="switch-line"><input type="checkbox" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /><span>{draft.hasDeadline ? "Установлен" : "Без дедлайна"}</span></span></label>

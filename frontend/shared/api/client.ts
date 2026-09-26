@@ -1,4 +1,4 @@
-import type { Announcement, AuthUser, RankEntry, StarAward, Submission, Store, Task, TaskProgram, User } from "@/shared/domain/types";
+import type { Announcement, AuthUser, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
 import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
 import { ScopeChangedError } from "@/frontend/shared/lib/query-cache";
@@ -69,6 +69,31 @@ export async function request<T>(input: RequestInfo | URL, init?: RequestInit): 
   if (method !== "GET") announceMutation(mutationTopics(url, method));
   return body;
 }
+export async function uploadTaskAttachment(taskId: string, file: File): Promise<TaskAttachment> {
+  const form = new FormData(); form.set("file", file);
+  const url = `/api/tasks/${encodeURIComponent(taskId)}/attachments`;
+  const response = await authFetch(url, { method: "POST", body: form });
+  const body = await response.json().catch(() => ({})) as ApiResponse<{ attachment?: ApiRow }>;
+  if (!response.ok || !body.attachment) throw new ApiError(typeof body.message === "string" ? body.message : "Не удалось загрузить PDF.", response.status);
+  announceMutation(mutationTopics(url, "POST"));
+  return mapTaskAttachment(body.attachment);
+}
+export async function deleteTaskAttachment(taskId: string, attachmentId: string): Promise<boolean> {
+  const url = `/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(attachmentId)}`;
+  const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>(url, { method: "DELETE" });
+  return Boolean(response.storageCleanupWarning);
+}
+export async function fetchTaskAttachmentFile(taskId: string, attachmentId: string): Promise<Blob> {
+  const response = await authFetch(`/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(attachmentId)}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as ApiResponse<Record<string, never>>;
+    throw new ApiError(typeof body.message === "string" ? body.message : "Не удалось открыть PDF.", response.status);
+  }
+  return response.blob();
+}
+export function mapTaskAttachment(row: ApiRow): TaskAttachment {
+  return { id: String(row.id), fileName: String(row.file_name || "document.pdf"), contentType: "application/pdf", sizeBytes: Number(row.size_bytes || 0), createdAt: String(row.created_at || new Date().toISOString()) };
+}
 export function mapTask(row: ApiRow): Task {
   return { id: String(row.id), title: String(row.title || ""), description: String(row.description || ""), maxPoints: Number(row.max_points || 0),
     deadlineAt: row.deadline_at ? String(row.deadline_at) : undefined, isActive: Boolean(row.is_active), teamId: row.team_id ? String(row.team_id) : undefined,
@@ -79,7 +104,8 @@ export function mapTask(row: ApiRow): Task {
     dueAt: row.due_at ? String(row.due_at) : undefined, createdAt: String(row.created_at || new Date().toISOString()),
     publisherId: row.publisher_id ? String(row.publisher_id) : undefined,
     interactiveKind: row.interactive_kind === "dream-plan" ? row.interactive_kind : undefined,
-    updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
+    updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()),
+    attachments: Array.isArray(row.attachments) ? row.attachments.filter((item): item is ApiRow => Boolean(item && typeof item === "object")).map(mapTaskAttachment) : [] };
 }
 export function mapProgram(row: ApiRow): TaskProgram {
   return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), publisherId: row.publisher_id ? String(row.publisher_id) : undefined, templateKey: row.template_key === "dream-plan" ? row.template_key : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };

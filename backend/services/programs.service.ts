@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 import { readyProgramByKey } from "@/shared/domain/ready-programs";
 import type { ReadyProgramKey, TaskInteractiveKind, TaskPublicationType } from "@/shared/domain/types";
+import { removeAttachmentPaths } from "@/backend/services/task-attachments.service";
 
 type ProgramTaskInput = { title: string; description: string; maxPoints: number; resourceUrl?: string | null; publicationType?: TaskPublicationType; interactiveKind?: TaskInteractiveKind };
 type ProgramViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
@@ -86,8 +87,14 @@ export async function deleteProgram(id: string, actor?: ProgramViewer) {
   if (current.error || !current.data) return { forbidden: true as const };
   const canDelete = actor?.role === "ceo" || (Boolean(actor?.teamId) && current.data.team_id === actor?.teamId && (actor?.role === "admin" || (actor?.canPublishTasks === true && current.data.publisher_id === actor.id)));
   if (!canDelete) return { forbidden: true as const };
+  const taskRows = await supabase.from("tasks").select("id").eq("program_id", id);
+  if (taskRows.error) return { error: taskRows.error };
+  const attachments = taskRows.data?.length ? await supabase.from("task_attachments").select("storage_path").in("task_id", taskRows.data.map((row) => String(row.id))) : { data: [], error: null };
+  if (attachments.error) return { error: attachments.error };
   let query = supabase.from("task_programs").delete().eq("id", id);
   if (actor?.role !== "ceo" && actor?.teamId) query = query.eq("team_id", actor.teamId);
-  const result = await query;
-  return result.error ? { error: result.error } : { data: true };
+  const result = await query.select("id");
+  if (result.error) return { error: result.error };
+  const cleanup = await removeAttachmentPaths((attachments.data || []).map((row) => String(row.storage_path)));
+  return { data: true, storageCleanupWarning: cleanup.warning };
 }

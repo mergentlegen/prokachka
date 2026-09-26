@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createAdminProgram, deleteAdminProgram, updateAdminProgram } from "@/frontend/shared/api/admin-client";
+import { uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
+import styles from "./ProgramsPanel.module.css";
 
-type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string };
+type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string; files: File[] };
 function validLink(value: string) {
   if (!value.trim()) return true;
   try { return value.trim().length <= 2000 && ["http:", "https:"].includes(new URL(value.trim()).protocol); }
@@ -42,10 +44,10 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
   function addStep() {
     if (busy || draftTasks.length >= 100) return;
     focusNewStep.current = true;
-    const task = { id: nextId.current++, title: "", description: "", resourceUrl: "", maxPoints: "10" };
+    const task = { id: nextId.current++, title: "", description: "", resourceUrl: "", maxPoints: "10", files: [] };
     setDraftTasks((current) => [...current, task]);
   }
-  function updateTask(id: number, key: keyof Omit<DraftTask, "id">, value: string) {
+  function updateTask<K extends keyof Omit<DraftTask, "id">>(id: number, key: K, value: DraftTask[K]) {
     setDraftTasks((current) => current.map((task) => task.id === id ? { ...task, [key]: value } : task));
   }
   async function publish() {
@@ -56,9 +58,22 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
         title: title.trim(), deadlineHours: Number(deadlineHours),
         tasks: draftTasks.map((task) => ({ title: task.title.trim(), description: task.description.trim(), resourceUrl: task.resourceUrl.trim() || null, maxPoints: Number(task.maxPoints) })),
       });
-      onChange([created.program, ...programs], [...created.tasks, ...tasks]);
+      const tasksWithFiles = [...created.tasks];
+      const uploadErrors: string[] = [];
+      for (let index = 0; index < draftTasks.length; index += 1) {
+        const task = tasksWithFiles.find((item) => item.position === index + 1) || tasksWithFiles[index];
+        if (!task) continue;
+        for (const file of draftTasks[index].files) {
+          try {
+            const attachment = await uploadTaskAttachment(task.id, file);
+            const taskIndex = tasksWithFiles.findIndex((item) => item.id === task.id);
+            tasksWithFiles[taskIndex] = { ...tasksWithFiles[taskIndex], attachments: [...(tasksWithFiles[taskIndex].attachments || []), attachment] };
+          } catch { uploadErrors.push(file.name); }
+        }
+      }
+      onChange([created.program, ...programs], [...tasksWithFiles, ...tasks]);
       setTitle(""); setDraftTasks([]); setPreview(false);
-      onError("Программа опубликована. Первый шаг уже доступен участникам.");
+      onError(uploadErrors.length ? `Программа опубликована, но не загрузились PDF: ${uploadErrors.join(", ")}. Их можно добавить позже через редактирование соответствующих заданий.` : "Программа опубликована. Первый шаг уже доступен участникам.");
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось создать программу."); }
     finally { setBusy(false); }
   }
@@ -76,9 +91,9 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
     const program = deleteTarget;
     setBusy(true);
     try {
-      await deleteAdminProgram(program.id);
+      const cleanupWarning = await deleteAdminProgram(program.id);
       onChange(programs.filter((item) => item.id !== program.id), tasks.filter((task) => task.programId !== program.id));
-      onError("Программа и её шаги удалены.");
+      onError(cleanupWarning ? "Программа и шаги удалены, но часть PDF не удалось очистить из хранилища." : "Программа и её шаги удалены.");
       setDeleteTarget(null);
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось удалить программу."); }
     finally { setBusy(false); }
@@ -110,6 +125,14 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, onChange
                 <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" maxLength={2000} value={task.resourceUrl} aria-invalid={!validLink(task.resourceUrl)} onChange={(event) => updateTask(task.id, "resourceUrl", event.target.value)} placeholder="https://youtube.com/..." />{!validLink(task.resourceUrl) && <span className="program-field-error">Укажите ссылку с http:// или https://</span>}</label>
               </div>
               <ResourceCard url={task.resourceUrl} caption="Так участник увидит материал" />
+              <label>PDF-файлы <span className="field-hint">необязательно · до 15 МБ каждый</span><input type="file" accept="application/pdf,.pdf" multiple onChange={(event) => {
+                const selected = [...(event.target.files || [])];
+                const valid = selected.filter((file) => (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) && file.size <= 15 * 1024 * 1024);
+                if (valid.length !== selected.length) onError("Прикрепляйте только PDF-файлы размером не больше 15 МБ.");
+                if (task.files.length + valid.length > 10) { onError("К шагу можно прикрепить не больше 10 PDF."); event.target.value = ""; return; }
+                updateTask(task.id, "files", [...task.files, ...valid]); event.target.value = "";
+              }} /></label>
+              {task.files.length > 0 && <ul className={styles.selectedFiles}>{task.files.map((file, fileIndex) => <li key={`${file.name}-${file.lastModified}-${fileIndex}`}><span>{file.name} · {(file.size / 1048576).toFixed(1)} МБ</span><button type="button" onClick={() => updateTask(task.id, "files", task.files.filter((_, itemIndex) => itemIndex !== fileIndex))}>Убрать</button></li>)}</ul>}
             </div>)}</div>}
           <button type="button" className="program-add-step" disabled={draftTasks.length >= 100} onClick={addStep}>＋ {draftTasks.length ? "Добавить следующий шаг" : "Добавить первый шаг"}</button>
         </fieldset>

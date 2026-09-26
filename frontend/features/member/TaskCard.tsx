@@ -5,6 +5,7 @@ import type { Submission, Task } from "@/shared/domain/types";
 import { externalHref, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
+import { TaskAttachments } from "@/frontend/shared/TaskAttachments";
 import { DreamPlanGame } from "./DreamPlanGame";
 import styles from "./TaskCard.module.css";
 
@@ -35,6 +36,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: 
       <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
       <h3><button className={styles.title} onClick={() => setOpen(true)} aria-haspopup="dialog">{task.title}</button></h3>
       <p className={styles.preview}>{task.description}</p>
+      {Boolean(task.attachments?.length) && <p className={styles.attachmentHint}>PDF-материалы · {task.attachments?.length} {task.attachments?.length === 1 ? "файл" : "файла"}</p>}
       {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>}
       <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isDreamPlan ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
     </article>
@@ -44,6 +46,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete }: 
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div></>}
         {isDreamPlan && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} />}
         {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}

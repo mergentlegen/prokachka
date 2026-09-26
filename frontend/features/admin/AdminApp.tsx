@@ -6,7 +6,7 @@ import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { userScope } from "@/shared/domain/live-updates";
 import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
-import { ApiError, authFetch, clearDevSession, createTelegramLink, loadTelegramLinkStatus, refreshAuthSession } from "@/frontend/shared/api/client";
+import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { createAdminTask, deleteAdminTask, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Toast } from "@/frontend/shared/Toast";
@@ -17,7 +17,7 @@ import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
 import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
-import type { AuthUser, Submission, Task, TeamJoinRequest } from "@/shared/domain/types";
+import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest } from "@/shared/domain/types";
 import { TaskEditorModal, ReviewModal, DeleteModal } from "./AdminModals";
 import type { TaskDraft, ReviewDraft } from "./AdminModals";
 import { AccessDenied, Dashboard, TasksView, ReviewView, HistoryView, RequestsView } from "./AdminViews";
@@ -52,6 +52,8 @@ export function AdminApp() {
   const [modal, setModal] = useState<AdminModal>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "" });
+  const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([]);
+  const [taskFiles, setTaskFiles] = useState<File[]>([]);
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
@@ -157,6 +159,8 @@ export function AdminApp() {
       hasDeadline: Boolean(task?.deadlineAt),
       deadline: toLocalDateTime(task?.deadlineAt),
     });
+    setTaskAttachments(task?.attachments || []);
+    setTaskFiles([]);
     setModal({ type: "task", task });
   }
 
@@ -259,10 +263,26 @@ export function AdminApp() {
     }
     setModalBusy(true);
     try {
-      const saved = modal.task
+      const taskRecord = modal.task
         ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt })
         : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt });
+      let saved: Task = { ...taskRecord, attachments: taskAttachments };
+      for (let index = 0; index < taskFiles.length; index += 1) {
+        try {
+          const attachment = await uploadTaskAttachment(saved.id, taskFiles[index]);
+          saved = { ...saved, attachments: [...(saved.attachments || []), attachment] };
+          setTaskAttachments(saved.attachments || []);
+        } catch (error) {
+          const remaining = taskFiles.slice(index);
+          setTaskFiles(remaining);
+          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [saved, ...current.tasks] }));
+          setModal({ type: "task", task: saved });
+          setToast(`Задание сохранено, но PDF «${taskFiles[index].name}» не загрузился. ${error instanceof Error ? error.message : "Повторите загрузку."}`);
+          return;
+        }
+      }
       setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [saved, ...current.tasks] }));
+      setTaskFiles([]);
       setModal(null);
       setToast("Задание сохранено.");
     } catch {
@@ -270,6 +290,20 @@ export function AdminApp() {
     } finally {
       setModalBusy(false);
     }
+  }
+
+  async function removeTaskFile(attachment: TaskAttachment) {
+    if (!modal || modal.type !== "task" || !modal.task) return;
+    setModalBusy(true);
+    try {
+      const cleanupWarning = await deleteTaskAttachment(modal.task.id, attachment.id);
+      const updatedAttachments = taskAttachments.filter((item) => item.id !== attachment.id);
+      setTaskAttachments(updatedAttachments);
+      setStore((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === modal.task?.id ? { ...item, attachments: updatedAttachments } : item) }));
+      setModal({ type: "task", task: { ...modal.task, attachments: updatedAttachments } });
+      if (cleanupWarning) setToast("Ссылка на PDF удалена, но файл не удалось очистить в закрытом хранилище.");
+    } catch (error) { setToast(error instanceof Error ? error.message : "Не удалось удалить файл."); }
+    finally { setModalBusy(false); }
   }
 
   async function toggleTask(id: string) {
@@ -288,10 +322,10 @@ export function AdminApp() {
     if (!modal || modal.type !== "delete") return;
     setModalBusy(true);
     try {
-      await deleteAdminTask(modal.task.id);
+      const cleanupWarning = await deleteAdminTask(modal.task.id);
       setStore((current) => ({ ...current, tasks: current.tasks.filter((task) => task.id !== modal.task?.id), submissions: current.submissions.filter((submission) => submission.taskId !== modal.task?.id) }));
       setModal(null);
-      setToast("Задание удалено.");
+      setToast(cleanupWarning ? "Задание удалено, но его PDF не удалось очистить в закрытом хранилище." : "Задание удалено.");
     } catch {
       setToast("Не удалось удалить задание.");
     } finally {
@@ -343,7 +377,7 @@ export function AdminApp() {
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
     </MobileDrawer>
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
-    {modal?.type === "task" && <TaskEditorModal draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
+    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}
   </main>;

@@ -91,5 +91,5 @@ export async function deleteProgramController(request: Request, id: string) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
   if (result.error) return failure("Не удалось удалить программу.");
-  return ok({});
+  return ok({ storageCleanupWarning: result.storageCleanupWarning });
 }
