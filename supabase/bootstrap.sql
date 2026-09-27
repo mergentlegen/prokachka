@@ -22,3 +22,4 @@
 \ir 20261001-profile-avatars.sql
 \ir 20261002-email-verification.sql
 \ir 20261003-password-recovery.sql
+\ir 20261004-task-feed-order.sql

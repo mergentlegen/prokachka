@@ -4,6 +4,7 @@ import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
 import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from "@/backend/services/tasks.service";
 import { listTaskAttachments } from "@/backend/services/task-attachments.service";
+import { applyTaskFeedOrder } from "@/backend/services/task-feed-order.service";
 
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
@@ -31,7 +32,9 @@ export async function listTasks(request: Request) {
     const attachments = await listTaskAttachments(result.data.map((task) => String(task.id)));
     if ("unavailable" in attachments) return failure("База данных не настроена.", 503);
     if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
-    return ok({ tasks: result.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [] })) });
+    const ordered = await applyTaskFeedOrder(result.data, user, false);
+    if (!ordered.data) return failure("Не удалось загрузить порядок заданий.", 503);
+    return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [] })) });
   }
   if ((user.role === "admin" || user.role === "member") && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "ceo" ? undefined : user.teamId, user);
@@ -40,7 +43,9 @@ export async function listTasks(request: Request) {
   const attachments = await listTaskAttachments(result.data.map((task) => String(task.id)));
   if ("unavailable" in attachments) return failure("База данных не настроена.", 503);
   if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
-  return ok({ tasks: result.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [] })) });
+  const ordered = await applyTaskFeedOrder(result.data, user, true);
+  if (!ordered.data) return failure("Не удалось загрузить порядок заданий.", 503);
+  return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [] })) });
 }
 
 export async function createTask(request: Request) {

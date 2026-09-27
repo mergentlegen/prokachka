@@ -18,6 +18,7 @@ import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
 import { ProgramEditorModal } from "./ProgramEditorModal";
 import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
+import { TaskOrderDialog } from "./TaskOrderDialog";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { WelcomeVideoSettingsPanel } from "@/frontend/features/admin/WelcomeVideoSettingsPanel";
 import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
@@ -58,6 +59,7 @@ export function AdminApp() {
   const [modal, setModal] = useState<AdminModal>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [programEditorOpen, setProgramEditorOpen] = useState(false);
+  const [taskOrderOpen, setTaskOrderOpen] = useState(false);
   const [taskActionBusy, setTaskActionBusy] = useState("");
   const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "" });
   const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([]);
@@ -69,7 +71,7 @@ export function AdminApp() {
   const [profileOpen, setProfileOpen] = useState(false);
   const shellRef = useRef<HTMLElement>(null);
   const openMobileMenu = useCallback(() => setMobileMenuOpen(true), []);
-  useMenuSwipe(shellRef, !authLoading && hasMentorAccess(authUser) && !mobileMenuOpen && !modal, openMobileMenu);
+  useMenuSwipe(shellRef, !authLoading && hasMentorAccess(authUser) && !mobileMenuOpen && !modal && !taskOrderOpen, openMobileMenu);
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [section]);
@@ -108,6 +110,7 @@ export function AdminApp() {
         setAuthUser(currentUser);
         if (userScope(currentUser) !== userScope(authUser)) {
           setModal(null);
+          setTaskOrderOpen(false);
           setSection("dashboard");
           return;
         }
@@ -284,13 +287,13 @@ export function AdminApp() {
         } catch (error) {
           const remaining = taskFiles.slice(index);
           setTaskFiles(remaining);
-          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [...current.tasks, saved] }));
+          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks, saved] }));
           setModal({ type: "task", task: saved });
           setToast(`Задание сохранено, но PDF «${taskFiles[index].name}» не загрузился. ${error instanceof Error ? error.message : "Повторите загрузку."}`);
           return;
         }
       }
-      setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? saved : item) : [...current.tasks, saved] }));
+      setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks, saved] }));
       setTaskFiles([]);
       setModal(null);
       setToast("Задание сохранено.");
@@ -321,7 +324,7 @@ export function AdminApp() {
     setTaskActionBusy(id);
     try {
       const updated = await updateAdminTask(id, { isActive: !task.isActive });
-      setStore((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === id ? { ...updated, attachments: item.attachments } : item) }));
+      setStore((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === id ? { ...updated, feedOrder: item.feedOrder, attachments: item.attachments } : item) }));
       setToast(updated.isActive ? "Задание активировано." : "Задание скрыто.");
     } catch {
       setToast("Не удалось изменить статус задания.");
@@ -377,7 +380,7 @@ export function AdminApp() {
         {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
         {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav></aside>
-      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
+      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit" onClick={() => setTaskOrderOpen(true)}>↕ Изменить порядок</button><button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button></>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
         <SectionBoundary loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
@@ -402,6 +405,7 @@ export function AdminApp() {
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
     </MobileDrawer>
     {profileOpen && <ProfileDialog user={authUser} onClose={() => setProfileOpen(false)} onSaved={(updated) => { setAuthUser(updated); setToast("Профиль обновлён."); void refreshData(); }} />}
+    {taskOrderOpen && <TaskOrderDialog onClose={() => setTaskOrderOpen(false)} onSaved={() => { setTaskOrderOpen(false); setToast("Порядок заданий сохранён."); void refreshData(); }} />}
     {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}

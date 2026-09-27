@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Avatar } from "@/frontend/shared/Avatar";
-import { comparePublications } from "@/shared/domain/publication-order";
+import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import type { Store, Submission, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
@@ -23,7 +23,7 @@ type TaskRowsProps = {
 
 export function TasksView({ store, ...props }: Omit<TaskRowsProps, "tasks" | "submissions"> & { store: Store }) {
   const readyProgramIds = new Set(store.programs.filter((program) => program.templateKey).map((program) => program.id));
-  const tasks = store.tasks.filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && task.publicationType !== "sequential").sort(comparePublications);
+  const tasks = store.tasks.filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && task.publicationType !== "sequential").sort(compareTaskFeed);
   return <div className="admin-panel table-panel"><TaskRows tasks={tasks} submissions={store.submissions} {...props} /></div>;
 }
 

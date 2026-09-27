@@ -14,6 +14,7 @@ export function resourceTopics(url: string): ChangeTopic[] {
   if (path === "/api/submissions" && new URLSearchParams(query).has("summary")) return ["submissions", "requests", "users", "network"];
   if (path === "/api/submissions") return ["submissions", "tasks", "network"];
   if (path === "/api/tasks") return ["tasks", "programs", "submissions", "network"];
+  if (path === "/api/tasks/order") return ["tasks", "programs", "network"];
   if (path === "/api/programs/history") return ["programs", "tasks", "submissions", "users", "network"];
   if (path === "/api/publication-history") return ["programs", "tasks", "announcements", "users", "network"];
   if (path === "/api/programs") return ["programs", "tasks", "network"];

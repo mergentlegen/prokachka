@@ -65,7 +65,7 @@ export async function request<T>(input: RequestInfo | URL, init?: RequestInit): 
     }
     return body as T;
   };
-  if (typeof window !== "undefined" && method === "GET" && resourceTopics(url).length) return dataCache.read(url, fetcher);
+  if (typeof window !== "undefined" && method === "GET" && init?.cache !== "no-store" && resourceTopics(url).length) return dataCache.read(url, fetcher);
   const body = await fetcher();
   if (method !== "GET") announceMutation(mutationTopics(url, method));
   return body;
@@ -97,6 +97,7 @@ export function mapTaskAttachment(row: ApiRow): TaskAttachment {
 }
 export function mapTask(row: ApiRow): Task {
   return { id: String(row.id), title: String(row.title || ""), description: String(row.description || ""), maxPoints: Number(row.max_points || 0),
+    feedOrder: typeof row.feed_order === "number" && Number.isFinite(row.feed_order) ? row.feed_order : undefined,
     deadlineAt: row.deadline_at ? String(row.deadline_at) : undefined, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, teamId: row.team_id ? String(row.team_id) : undefined,
     publicationType: row.publication_type === "sequential" || row.publication_type === "evergreen" ? row.publication_type : "fixed",
     programId: row.program_id ? String(row.program_id) : undefined, position: row.position ? Number(row.position) : undefined,

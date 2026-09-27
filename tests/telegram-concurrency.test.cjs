@@ -22,6 +22,18 @@ function fixture() {
   return { team, root, alice, bob, task };
 }
 
+test('parallel first task-order saves accept one revision without overwriting the winner', { skip: !port }, async () => {
+  const { team, root, task } = fixture(), other = randomUUID();
+  query(`insert into tasks(id,team_id,title,description,publication_type) values('${other}','${team}','Second task','Description','evergreen');`);
+  const snapshot = JSON.parse(query(`select app_task_order_snapshot('${root}',true);`));
+  const requests = await Promise.all(Array.from({ length: 8 }, () => parallel(
+    `select app_save_task_order('${root}','${snapshot.revision}',array[]::text[],array['${other}','${task}']);`)));
+  assert.equal(requests.filter(value => JSON.parse(value).conflict).length, 7);
+  assert.equal(requests.filter(value => JSON.parse(value).items).length, 1);
+  assert.equal(query(`select count(*) from task_feed_orders where team_id='${team}'`), '1');
+  assert.deepEqual(JSON.parse(query(`select app_task_order_snapshot('${root}',true);`)).items.map(item => item.key), [other, task]);
+});
+
 test('parallel recovery submissions have exactly one active claim and revoke old sessions once', { skip: !port }, async () => {
   const { alice } = fixture();
   const authId = randomUUID(), tokenHash = require('node:crypto').createHash('sha256').update(randomUUID()).digest('hex');

@@ -99,6 +99,7 @@ jobs:
         run: |
           psql -X -v ON_ERROR_STOP=1 -f tests/email-auth.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/password-recovery.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/task-feed-order.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/telegram-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/architecture-integrity.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/live-updates.sql

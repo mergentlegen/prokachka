@@ -37,7 +37,7 @@ export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; pinnedAt?: string; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; createdAt: string; updatedAt: string;
-  attachments?: TaskAttachment[];
+  attachments?: TaskAttachment[]; feedOrder?: number;
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
