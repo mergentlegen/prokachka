@@ -75,8 +75,15 @@ export async function receiveTelegramUpdate(request: Request) {
         if (!("error" in linked) && confirmation.ok) await sendTelegramMessage(telegramId, telegramLinkWelcomeMessage);
         scheduleTelegramDelivery();
       } else {
-        const selected = await beginTelegramSubmission(payload?.startsWith("submit_") ? payload.slice(7) : payload?.startsWith("company_voice_") ? payload.slice(14) : "", telegramId, messageId);
+        const selected = await beginTelegramSubmission(payload?.startsWith("submit_") ? payload.slice(7) : payload?.startsWith("company_voice_") ? payload.slice(14) : payload?.startsWith("captain_") ? payload.slice(8) : "", telegramId, messageId);
         if ("unavailable" in selected || "error" in selected) return failure("Не удалось выбрать задание.", 503);
+        if (!selected.duplicate && selected.ready && selected.purpose === "captain-screenshot") {
+          if (!selected.summary) return failure("Не удалось подготовить сообщение о круизе.", 503);
+          const summary = await sendTelegramMessage(telegramId, selected.summary);
+          if (!summary.ok) return failure("Не удалось показать сообщение о круизе. Попробуйте открыть ссылку снова.", 503);
+          await sendTelegramMessage(telegramId, "Сообщение выше подготовлено автоматически: копировать и отправлять его не нужно. Прикрепите один скриншот настоящего круиза как фото (не файл и не альбом). Наставники вашей ветки получат сначала этот текст, затем скриншот. После сохранения фото начислится ещё 1 миля — всего 20.");
+          return NextResponse.json({ ok: true });
+        }
         if (!selected.duplicate) await sendTelegramMessage(telegramId, selected.ready
           ? selected.purpose === "company-voice"
             ? "Запишите здесь голосовое на 30–60 секунд о компании, в которой вы теперь. Нажмите на микрофон и отправьте одно голосовое сообщение. Бот передаст его наставникам вашей ветки. 10 миль за тест уже начислены — повторной проверки и начисления не будет."
@@ -109,6 +116,7 @@ export async function receiveTelegramUpdate(request: Request) {
       scheduleTelegramDelivery();
       if (!result.duplicate) await sendTelegramMessage(telegramId, result.purpose === "company-voice"
         ? "Голосовое сохранено и поставлено в очередь доставки наставникам вашей ветки. Мили за тест не изменились."
+        : result.purpose === "captain-screenshot" ? "Скриншот сохранён и поставлен в очередь доставки наставникам вашей ветки вместе с сообщением о круизе. Начислена ещё 1 миля — всего 20."
         : "Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.");
     } else {
       return failure("Не удалось подтвердить сохранение ответа.", 503);

@@ -2,6 +2,7 @@ import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
 import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
+import { captainCruiseAction, type CaptainAction } from "@/backend/services/captain-cruise.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
@@ -17,8 +18,19 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await request.json() as { action?: ReadyAttemptAction; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown };
+    const body = await request.json() as { action?: ReadyAttemptAction | "captain"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction; index?: unknown; payload?: unknown };
     const action = body?.action;
+    if (action === "captain") {
+      if (!body.operation || !["start", "checkpoint", "retry", "finish", "save-details", "telegram-link"].includes(body.operation)
+        || (body.index !== undefined && (!Number.isInteger(body.index) || Number(body.index) < 0 || Number(body.index) > 15))
+        || (body.payload !== undefined && (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)))
+        || JSON.stringify(body.payload || {}).length > 3000) return failure("Некорректное действие тренировки.", 400);
+      const result = await captainCruiseAction(user.id, taskId, body.operation, body.index as number | undefined, body.payload as Record<string, unknown> | undefined);
+      if ("unavailable" in result) return failure("База данных или Telegram пока не настроены.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Отправка пока недоступна.", "linkRequired" in result ? 422 : 409);
+      if ("error" in result) return failure("Не удалось сохранить тренировку. Попробуйте ещё раз.");
+      return "url" in result ? ok({ url: result.url, expiresAt: result.expiresAt }) : ok({ attempt: result.data });
+    }
     if (action !== "start" && action !== "advance" && action !== "answer" && action !== "restart-quiz" && action !== "complete" && action !== "save-story" && action !== "voice-link") return failure("Неизвестное действие программы.", 400);
     if (action === "voice-link") {
       const result = await prepareCompanyVoice(user.id, taskId);

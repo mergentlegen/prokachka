@@ -11,6 +11,7 @@ import { DreamPlanGame } from "./DreamPlanGame";
 import { StarterRulesGame } from "./StarterRulesGame";
 import { HeartSurvey } from "./HeartSurvey";
 import { CompanyVoyageGame } from "./CompanyVoyageGame";
+import { CaptainCruiseGame } from "./CaptainCruiseGame";
 import styles from "./TaskCard.module.css";
 
 export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
@@ -19,10 +20,11 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, on
   const isInteractive = Boolean(task.interactiveKind);
   const isSurvey = task.interactiveKind === "heart-survey";
   const surveyInProgress = isSurvey && submission?.interactiveCompleted === false;
+  const captainPending = task.interactiveKind === "captain-cruise" && submission?.interactiveCompleted === false;
   const deadline = task.dueAt || task.deadlineAt;
   const expired = Boolean(deadline && new Date(deadline).getTime() <= Date.now());
   const status = submission?.status || (expired ? "missed" : "new");
-  const statusText = surveyInProgress ? `Сохранено ${submission?.points} из 5 ответов` : status === "accepted" ? "Принято" : status === "pending" ? "На проверке" : status === "revision" ? "На доработку" : status === "missed" ? "Срок истёк" : "Не начато";
+  const statusText = captainPending ? "Тренировка пройдена · ждём скриншот" : surveyInProgress ? `Сохранено ${submission?.points} из 5 ответов` : status === "accepted" ? "Принято" : status === "pending" ? "На проверке" : status === "revision" ? "На доработку" : status === "missed" ? "Срок истёк" : "Не начато";
   const resource = externalHref(task.resourceUrl);
   const canSubmit = task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   async function send() {
@@ -31,6 +33,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, on
     try { await onSubmit(task.id); } finally { setSending(false); }
   }
   function action(inDetail = false) {
+    if (captainPending) return <button className={styles.submit} onClick={() => setOpen(true)}>Отправить скриншот · +1 миля</button>;
     if (surveyInProgress) return <button className={styles.submit} onClick={() => setOpen(true)}>Продолжить опросник</button>;
     if (status === "accepted") return <strong className={styles.accepted}>+{formatMiles(submission?.points || 0)}</strong>;
     if (status === "pending") return <span className={styles.waiting}>Ответ на проверке</span>;
@@ -56,6 +59,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, on
         {task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "company-voyage" && <CompanyVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {task.interactiveKind === "captain-cruise" && <CaptainCruiseGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} />}

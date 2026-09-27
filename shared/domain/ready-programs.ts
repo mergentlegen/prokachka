@@ -1,6 +1,7 @@
 import type { ReadyProgramKey, TaskInteractiveKind, TaskPublicationType } from "./types";
 import { HEART_SURVEY } from "@/shared/domain/heart-survey";
 import { COMPANY_VOYAGE_REWARD, COMPANY_VOYAGE_TITLE } from "@/shared/domain/company-voyage";
+import { CAPTAIN_CRUISE_TITLE, CAPTAIN_CRUISE_REWARD } from "@/shared/domain/captain-cruise";
 
 export type ReadyProgramTask = {
   title: string;
@@ -64,6 +65,12 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     description: "Восемь карточек о компании, 17 вопросов и свой рассказ за 60 секунд. Узнай клуб и собери ответы на вопросы друзей.",
     badge: "Без дедлайна", taskCount: 1,
     tasks: [{ title: COMPANY_VOYAGE_TITLE, description: "Познакомься с компанией, пройди игру «Правда или миф» без ошибок и получи 10 миль автоматически. Затем собери свой рассказ для наставника.", maxPoints: COMPANY_VOYAGE_REWARD, publicationType: "evergreen", interactiveKind: "company-voyage" }],
+  },
+  {
+    key: "captain-cruise", title: CAPTAIN_CRUISE_TITLE, eyebrow: "Тренажёр поиска круиза",
+    description: "Пройди путь от поиска до выбора каюты: направления, линии, даты, пассажиры и цена. Затем покажи настоящий круиз наставнику.",
+    badge: "Без дедлайна", taskCount: 1,
+    tasks: [{ title: CAPTAIN_CRUISE_TITLE, description: "Пройди тренировку и получи 19 миль. Найди круиз в своём кабинете inCruises и отправь скриншот наставникам через Telegram — ещё 1 миля автоматически.", maxPoints: CAPTAIN_CRUISE_REWARD, publicationType: "evergreen", interactiveKind: "captain-cruise" }],
   },
 ];
 

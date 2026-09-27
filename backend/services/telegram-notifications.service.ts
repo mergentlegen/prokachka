@@ -82,7 +82,7 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 }
 
 type NotificationJob = {
-  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission" | "survey" | "company-voice";
+  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot";
   payload: { canReview?: boolean; canPublishTasks?: boolean }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
@@ -139,6 +139,34 @@ export async function deliverTelegramNotifications() {
         const text = String(result.data.answer_text);
         if (text.length > 4000) throw new Error("Survey message is too long");
         delivery = await sendTelegramMessage(chatId, text);
+      } else if (job.kind === "captain-screenshot") {
+        const checkAccess = () => supabase.rpc("tg_can_receive_captain_screenshot", { p_recipient: user.id, p_submission: job.submission_id });
+        const allowed = await checkAccess();
+        if (allowed.error) throw new Error("Cannot verify screenshot recipient access");
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const result = await supabase.from("ready_program_attachments").select("summary,telegram_file_id,telegram_chat_id,telegram_message_id").eq("submission_id", job.submission_id).maybeSingle();
+        if (result.error || !result.data?.telegram_file_id || !result.data.summary) throw new Error("Cannot load captain screenshot");
+        const attachment = result.data;
+        if (!job.summary_sent) {
+          const summary = await sendTelegramMessage(chatId, String(attachment.summary));
+          if (!summary.ok) throw new Error(summary.error);
+          await save({ summary_sent: true });
+        }
+        const recheck = await checkAccess();
+        if (recheck.error) throw new Error("Cannot recheck screenshot recipient access");
+        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        delivery = await copyTelegramMessage(chatId, String(attachment.telegram_chat_id), String(attachment.telegram_message_id));
+        if (!delivery.ok) {
+          const fallbackAccess = await checkAccess();
+          if (fallbackAccess.error) throw new Error("Cannot verify fallback screenshot access");
+          if (!fallbackAccess.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+          const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/sendPhoto`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, photo: attachment.telegram_file_id }), signal: AbortSignal.timeout(8_000),
+          });
+          const payload = await response.json() as TelegramApiResponse;
+          delivery = response.ok && payload.ok ? { ok: true } : { ok: false, error: payload.description || "Screenshot delivery failed" };
+        }
       } else if (job.kind === "company-voice") {
         const checkAccess = () => supabase.rpc("tg_can_receive_company_voice", { p_recipient: user.id, p_submission: job.submission_id });
         const allowed = await checkAccess();

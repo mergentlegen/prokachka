@@ -258,3 +258,42 @@ test('company voice delivery rechecks ancestor access, retries failed copying wi
     } finally { global.fetch = original; }
   }
 });
+
+test('captain bot automatically displays the exact cruise message before requesting one screenshot', async () => {
+  const messages = []; let preparedToken, deliveries = 0;
+  const summary = 'Привет! Я прошёл(ла) тренировку «Капитан ищет свой круиз» 🚢\nВыбрал(а) направление: Европа\nСкриншот прикрепляю 📸';
+  const controller = load('backend/controllers/telegram.controller.ts', {
+    'next/server': { NextResponse: { json: data => ({ data, status: 200 }) } },
+    '@/backend/http/api-response': { failure: (message, status) => ({ message, status }) },
+    ...dbOverrides(null), [envKey]: { serverEnv: {}, isValidTelegramSecret: value => value === 'fixture' },
+    '@/backend/services/telegram-submission.service': {
+      beginTelegramSubmission: async token => { preparedToken = token; return { ready: true, purpose: 'captain-screenshot', summary }; },
+      attachTelegramSubmission: async input => { assert.equal(input.mediaType, 'photo'); assert.equal(input.telegramFileId, 'screenshot-id'); return { data: { id: 'existing-reward' }, purpose: 'captain-screenshot' }; },
+    },
+    '@/backend/services/telegram-link.service': {},
+    '@/backend/services/telegram-notifications.service': { sendTelegramMessage: async (_id, text) => { messages.push(text); return { ok: true }; }, scheduleTelegramDelivery: () => deliveries++ },
+  });
+  const send = message => controller.receiveTelegramUpdate(new Request('https://fixture.test', { method: 'POST', headers: { 'x-telegram-bot-api-secret-token': 'fixture' }, body: JSON.stringify({ update_id: 98, message: { from: { id: 111 }, chat: { id: 111, type: 'private' }, message_id: 99, ...message } }) }));
+  assert.equal((await send({ text: '/start captain_fixture' })).status, 200);
+  assert.equal(preparedToken, 'fixture'); assert.equal(messages[0], summary); assert.match(messages[1], /копировать.*не нужно/); assert.equal(deliveries, 0);
+  assert.equal((await send({ photo: [{ file_id: 'small' }, { file_id: 'screenshot-id' }] })).status, 200);
+  assert.equal(deliveries, 1); assert.match(messages[2], /всего 20/);
+});
+
+test('captain delivery sends stored text first, then screenshot and rechecks the current branch', async () => {
+  for (const revoked of [false, true]) {
+    const summary = 'Привет! Я прошёл(ла) тренировку «Капитан ищет свой круиз» 🚢\nВыбрал(а) направление: Европа';
+    const db = database({ users: { data: { id: 'mentor', role: 'admin', team_id: 'team', telegram_id: '999' } }, ready_program_attachments: { data: { summary, telegram_file_id: 'photo-id', telegram_chat_id: '111', telegram_message_id: 8 } } });
+    let claimed = false, checks = 0;
+    db.rpc = async name => name === 'tg_can_receive_captain_screenshot' ? { data: !revoked || ++checks === 1 } : { data: claimed ? [] : (claimed = true, [{ id: 'job', kind: 'captain-screenshot', recipient_id: 'mentor', submission_id: 's', attempts: 1, lock_token: 'lock' }]) };
+    const requests = [], original = global.fetch;
+    global.fetch = async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); return { ok: !url.endsWith('/copyMessage'), status: 200, json: async () => ({ ok: !url.endsWith('/copyMessage') }) }; };
+    try {
+      const service = load('backend/services/telegram-notifications.service.ts', { ...dbOverrides(db), 'next/server': { after: () => {} }, [envKey]: { serverEnv: { telegramBotToken: 'fixture' } } });
+      const result = await service.deliverTelegramNotifications();
+      assert.equal(requests[0].body.text, summary);
+      if (revoked) { assert.equal(result.delivered, 0); assert.equal(requests.length, 1); }
+      else { assert.equal(result.delivered, 1); assert.deepEqual(requests.map(item => item.url.split('/').at(-1)), ['sendMessage','copyMessage','sendPhoto']); assert.equal(requests[2].body.photo, 'photo-id'); }
+    } finally { global.fetch = original; }
+  }
+});

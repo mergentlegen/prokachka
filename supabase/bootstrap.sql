@@ -25,3 +25,4 @@
 \ir 20261004-task-feed-order.sql
 \ir 20261005-company-voyage.sql
 \ir 20261006-company-voice.sql
+\ir 20261007-captain-cruise.sql

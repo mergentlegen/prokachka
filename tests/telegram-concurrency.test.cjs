@@ -22,6 +22,40 @@ function fixture() {
   return { team, root, alice, bob, task };
 }
 
+test('parallel captain finishes and screenshot webhooks award exactly 19 plus 1 on the same result', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  query(`update users set parent_user_id='${root}' where id='${alice}';`);
+  const published = JSON.parse(query(`select app_create_program('${JSON.stringify({ teamId: team, publisherId: root, title: 'Captain cruise', deadlineHours: 720, templateKey: 'captain-cruise', tasks: [{ title: 'Captain cruise', description: 'Search trainer.', maxPoints: 20, publicationType: 'evergreen', interactiveKind: 'captain-cruise' }] })}'::jsonb);`));
+  const task = published.tasks[0].id, keys = [0,2,1,1,2,-1,-1,1,1,1,2,1,1,1,0];
+  query(`select app_captain_cruise('${alice}','${task}','start',null,'{}');`);
+  keys.forEach((answer, index) => {
+    let payload = { answer };
+    if (index === 5) payload = { direction: 'Европа' };
+    if (index === 6) payload = { readKeys: ['line','ship','port','nights','dates','price'] };
+    if (index === 9) payload.readCabins = [0,1,2,3];
+    if (index === 11) payload.guests = [2,2,0];
+    const asciiPayload = JSON.stringify(payload).replace(/[^\x00-\x7f]/g, char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
+    query(`select app_captain_cruise('${alice}','${task}','checkpoint',${index},'${asciiPayload}');`);
+  });
+  const results = await Promise.all(Array.from({ length: 8 }, () => parallel(`select app_captain_cruise('${alice}','${task}','finish',null,'{}');`)));
+  assert.equal(new Set(results.map(value => JSON.parse(value).submission.id)).size, 1);
+  assert.ok(results.every(value => JSON.parse(value).earnedPoints === 19));
+  const submission = JSON.parse(results[0]).submission.id;
+  const telegramId = String(900000000000000 + parseInt(alice.replaceAll('-','').slice(0,12),16));
+  const updateId = parseInt(alice.replaceAll('-','').slice(0,12),16), tokenHash = randomUUID();
+  const details = { direction: 'Europe', line: 'MSC', who: '2 adults, 2 children', price: '$1000' };
+  query(`select app_captain_cruise('${alice}','${task}','save-details',null,'${JSON.stringify({ details })}');
+    update users set telegram_id='${telegramId}' where id='${alice}';
+    insert into telegram_submission_sessions(token_hash,user_id,task_id,telegram_id,expires_at,purpose) values('${tokenHash}','${alice}','${task}','${telegramId}',now()+interval '15 minutes','captain-screenshot');
+    select tg_begin_submission('${tokenHash}','${telegramId}',100);`);
+  const photos = await Promise.all(Array.from({ length: 8 }, () => parallel(`select tg_submit_answer('${telegramId}','${telegramId}',101,${updateId},'photo','','fixture-photo');`)));
+  assert.equal(photos.filter(value => JSON.parse(value).duplicate === false).length, 1);
+  assert.equal(photos.filter(value => JSON.parse(value).duplicate === true).length, 7);
+  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${task}'`), '1:20');
+  assert.equal(query(`select count(*) from ready_program_attachments where submission_id='${submission}'`), '1');
+  assert.equal(query(`select count(*) from telegram_notification_jobs where submission_id='${submission}' and kind='captain-screenshot'`), '1');
+});
+
 test('parallel company completions create one ten-mile reward; story saves cannot duplicate it', { skip: !port }, async () => {
   const { team, root, alice } = fixture();
   query(`update users set parent_user_id='${root}' where id='${alice}';`);
