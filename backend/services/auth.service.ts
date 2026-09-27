@@ -1,10 +1,12 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { serverEnv } from "@/backend/config/env";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { findInvitationByToken } from "@/backend/services/network.service";
 import type { AuthUser } from "@/shared/domain/types";
 import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
 import { authenticateEmailAccount } from "@/backend/services/email-auth.service";
+import { validateExistingPassword, validateNewPassword } from "@/shared/domain/password-policy";
 
 type StoredAccount = { user: AuthUser; passwordHash: string };
 const demoAccounts = new Map<string, StoredAccount>();
@@ -14,22 +16,20 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export function validatePassword(password: unknown) {
-  if (typeof password !== "string" || password.length < 6) return "Пароль должен содержать минимум 6 символов.";
-  if (password.length > 1024) return "Пароль должен содержать не больше 1024 символов.";
-  return null;
-}
+export const validatePassword = validateNewPassword;
+const deriveKey = promisify(scrypt);
 
-function hashPassword(password: string) {
+async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
+  const hash = ((await deriveKey(password, salt, 64)) as Buffer).toString("hex");
   return salt + ":" + hash;
 }
 
-function verifyPassword(password: string, stored: string) {
+async function verifyPassword(password: string, stored: string) {
+  if (!/^[^:]{1,128}:[a-f0-9]{128}$/i.test(stored)) return false;
   const [salt, expected] = stored.split(":");
   if (!salt || !expected) return false;
-  const actual = scryptSync(password, salt, 64);
+  const actual = (await deriveKey(password, salt, 64)) as Buffer;
   const expectedBuffer = Buffer.from(expected, "hex");
   return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
 }
@@ -131,7 +131,7 @@ export function validateLoginCredentials(email: unknown, password: unknown) {
   ) {
     return "Введите корректный email.";
   }
-  return validatePassword(password);
+  return validateExistingPassword(password);
 }
 
 export async function registerAccount(
@@ -145,8 +145,12 @@ export async function registerAccount(
   const normalizedFirstName = firstName.trim();
   const normalizedLastName = lastName.trim();
   const fullName = normalizedFirstName + " " + normalizedLastName;
-  const passwordHash = hashPassword(password);
+  const passwordError = validatePassword(password);
+  if (passwordError) return { validationError: passwordError };
   const supabase = getSupabaseAdmin();
+
+  if (!supabase && process.env.NODE_ENV === "production") return { error: "Сервис авторизации временно недоступен.", status: 503 };
+  const passwordHash = await hashPassword(password);
 
   if (supabase) {
     let invitation: { id: string; team_id: string; inviter_user_id: string } | undefined;
@@ -225,6 +229,7 @@ export async function authenticateAccount(email: string, password: string) {
   }
 
   const supabase = getSupabaseAdmin();
+  if (!supabase && process.env.NODE_ENV === "production") return { error: "Сервис авторизации временно недоступен.", status: 503 };
   if (supabase) {
     let data: Record<string, unknown> | null = null;
     let error: { message?: string } | null = null;
@@ -262,14 +267,14 @@ export async function authenticateAccount(email: string, password: string) {
       const user = await findAccountById(result.accountId);
       return user ? { user } : { error: "Сервис авторизации временно недоступен.", status: 503 };
     }
-    if (!data || !verifyPassword(password, String(data.password_hash))) {
+    if (!data || !await verifyPassword(password, String(data.password_hash))) {
       return { error: "Неверный email или пароль." };
     }
     return { user: publicUser((await withAvatarUrls([data]))[0]) };
   }
 
   const account = demoAccounts.get(normalizedEmail);
-  if (!account || !verifyPassword(password, account.passwordHash)) {
+  if (!account || !await verifyPassword(password, account.passwordHash)) {
     return { error: "Неверный email или пароль." };
   }
   return { user: account.user };
@@ -283,12 +288,16 @@ function getSessionSecret() {
   return secret || serverEnv.adminPassword || "development-only-session-secret";
 }
 
+function systemCredentialVersion(secret: string) {
+  return createHmac("sha256", secret).update(`system-account:${serverEnv.ceoLogin}:${serverEnv.ceoPassword}`).digest("base64url");
+}
+
 export function createSession(user: AuthUser) {
   const secret = getSessionSecret();
   if (!secret) throw new Error("AUTH_SECRET is not configured");
   const { avatarUrl: _avatarUrl, firstName: _firstName, lastName: _lastName, profileVersion: _profileVersion, ...identity } = user;
   const payload = Buffer.from(
-    JSON.stringify({ ...identity, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 }),
+    JSON.stringify({ ...identity, ...(user.id === "ceo" ? { credentialVersion: systemCredentialVersion(secret) } : {}), exp: Date.now() + 1000 * 60 * 60 * 24 * 14 }),
   ).toString("base64url");
   const signature = createHmac("sha256", secret).update(payload).digest("base64url");
   return payload + "." + signature;
@@ -296,7 +305,7 @@ export function createSession(user: AuthUser) {
 
 export function readSession(token: string | undefined): AuthUser | null {
   const secret = getSessionSecret();
-  if (!token || !secret) return null;
+  if (!token || !secret || token.length > 8192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
   const expected = createHmac("sha256", secret).update(payload).digest("base64url");
@@ -308,10 +317,15 @@ export function readSession(token: string | undefined): AuthUser | null {
   }
 
   try {
-    const user = JSON.parse(Buffer.from(payload, "base64url").toString()) as AuthUser & {
-      exp?: number;
-    };
-    return user.exp && user.exp > Date.now() ? user : null;
+    const user = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (!user || typeof user !== "object" || Array.isArray(user)
+      || typeof user.id !== "string" || !user.id || typeof user.name !== "string"
+      || !["ceo", "admin", "member"].includes(user.role)
+      || !Number.isFinite(user.exp) || user.exp <= Date.now()) return null;
+    if (user.id === "ceo" && (user.role !== "ceo" || !serverEnv.ceoLogin || !serverEnv.ceoPassword
+      || user.credentialVersion !== systemCredentialVersion(secret))) return null;
+    const { credentialVersion: _version, ...identity } = user;
+    return identity as AuthUser;
   } catch {
     return null;
   }

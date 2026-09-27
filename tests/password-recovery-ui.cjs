@@ -31,7 +31,7 @@ const base = 'http://127.0.0.1:3107';
         }) : json(400, { message: 'Код неверный или срок его действия истёк.' });
       }
       if (url.pathname === '/api/auth/password/reset') {
-        if (payload.password === 'weak-password') return json(400, { message: 'Этот пароль слишком простой. Выберите другой пароль.' });
+        if (payload.password === 'Weak-password1') return json(400, { message: 'Этот пароль слишком простой. Выберите другой пароль.' });
         return json(200, { passwordReset: true }, { 'set-cookie': 'prokachka_password_recovery=; Path=/api/auth/password; HttpOnly; Max-Age=0' });
       }
       if (url.pathname === '/api/auth/session') return json(401, { message: 'No fixture session' });
@@ -70,7 +70,7 @@ const base = 'http://127.0.0.1:3107';
     const store = await page.evaluate(() => sessionStorage.getItem('prokachka-password-recovery'));
     assert.ok(!store.includes('012345') && !store.includes('token'));
     await layouts('password');
-    await page.getByLabel('Новый пароль', { exact: true }).fill('new-password');
+    await page.getByLabel('Новый пароль', { exact: true }).fill('New-password1');
     await page.getByLabel('Повторите новый пароль', { exact: true }).fill('mismatch');
     await page.getByRole('button', { name: 'Сохранить новый пароль' }).click();
     await page.getByRole('alert').filter({ hasText: 'Пароли не совпадают' }).waitFor();
@@ -78,11 +78,11 @@ const base = 'http://127.0.0.1:3107';
     await page.reload();
     await page.getByRole('heading', { name: 'Новый пароль' }).waitFor();
     assert.equal(await page.getByLabel('Новый пароль', { exact: true }).inputValue(), '');
-    for (const value of ['weak-password', 'new-password']) {
+    for (const value of ['Weak-password1', 'New-password1']) {
       await page.getByLabel('Новый пароль', { exact: true }).fill(value);
       await page.getByLabel('Повторите новый пароль', { exact: true }).fill(value);
       await page.getByRole('button', { name: 'Сохранить новый пароль' }).click();
-      if (value === 'weak-password') await page.getByRole('alert').filter({ hasText: 'слишком простой' }).waitFor();
+      if (value === 'Weak-password1') await page.getByRole('alert').filter({ hasText: 'слишком простой' }).waitFor();
     }
     await page.getByRole('heading', { name: 'Войти в аккаунт' }).waitFor();
     await page.getByRole('status').filter({ hasText: 'Пароль изменён' }).waitFor();

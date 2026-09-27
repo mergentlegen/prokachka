@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { NextResponse } from "next/server";
 import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser } from "@/backend/http/current-user";
@@ -53,7 +54,7 @@ export async function startTelegram(request: Request) {
 export async function receiveTelegramUpdate(request: Request) {
   if (!isValidTelegramSecret(request.headers.get("x-telegram-bot-api-secret-token"))) return failure("Доступ запрещён", 401);
   let update;
-  try { update = await request.json(); } catch { return failure("Некорректное обновление Telegram", 400); }
+  try { update = await readLimitedJson(request); } catch (error) { return requestBodyFailure(error) || failure("Некорректное обновление Telegram", 400); }
   const message = update?.message;
   if (!message || message.chat?.type !== "private" || message.from?.is_bot) return NextResponse.json({ ok: true });
   const validId = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0;

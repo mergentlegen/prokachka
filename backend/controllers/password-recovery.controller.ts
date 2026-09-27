@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { failure, ok } from "@/backend/http/api-response";
 import { isProductionConfigSafe } from "@/backend/http/security";
 import { passwordRecoveryCookie, readPasswordRecoveryCookie } from "@/backend/http/password-recovery-cookie";
@@ -17,7 +18,7 @@ function failed(result: { error: string; status: number; retryAfter?: number }) 
 }
 function unavailable() { return failure("Восстановление пароля временно недоступно. Попробуйте позже.", 503); }
 async function readBody(request: Request): Promise<Record<string, unknown> | null> {
-  const value = await request.json().catch(() => null);
+  const value = await readLimitedJson(request);
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 
@@ -32,7 +33,7 @@ export async function requestRecovery(request: Request) {
     const response = ok(result, 202);
     response.headers.append("Set-Cookie", passwordRecoveryCookie("", 0));
     return response;
-  } catch { return unavailable(); }
+  } catch (error) { return requestBodyFailure(error) || unavailable(); }
 }
 
 export async function verifyRecovery(request: Request) {
@@ -47,7 +48,7 @@ export async function verifyRecovery(request: Request) {
     const response = ok({ recoveryVerified: true, expiresIn: result.expiresIn });
     response.headers.append("Set-Cookie", passwordRecoveryCookie(result.token, result.expiresIn));
     return response;
-  } catch { return unavailable(); }
+  } catch (error) { return requestBodyFailure(error) || unavailable(); }
 }
 
 export async function resetPassword(request: Request) {
@@ -70,5 +71,5 @@ export async function resetPassword(request: Request) {
     response.headers.append("Set-Cookie", passwordRecoveryCookie("", 0));
     response.headers.append("Set-Cookie", sessionCookie("", 0));
     return response;
-  } catch { return unavailable(); }
+  } catch (error) { return requestBodyFailure(error) || unavailable(); }
 }

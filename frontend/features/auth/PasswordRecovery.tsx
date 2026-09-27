@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { AuthLayout } from "./AuthLayout";
 import { AuthField } from "./AuthField";
+import { PASSWORD_HINT, validateNewPassword } from "@/shared/domain/password-policy";
 import styles from "./AuthScreen.module.css";
 
 export type RecoveryState = { step: "email" | "code" | "password"; email: string; resendAt: number; expiresAt: number };
@@ -71,7 +72,8 @@ export function PasswordRecovery({ initial, onBack, onDone }: {
     if (action === "request" && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254)) invalid.email = "Введите корректный email.";
     if (action === "verify" && !/^\d{6}$/.test(code)) invalid.code = "Введите шестизначный код из письма.";
     if (action === "reset") {
-      if (password.length < 6 || password.length > 1024) invalid.password = "Пароль должен содержать от 6 до 1024 символов.";
+      const passwordError = validateNewPassword(password);
+      if (passwordError) invalid.password = passwordError;
       if (!confirmation || password !== confirmation) invalid.passwordConfirmation = "Пароли не совпадают.";
     }
     setErrors(invalid);
@@ -129,7 +131,7 @@ export function PasswordRecovery({ initial, onBack, onDone }: {
             {errors.code && <p id="recovery-code-error" className={styles.fieldError} role="alert">{errors.code}</p>}
           </div>}
           {state.step === "password" && <>
-            <AuthField name="password" label="Новый пароль" type="password" autoComplete="new-password" value={password} placeholder="Минимум 6 символов" error={errors.password} onChange={(value) => edit("password", value)} />
+            <AuthField name="password" label="Новый пароль" type="password" autoComplete="new-password" value={password} placeholder="Придумайте новый пароль" hint={PASSWORD_HINT} error={errors.password} onChange={(value) => edit("password", value)} />
             <AuthField name="passwordConfirmation" label="Повторите новый пароль" type="password" autoComplete="new-password" value={confirmation} placeholder="Повторите пароль" error={errors.passwordConfirmation} onChange={(value) => edit("passwordConfirmation", value)} />
           </>}
         </fieldset>

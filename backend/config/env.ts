@@ -11,7 +11,7 @@ export const serverEnv = {
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
   telegramDeliverySecret: process.env.TELEGRAM_DELIVERY_SECRET,
   appUrl: process.env.NEXT_PUBLIC_APP_URL,
-  authDevMode: process.env.AUTH_DEV_MODE === "true",
+  authDevMode: process.env.NODE_ENV !== "production" && process.env.AUTH_DEV_MODE === "true",
   emailVerificationEnabled: process.env.AUTH_EMAIL_VERIFICATION_ENABLED === "true",
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   // Read at server startup, not baked into the GitHub-built release.

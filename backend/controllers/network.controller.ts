@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
@@ -31,7 +32,7 @@ export async function patchNetworkUser(request: Request, id: string) {
   if (!user || user.role !== "admin") return failure("Только руководитель команды может менять структуру.", user ? 403 : 401);
   if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (body.parentUserId !== undefined && body.parentUserId !== null && body.parentUserId !== "" && !isUuid(body.parentUserId)) return failure("Некорректный руководитель.", 400);
     for (const key of ["canReview", "canPublishTasks"]) {
       if (body[key] !== undefined && typeof body[key] !== "boolean") return failure("Некорректное значение разрешения.", 400);
@@ -47,7 +48,7 @@ export async function patchNetworkUser(request: Request, id: string) {
     if ("error" in result) return failure("Не удалось сохранить структуру сети.");
     scheduleTelegramDelivery();
     return ok({ user: result.data });
-  } catch {
-    return failure("Некорректные данные.", 400);
+  } catch (error) {
+    return requestBodyFailure(error) || failure("Некорректные данные.", 400);
   }
 }

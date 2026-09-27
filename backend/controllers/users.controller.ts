@@ -1,4 +1,5 @@
-import { getRequestUser, hasRole } from "@/backend/http/auth-guard";
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
+import { hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { deleteUser, findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
@@ -29,23 +30,24 @@ export async function listUsers(request: Request) {
 }
 
 export async function upsertUser(request: Request) {
-  const currentUser = getRequestUser(request);
+  const currentUser = await getCurrentUser(request);
   if (!hasRole(currentUser, ["ceo"])) return failure("Недостаточно прав.", currentUser ? 403 : 401);
   try {
-    const body = await request.json();
-    if (!body.name?.trim() || !body.telegramId) return failure("Нужно имя и Telegram ID.", 400);
+    const body = await readLimitedJson(request);
+    if (typeof body.name !== "string" || body.name.trim().length < 2 || body.name.trim().length > 160
+      || !/^[1-9][0-9]{0,15}$/.test(String(body.telegramId))) return failure("Укажите имя (2–160 символов) и корректный Telegram ID.", 400);
     const result = await saveUser(body.name.trim(), String(body.telegramId));
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure("Не удалось сохранить участника.");
     return ok({ user: (await withAvatarUrls([result.data]))[0] }, 201);
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 export async function updateUserAccessController(request: Request, id: string) {
-  const currentUser = getRequestUser(request);
+  const currentUser = await getCurrentUser(request);
   if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
   if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (body.role !== "admin" && body.role !== "member") return failure("Можно назначить только участника или наставника.", 400);
     if (body.teamId !== undefined && body.teamId !== null && body.teamId !== "" && !isUuid(body.teamId)) return failure("Некорректная команда.", 400);
     const result = await updateUserAccess(id, { role: body.role, teamId: body.teamId });
@@ -55,11 +57,11 @@ export async function updateUserAccessController(request: Request, id: string) {
       : "Не удалось обновить доступ пользователя.", result.error.code === "23514" ? 409 : 500);
     scheduleTelegramDelivery();
     return ok({ user: (await withAvatarUrls([result.data]))[0] });
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 
 export async function deleteUserController(request: Request, id: string) {
-  const currentUser = getRequestUser(request);
+  const currentUser = await getCurrentUser(request);
   if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
   if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
   const result = await deleteUser(id);

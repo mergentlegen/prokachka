@@ -2,14 +2,20 @@ import { getCurrentUser } from "@/backend/http/current-user";
 import { getSessionToken, readSession } from "@/backend/services/auth.service";
 import { liveEvents } from "@/backend/services/live-events.service";
 import { topicsForViewer } from "@/shared/domain/live-updates";
+import { acquireLiveConnection } from "@/backend/http/connection-limit";
+import { enforceRequestSecurity } from "@/backend/http/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (request.headers.get("sec-fetch-site") === "cross-site") return new Response(null, { status: 403 });
+  const blocked = enforceRequestSecurity(request, "live-connect", { max: 300 });
+  if (blocked) return blocked;
   const user = await getCurrentUser(request);
   if (!user) return new Response(null, { status: 401 });
+  const release = acquireLiveConnection(user.id);
+  if (!release) return new Response(null, { status: 429, headers: { "Retry-After": "30", "Cache-Control": "no-store" } });
   const token = getSessionToken(request);
   let cleanup = () => {};
   const body = new ReadableStream<Uint8Array>({
@@ -22,6 +28,7 @@ export async function GET(request: Request) {
       const finish = () => {
         if (closed) return;
         closed = true;
+        release();
         clearInterval(heartbeat); clearTimeout(lifetime); unsubscribe();
         request.signal.removeEventListener("abort", finish);
         try { controller.close(); } catch { /* Already cancelled by the client. */ }
@@ -34,7 +41,7 @@ export async function GET(request: Request) {
         controller.enqueue(encoder.encode(frame));
       };
       const event = (name: string, data: unknown) => send(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
-      unsubscribe = liveEvents.subscribe({
+      try { unsubscribe = liveEvents.subscribe({
         change(change) {
           const topics = topicsForViewer(change, user);
           if (topics.length) event("change", topics);
@@ -42,7 +49,7 @@ export async function GET(request: Request) {
           if (topics.includes("session")) finish();
         },
         status(ready) { event(ready ? "ready" : "degraded", {}); },
-      });
+      }); } catch { finish(); return; }
       heartbeat = setInterval(() => {
         if (!readSession(token)) { event("change", ["session"]); finish(); }
         else send(": heartbeat\n\n");

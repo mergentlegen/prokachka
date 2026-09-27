@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { failure } from "@/backend/http/api-response";
+import { isIP } from "node:net";
+import { setRequestBodyLimit } from "@/backend/http/request-body";
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
+const maxBuckets = 10_000;
+let nextSweepAt = 0;
 const mutationMethods = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
 type SecurityOptions = { max?: number; windowMs?: number; maxBodyBytes?: number; skipOrigin?: boolean };
 
 function clientIp(request: Request) {
   const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
+  if (realIp && isIP(realIp)) return realIp;
 
   // Nginx appends the actual client address to X-Forwarded-For. Use the
   // last hop so a client cannot choose the first value and bypass limits.
@@ -16,22 +20,30 @@ function clientIp(request: Request) {
     ?.split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  return forwarded?.at(-1) || "unknown";
+  const last = forwarded?.at(-1);
+  return last && isIP(last) ? last : "unknown";
+}
+
+function limited(retryAfter: number) {
+  return NextResponse.json({ ok: false, message: "Слишком много запросов. Попробуйте чуть позже." }, { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } });
 }
 
 export function enforceRateLimit(key: string, max: number, windowMs: number) {
   const now = Date.now();
+  if (now >= nextSweepAt) {
+    for (const [entryKey, entry] of buckets) if (entry.resetAt <= now) buckets.delete(entryKey);
+    nextSweepAt = now + 30_000;
+  }
   const current = buckets.get(key);
   if (!current || current.resetAt <= now) {
-    if (buckets.size > 2000) {
-      for (const [entryKey, entry] of buckets) if (entry.resetAt <= now) buckets.delete(entryKey);
-    }
+    // Fail closed when saturated; evicting live entries would reset an attacker's limit.
+    if (!current && buckets.size >= maxBuckets) return limited(30);
     buckets.set(key, { count: 1, resetAt: now + windowMs });
     return null;
   }
   if (current.count >= max) {
     const retryAfter = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
-    return NextResponse.json({ ok: false, message: "Слишком много запросов. Попробуйте чуть позже." }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
+    return limited(retryAfter);
   }
   current.count += 1;
   return null;
@@ -43,6 +55,14 @@ function sameOrigin(request: Request) {
   try {
     const requestOrigin = new URL(request.url).origin;
     const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin : "";
+    if (process.env.NODE_ENV === "production") {
+      // Do not trust Host / X-Forwarded-Host supplied by a caller as the CSRF authority.
+      const allowed = new Set([configuredOrigin]);
+      if (["https://prokachka.kz", "https://www.prokachka.kz"].includes(configuredOrigin)) {
+        allowed.add("https://prokachka.kz"); allowed.add("https://www.prokachka.kz");
+      }
+      return Boolean(configuredOrigin) && allowed.has(origin);
+    }
     return origin === requestOrigin || Boolean(configuredOrigin && origin === configuredOrigin);
   } catch {
     return false;
@@ -51,8 +71,11 @@ function sameOrigin(request: Request) {
 
 export function enforceRequestSecurity(request: Request, bucket: string, options: SecurityOptions = {}) {
   const { max = 120, windowMs = 60_000, maxBodyBytes = 128 * 1024, skipOrigin = false } = options;
+  setRequestBodyLimit(request, maxBodyBytes);
   if (mutationMethods.has(request.method)) {
-    const contentLength = Number(request.headers.get("content-length") || 0);
+    const rawLength = request.headers.get("content-length");
+    if (rawLength !== null && !/^\d+$/.test(rawLength)) return failure("Некорректный размер запроса.", 400);
+    const contentLength = Number(rawLength || 0);
     if (contentLength > maxBodyBytes) return failure("Запрос слишком большой.", 413);
     if (!skipOrigin && !sameOrigin(request)) return failure("Недопустимый источник запроса.", 403);
   }
@@ -84,5 +107,5 @@ export function parseExternalUrl(value: unknown): ExternalUrlResult {
 
 export function isProductionConfigSafe() {
   const authSecret = process.env.AUTH_SECRET;
-  return process.env.NODE_ENV !== "production" || Boolean(authSecret && authSecret.length >= 32);
+  return process.env.NODE_ENV !== "production" || Boolean(authSecret && authSecret.length >= 32 && process.env.AUTH_DEV_MODE !== "true");
 }

@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
@@ -53,7 +54,7 @@ export async function createTask(request: Request) {
   if (!user) return failure("Недостаточно прав.", 401);
   if (!canPublish(user)) return failure("Недостаточно прав для публикации заданий.", 403);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (typeof body.title !== "string" || typeof body.description !== "string" || body.title.trim().length < 2 || body.description.trim().length < 2) return failure("Заполните название и описание.", 400);
     if (body.title.trim().length > 160 || body.description.trim().length > 5000) return failure("Название или описание слишком длинные.", 400);
     const deadline = parseDeadline(body.deadlineAt);
@@ -77,7 +78,7 @@ export async function createTask(request: Request) {
     if ("validationError" in result) return failure(result.validationError || "Выберите команду.", 400);
     if (result.error) return failure("Не удалось создать задание.");
     return ok({ task: result.data }, 201);
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 
 export async function updateTask(request: Request, id: string) {
@@ -86,7 +87,7 @@ export async function updateTask(request: Request, id: string) {
   if (!user) return failure("Недостаточно прав.", 401);
   if (!canPublish(user)) return failure("Недостаточно прав для изменения заданий.", 403);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (body.title !== undefined && (typeof body.title !== "string" || body.title.trim().length < 2 || body.title.trim().length > 160)) return failure("Название задания должно быть от 2 до 160 символов.", 400);
     if (body.description !== undefined && (typeof body.description !== "string" || body.description.trim().length < 2 || body.description.trim().length > 5000)) return failure("Описание задания должно быть от 2 до 5000 символов.", 400);
     if (body.maxPoints !== undefined && (!Number.isFinite(Number(body.maxPoints)) || Number(body.maxPoints) < 0 || Number(body.maxPoints) > 100)) return failure("Некорректное количество миль.", 400);
@@ -105,7 +106,7 @@ export async function updateTask(request: Request, id: string) {
     if ("validationError" in result) return failure(result.validationError || "Некорректное изменение задания.", 400);
     if (result.error) return failure("Не удалось обновить задание.");
     return ok({ task: result.data });
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 
 export async function deleteTask(request: Request, id: string) {

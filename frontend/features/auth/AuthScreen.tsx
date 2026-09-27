@@ -12,6 +12,7 @@ import styles from "./AuthScreen.module.css";
 import { EmailConfirmation, emailConfirmationSnapshot, rememberEmailConfirmation, restoreEmailConfirmation, subscribeEmailConfirmation } from "./EmailConfirmation";
 import { AuthField } from "./AuthField";
 import { AuthLayout } from "./AuthLayout";
+import { PASSWORD_HINT } from "@/shared/domain/password-policy";
 import { PasswordRecovery, passwordRecoverySnapshot, rememberPasswordRecovery, restorePasswordRecovery, subscribePasswordRecovery } from "./PasswordRecovery";
 
 export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthenticated: (user: AuthUser) => void; initialMode?: AuthMode }) {
@@ -89,6 +90,7 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
     const message = serverErrors[name] || ((attempted || touched.has(name)) ? validation[name] : undefined);
     const credentialError = credentialsInvalid && (name === "email" || name === "password");
     return <AuthField key={name} name={name} label={label} value={values[name]} type={type} autoComplete={autocomplete} placeholder={placeholder} action={action}
+      hint={mode === "register" && name === "password" ? PASSWORD_HINT : undefined}
       error={message} credentialError={credentialError} onChange={(value) => change(name, value)}
       onBlur={() => setTouched((current) => new Set(current).add(name))} />;
   }
@@ -111,7 +113,7 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
         <fieldset className={styles.fields} disabled={pending}>
           {mode === "register" && <div className={styles.names}>{field("firstName", "Имя", "given-name", "Имя")}{field("lastName", "Фамилия", "family-name", "Фамилия")}</div>}
           {field("email", "Email", "email", "name@example.com", "email")}
-          {field("password", "Пароль", mode === "login" ? "current-password" : "new-password", mode === "register" ? "Минимум 6 символов" : "Ваш пароль", "password", mode === "login" &&
+          {field("password", "Пароль", mode === "login" ? "current-password" : "new-password", mode === "register" ? "Придумайте пароль" : "Ваш пароль", "password", mode === "login" &&
             <button type="button" className={styles.forgotAction} disabled={pending} onClick={() => {
               setValues((current) => ({ ...current, password: "", passwordConfirmation: "" }));
               rememberPasswordRecovery({ step: "email", email: values.email.trim().slice(0, 254), resendAt: 0, expiresAt: Date.now() + 600_000 });

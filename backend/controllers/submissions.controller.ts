@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
@@ -33,21 +34,21 @@ export async function createSubmission(request: Request) {
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   if (user.role !== "member") return failure("Работу может отправить только участник.", 403);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (!isUuid(body.taskId)) return failure("Некорректное задание.", 400);
     const result = await prepareTelegramSubmission(user.id, body.taskId);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("validationError" in result) return failure(result.validationError || "Работу нельзя отправить.", 400);
     if ("error" in result) return failure("Не удалось подготовить отправку работы.");
     return ok({ url: result.url, expiresAt: result.expiresAt }, 201);
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 
 export async function reviewSubmission(request: Request, id: string) {
   const user = await currentUser(request);
   if (!user || (user.role !== "ceo" && user.role !== "admin" && !user.canReview)) return failure("Недостаточно прав.", user ? 403 : 401);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (!isUuid(id)) return failure("Некорректная работа.", 400);
     const status = body.status === "accepted" || body.status === "revision" ? body.status : null;
     if (!status) return failure("Неизвестный статус.", 400);
@@ -60,7 +61,7 @@ export async function reviewSubmission(request: Request, id: string) {
     if ("validationError" in result) return failure(result.validationError || "Работа уже проверена.", 409);
     if ("error" in result) return failure("Не удалось сохранить проверку.");
     return ok({ submission: result.data });
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 
 export async function streamSubmissionMedia(request: Request, id: string) {

@@ -7,7 +7,7 @@ const clientKey = '@/backend/infrastructure/supabase/auth-client';
 const emailKey = '@/backend/services/email-auth.service';
 const envKey = '@/backend/config/env';
 const verified = { id: 'auth-id', email: 'person@example.com', email_confirmed_at: '2026-01-01' };
-const input = { firstName: ' Anna ', lastName: ' Member ', email: ' PERSON@example.com ', password: 'secret-password' };
+const input = { firstName: ' Anna ', lastName: ' Member ', email: ' PERSON@example.com ', password: 'Secret-password1' };
 
 function service({ existing = null, draft = null, signup, otp, login, gate, provision, saveError, invitation } = {}) {
   const calls = [];
@@ -195,6 +195,7 @@ test('each Auth operation uses a fresh anonymous-key client with persistence and
 
 test('registration and unconfirmed login return a pending step without minting a session', async () => {
   const controller = load('backend/controllers/auth.controller.ts', {
+    '@/backend/services/login-security.service': { checkLoginAttempt: async () => null },
     [envKey]: { serverEnv: { emailVerificationEnabled: true } },
     '@/backend/http/security': { isProductionConfigSafe: () => true, enforceRateLimit: () => null },
     [emailKey]: { beginEmailRegistration: async value => {

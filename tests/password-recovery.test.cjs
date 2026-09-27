@@ -83,27 +83,27 @@ test('encrypted grants reject ciphertext modification and changes to the Auth se
 });
 test('expired, busy or mismatched grants never update passwords', async () => {
   for (const options of [{ claimStatus: 'invalid' }, { claimStatus: 'busy' }, { restoreUser: { ...identity, id: 'attacker-id' } }]) {
-    const api = service(options); const result = await api.resetRecoveredPassword('opaque-token', 'new-secret');
+    const api = service(options); const result = await api.resetRecoveredPassword('opaque-token', 'New-secret1');
     assert.ok(result.error); assert.ok(!api.calls.some(([name]) => name === 'password'));
   }
 });
 test('a password-policy failure releases the lease so a different password can be submitted without another OTP', async () => {
   const api = service({ updateError: { code: 'weak_password' } });
-  assert.equal((await api.resetRecoveredPassword('opaque-token', 'too-weak')).status, 400);
+  assert.equal((await api.resetRecoveredPassword('opaque-token', 'Too-weak1')).status, 400);
   assert.equal(api.calls.at(-1)[0], 'app_release_password_recovery');
   assert.ok(!api.calls.some(([name]) => name === 'app_finish_password_recovery'));
 });
 test('reset consumes the grant and revokes provider sessions; a completed Auth update can be safely retried', async () => {
   for (const updateError of [undefined, { code: 'same_password' }]) {
     const api = service({ updateError });
-    assert.deepEqual(await api.resetRecoveredPassword('opaque-token', 'new-password'), { passwordReset: true });
+    assert.deepEqual(await api.resetRecoveredPassword('opaque-token', 'New-password1'), { passwordReset: true });
     assert.equal(api.calls.at(-2)[0], 'app_finish_password_recovery');
     assert.deepEqual(api.calls.at(-1), ['signout', { scope: 'global' }]);
   }
 });
 test('a DB finalization error keeps the verified grant retryable and does not claim success', async () => {
   const api = service({ finishError: { message: 'private database detail' } });
-  const result = await api.resetRecoveredPassword('opaque-token', 'new-password');
+  const result = await api.resetRecoveredPassword('opaque-token', 'New-password1');
   assert.equal(result.status, 503); assert.ok(!JSON.stringify(result).includes('private database detail'));
   assert.equal(api.calls.at(-1)[0], 'app_release_password_recovery');
 });
@@ -121,12 +121,12 @@ test('controllers accept only a verified HttpOnly grant, never caller IDs, and v
   const verified = await controller.verifyRecovery(req({ email, code: '012345' }));
   assert.ok(!(await verified.clone().json()).token); assert.match(verified.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
   const cookie = 'prokachka_password_recovery=' + 'A'.repeat(43);
-  assert.equal((await controller.resetPassword(req({ password: 'new-secret', passwordConfirmation: 'new-secret', userId: 'attacker' }))).status, 410);
+  assert.equal((await controller.resetPassword(req({ password: 'New-secret1', passwordConfirmation: 'New-secret1', userId: 'attacker' }))).status, 410);
   assert.equal((await controller.resetPassword(req({ password: 'short', passwordConfirmation: 'short' }, cookie))).status, 400);
-  assert.equal((await controller.resetPassword(req({ password: 'new-secret', passwordConfirmation: 'different' }, cookie))).status, 400);
+  assert.equal((await controller.resetPassword(req({ password: 'New-secret1', passwordConfirmation: 'different' }, cookie))).status, 400);
   assert.equal(calls.length, 0);
-  const result = await controller.resetPassword(req({ password: 'new-secret', passwordConfirmation: 'new-secret', userId: 'attacker' }, cookie));
-  assert.deepEqual(calls, [['A'.repeat(43), 'new-secret']]);
+  const result = await controller.resetPassword(req({ password: 'New-secret1', passwordConfirmation: 'New-secret1', userId: 'attacker' }, cookie));
+  assert.deepEqual(calls, [['A'.repeat(43), 'New-secret1']]);
   assert.match(result.headers.get('set-cookie'), /incruises_session=.*Max-Age=0/);
 });
 test('old signed sessions are rejected after reset, including sessions without a version field', async () => {

@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { getTaskOrder, saveTaskOrder } from "@/backend/services/task-feed-order.service";
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 
 function respond(result: Awaited<ReturnType<typeof getTaskOrder>>) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
@@ -15,7 +16,9 @@ export async function taskOrder(request: Request) {
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   if (!user.teamId || (user.role !== "admin" && !user.canPublishTasks)) return failure("Недостаточно прав для изменения порядка.", 403);
   if (request.method === "GET") return respond(await getTaskOrder(user.id));
-  const body = await request.json().catch(() => null);
+  let body;
+  try { body = await readLimitedJson(request); }
+  catch (error) { return requestBodyFailure(error) || failure("Некорректные данные порядка заданий.", 400); }
   const validKeys = (value: unknown): value is string[] => Array.isArray(value) && value.length <= 2000
     && value.every((key) => typeof key === "string" && /^(?:[0-9a-f-]{36}|game:[a-z-]{1,50})$/.test(key)) && new Set(value).size === value.length;
   if (!body || typeof body.revision !== "string" || !/^[a-f0-9]{32}$/.test(body.revision)

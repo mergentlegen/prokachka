@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { getSupabaseAuthClient } from "@/backend/infrastructure/supabase/auth-client";
+import { validateNewPassword } from "@/shared/domain/password-policy";
 
 type RecoveryError = { error: string; status: number; retryAfter?: number };
 const unavailable = (): RecoveryError => ({ error: "Восстановление пароля временно недоступно. Попробуйте позже.", status: 503 });
@@ -100,6 +101,8 @@ export async function verifyPasswordRecovery(email: string, code: string) {
 }
 
 export async function resetRecoveredPassword(token: string, password: string) {
+  const passwordError = validateNewPassword(password);
+  if (passwordError) return { error: passwordError, status: 400 };
   const admin = getSupabaseAdmin(); const client = getSupabaseAuthClient();
   if (!admin || !client) return unavailable();
   const args = { p_token_hash: hash(token), p_claim_id: randomUUID() };

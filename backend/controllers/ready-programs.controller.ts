@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
@@ -34,7 +35,7 @@ export async function postReadyProgram(request: Request) {
   if (!user || !canPublish(user)) return failure("Недостаточно прав.", user ? 403 : 401);
   if (user.role !== "ceo" && !user.teamId) return failure("За пользователем не закреплена команда.", 403);
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     const key = body?.key as ReadyProgramKey;
     if (!readyProgramByKey(key)) return failure("Готовая программа не найдена.", 404);
     const teamId = user.role === "ceo" ? typeof body?.teamId === "string" ? body.teamId : "" : user.teamId || "";
@@ -49,5 +50,5 @@ export async function postReadyProgram(request: Request) {
     if ("validationError" in result) return failure(result.validationError || "Готовая программа не найдена.", 400);
     if ("error" in result) return failure("Не удалось опубликовать готовую программу.");
     return ok({ program: result.data.program, tasks: result.data.tasks, alreadyPublished: "alreadyPublished" in result && result.alreadyPublished }, "alreadyPublished" in result && result.alreadyPublished ? 200 : 201);
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

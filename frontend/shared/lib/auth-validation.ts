@@ -1,9 +1,11 @@
+import { validateExistingPassword, validateNewPassword } from "@/shared/domain/password-policy";
+
 export type AuthMode = "login" | "register";
 export type AuthValues = { firstName: string; lastName: string; email: string; password: string; passwordConfirmation: string };
 export type AuthFieldName = keyof AuthValues;
 export type AuthErrors = Partial<Record<AuthFieldName, string>>;
 
-// Mirrors the existing server requirements; this does not replace server validation.
+// Shared policy complements, but never replaces, server-side validation.
 export function validateAuthForm(mode: AuthMode, values: AuthValues): AuthErrors {
   const errors: AuthErrors = {};
   if (mode === "register") {
@@ -12,8 +14,8 @@ export function validateAuthForm(mode: AuthMode, values: AuthValues): AuthErrors
   }
   if (!values.email.trim()) errors.email = "Введите email.";
   else if (values.email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) errors.email = "Укажите email в формате name@example.com.";
-  if (values.password.length < 6) errors.password = "Пароль должен содержать минимум 6 символов.";
-  else if (values.password.length > 1024) errors.password = "Пароль должен содержать не больше 1024 символов.";
+  const passwordError = mode === "register" ? validateNewPassword(values.password) : validateExistingPassword(values.password);
+  if (passwordError) errors.password = passwordError;
   if (mode === "register" && (!values.passwordConfirmation || values.password !== values.passwordConfirmation)) errors.passwordConfirmation = "Пароли не совпадают.";
   return errors;
 }

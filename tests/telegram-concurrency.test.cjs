@@ -10,6 +10,16 @@ const psql = process.env.PROKACHKA_TEST_PSQL || 'psql';
 const args = ['-X', '-h', '127.0.0.1', '-p', port || '55439', '-U', 'postgres', '-d', process.env.PROKACHKA_TEST_PG_DATABASE || 'postgres', '-v', 'ON_ERROR_STOP=1', '-Atq'];
 const query = (sql) => execFileSync(psql, [...args, '-c', sql], { encoding: 'utf8' }).trim();
 const parallel = async (sql) => (await promisify(execFile)(psql, [...args, '-c', sql], { encoding: 'utf8' })).stdout.trim();
+
+test('parallel login attempts share one durable budget and cannot race past twenty attempts', { skip: !port }, async () => {
+  const key = require('node:crypto').createHash('sha256').update(randomUUID()).digest('hex');
+  try {
+    const results = await Promise.all(Array.from({ length: 28 }, () => parallel(`select app_login_attempt_limit('${key}');`)));
+    assert.equal(results.filter(value => JSON.parse(value).allowed === true).length, 20);
+    assert.equal(results.filter(value => JSON.parse(value).allowed === false).length, 8);
+    assert.equal(query(`select attempts from login_attempt_limits where email_hash='${key}'`), '21');
+  } finally { query(`delete from login_attempt_limits where email_hash='${key}'`); }
+});
 function fixture() {
   const team = randomUUID(), root = randomUUID(), alice = randomUUID(), bob = randomUUID(), task = randomUUID();
   query(`insert into teams(id,name) values('${team}','concurrency-${team}');

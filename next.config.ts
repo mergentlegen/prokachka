@@ -23,7 +23,7 @@ const contentSecurityPolicy = [
   "font-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline'" + (isDevelopment ? " 'unsafe-eval'" : ""),
-  `connect-src 'self' ws: wss: ${supabaseSources.join(" ")}`.trim(),
+  `connect-src 'self' ${isDevelopment ? "ws: wss:" : supabaseUrl ? `wss://${supabaseUrl.host}` : ""} ${supabaseSources.join(" ")}`.trim(),
 ].join("; ");
 
 const securityHeaders = [

@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { cancelWelcomeVideoUpload, completeWelcomeVideo, createWelcomeVideoUpload, deleteWelcomeVideo, finishWelcomeVideoUpload, getWelcomeVideo, getWelcomeVideoSettings } from "@/backend/services/welcome-video.service";
@@ -48,18 +49,18 @@ export async function requestWelcomeVideoUpload(request: Request) {
   const user = await authenticated(request);
   if (isResponse(user)) return user;
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     return resultResponse(await createWelcomeVideoUpload(user, body.metadata));
-  } catch { return failure("Не удалось прочитать данные загрузки.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Не удалось прочитать данные загрузки.", 400); }
 }
 
 export async function finishWelcomeVideo(request: Request) {
   const user = await authenticated(request);
   if (isResponse(user)) return user;
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     return resultResponse(await finishWelcomeVideoUpload(user, body.path, body.metadata));
-  } catch { return failure("Не удалось проверить загруженный файл.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Не удалось проверить загруженный файл.", 400); }
 }
 
 export async function removeWelcomeVideo(request: Request) {
@@ -71,6 +72,6 @@ export async function removeWelcomeVideo(request: Request) {
 export async function cancelWelcomeVideo(request: Request) {
   const user = await authenticated(request);
   if (isResponse(user)) return user;
-  try { return resultResponse(await cancelWelcomeVideoUpload(user, (await request.json()).path)); }
-  catch { return failure("Не удалось прочитать данные отмены загрузки.", 400); }
+  try { return resultResponse(await cancelWelcomeVideoUpload(user, (await readLimitedJson(request)).path)); }
+  catch (error) { return requestBodyFailure(error) || failure("Не удалось прочитать данные отмены загрузки.", 400); }
 }

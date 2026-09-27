@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { getSupabaseAuthClient } from "@/backend/infrastructure/supabase/auth-client";
 import { findInvitationByToken } from "@/backend/services/network.service";
+import { validateNewPassword } from "@/shared/domain/password-policy";
 
 type AuthError = { error: string; status: number; retryAfter?: number };
 type PendingEmail = { verificationRequired: true; email: string; resendAfter: number };
@@ -39,6 +40,8 @@ async function provision(authUserId: string): Promise<Identity | AuthError> {
 export async function beginEmailRegistration(input: {
   firstName: string; lastName: string; email: string; password: string; inviteToken?: string;
 }): Promise<PendingEmail | AuthError> {
+  const passwordError = validateNewPassword(input.password);
+  if (passwordError) return { error: passwordError, status: 400 };
   const admin = getSupabaseAdmin();
   const client = getSupabaseAuthClient();
   if (!admin || !client) return unavailable();

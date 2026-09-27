@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
@@ -18,7 +19,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await request.json() as { action?: ReadyAttemptAction | "captain"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction; index?: unknown; payload?: unknown };
     const action = body?.action;
     if (action === "captain") {
       if (!body.operation || !["start", "checkpoint", "retry", "finish", "save-details", "telegram-link"].includes(body.operation)
@@ -58,5 +59,5 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
     }
     if (action === "restart-quiz") return resultResponse(await restartReadyProgramQuizAttempt(user.id, taskId));
     return resultResponse(await completeReadyProgramAttempt(user.id, taskId));
-  } catch { return failure("Некорректные данные.", 400); }
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

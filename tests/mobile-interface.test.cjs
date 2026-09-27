@@ -214,7 +214,7 @@ test("star award list continues to exclude the mentor's own account", () => {
 });
 
 const { validateAuthForm, registrationServerField } = loadTs("frontend/shared/lib/auth-validation.ts");
-const validRegistration = { firstName: "Мерген", lastName: "Тлеген", email: "user@example.com", password: "123456", passwordConfirmation: "123456" };
+const validRegistration = { firstName: "Мерген", lastName: "Тлеген", email: "user@example.com", password: "Password1", passwordConfirmation: "Password1" };
 test("registration returns every field error, while login only validates its two fields", () => {
   const empty = Object.fromEntries(Object.keys(validRegistration).map((key) => [key, ""]));
   assert.deepEqual(Object.keys(validateAuthForm("register", empty)), ["firstName", "lastName", "email", "password", "passwordConfirmation"]);
@@ -223,9 +223,10 @@ test("registration returns every field error, while login only validates its two
   assert.deepEqual(Object.keys(validateAuthForm("register", { ...validRegistration, email: "test", passwordConfirmation: "different" })), ["email", "passwordConfirmation"]);
 });
 
-test("frontend preserves current password rules and server name/email boundaries", () => {
+test("frontend enforces new password policy without rejecting existing passwords at login", () => {
   for (const password of ["123456", "      ", "пароль", "a".repeat(300)]) {
-    assert.deepEqual(validateAuthForm("register", { ...validRegistration, password, passwordConfirmation: password }), {});
+    assert.ok(validateAuthForm("register", { ...validRegistration, password, passwordConfirmation: password }).password);
+    assert.deepEqual(validateAuthForm("login", { ...validRegistration, password }), {});
   }
   assert.ok(validateAuthForm("login", { ...validRegistration, password: "12345" }).password);
   assert.deepEqual(validateAuthForm("register", { ...validRegistration, firstName: " аa ", lastName: "б".repeat(80), email: " user@example.com " }), {});

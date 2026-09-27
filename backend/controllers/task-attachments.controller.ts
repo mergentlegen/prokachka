@@ -2,13 +2,17 @@ import { getCurrentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { deleteTaskAttachment as removeAttachment, getTaskAttachment, uploadTaskAttachment } from "@/backend/services/task-attachments.service";
+import { readLimitedFormData } from "@/backend/http/form-data";
+import { requestBodyFailure } from "@/backend/http/request-body";
 
 export async function createTaskAttachment(request: Request, taskId: string) {
   if (!isUuid(taskId)) return failure("Некорректное задание.", 400);
   const user = await getCurrentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (user.role !== "ceo" && user.role !== "admin" && !user.canPublishTasks) return failure("Недостаточно прав для загрузки файлов.", 403);
   let form: FormData;
-  try { form = await request.formData(); } catch { return failure("Не удалось прочитать загруженный файл.", 400); }
+  try { form = await readLimitedFormData(request, 16 * 1024 * 1024); }
+  catch (error) { return requestBodyFailure(error) || failure("Не удалось прочитать загруженный файл.", 400); }
   const file = form.get("file");
   if (!(file instanceof File)) return failure("Выберите PDF-файл для загрузки.", 400);
   const result = await uploadTaskAttachment(taskId, user, file);
@@ -37,6 +41,7 @@ export async function readTaskAttachment(request: Request, taskId: string, attac
     "Content-Disposition": `${disposition}; filename="${safeFallback}"; filename*=UTF-8''${encodeURIComponent(attachment.fileName)}`,
     "Content-Length": String(attachment.sizeBytes), "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
     "Cross-Origin-Resource-Policy": "same-origin",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
   } });
   return response;
 }

@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
@@ -44,7 +45,7 @@ export async function createStarAward(request: Request) {
   if (!user.teamId) return failure("Сначала назначьте команду.", 400);
 
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     const userId = body.userId;
     const awardOption = starAwardOption(body.kind);
     const comment = body.comment === undefined ? "" : body.comment;
@@ -83,8 +84,8 @@ export async function createStarAward(request: Request) {
     if ("forbidden" in result) return failure("Нельзя выдавать звёзды самому себе.", 403);
     if (result.error) return failure("Не удалось присвоить звёзды.");
     return ok({ award: result.data }, 201);
-  } catch {
-    return failure("Некорректные данные.", 400);
+  } catch (error) {
+    return requestBodyFailure(error) || failure("Некорректные данные.", 400);
   }
 }
 

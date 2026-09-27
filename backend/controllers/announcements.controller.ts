@@ -1,3 +1,4 @@
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
@@ -41,7 +42,7 @@ export async function createAnnouncement(request: Request) {
   if (!user.teamId) return failure("Сначала назначьте команду.", 400);
 
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (!validateText(body.title, 2, 160)) {
       return failure("Заголовок должен содержать от 2 до 160 символов.", 400);
     }
@@ -62,8 +63,8 @@ export async function createAnnouncement(request: Request) {
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure("Не удалось создать объявление.");
     return ok({ announcement: result.data }, 201);
-  } catch {
-    return failure("Некорректные данные.", 400);
+  } catch (error) {
+    return requestBodyFailure(error) || failure("Некорректные данные.", 400);
   }
 }
 
@@ -74,7 +75,7 @@ export async function updateAnnouncement(request: Request, id: string) {
   if (user.role !== "ceo" && !user.teamId) return failure("Сначала назначьте команду.", 400);
 
   try {
-    const body = await request.json();
+    const body = await readLimitedJson(request);
     if (body.title !== undefined && !validateText(body.title, 2, 160)) {
       return failure("Заголовок должен содержать от 2 до 160 символов.", 400);
     }
@@ -103,8 +104,8 @@ export async function updateAnnouncement(request: Request, id: string) {
     if ("forbidden" in result) return failure("У вас нет доступа к этому объявлению.", 403);
     if (result.error) return failure("Не удалось изменить объявление.");
     return ok({ announcement: result.data });
-  } catch {
-    return failure("Некорректные данные.", 400);
+  } catch (error) {
+    return requestBodyFailure(error) || failure("Некорректные данные.", 400);
   }
 }
 
