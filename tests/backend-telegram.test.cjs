@@ -206,3 +206,55 @@ test('successful Telegram linking sends confirmation followed by the club welcom
     'Получи гарантированный бонус 100 $',
   ].join('\n'));
 });
+
+test('company voice preparation binds a short opaque bot link to the member and stores only the token hash', async () => {
+  const db = database({ users: { data: { id: 'alice', role: 'member', telegram_id: '111' } } });
+  db.rpc = async (name, args) => { assert.equal(name, 'tg_company_voice_error'); assert.deepEqual(args, { p_user_id: 'alice', p_task_id: 'task' }); return { data: null }; };
+  const service = load('backend/services/telegram-submission.service.ts', { ...dbOverrides(db), [envKey]: { serverEnv: { telegramBotUsername: '@fixture_bot', telegramBotToken: 'fixture' } } });
+  const result = await service.prepareCompanyVoice('alice', 'task');
+  const token = new URL(result.url).searchParams.get('start');
+  assert.match(token, /^company_voice_[A-Za-z0-9_-]{32}$/); assert.ok(token.length <= 64);
+  const input = db.calls.find(call => call.table === 'telegram_submission_sessions').ops.find(([op]) => op === 'insert')[1];
+  assert.equal(input.token_hash, service.telegramTokenHash(token.slice(14)));
+  assert.equal(input.purpose, 'company-voice'); assert.equal(input.user_id, 'alice'); assert.equal(input.telegram_id, '111');
+  assert.ok(!db.calls.some(call => call.table === 'submissions'));
+});
+
+test('webhook selects company voice mode and processes an actual voice without treating it as text', async () => {
+  const messages = [], received = []; let deliveries = 0;
+  const controller = load('backend/controllers/telegram.controller.ts', {
+    'next/server': { NextResponse: { json: data => ({ data, status: 200 }) } },
+    '@/backend/http/api-response': { failure: (message, status) => ({ message, status }) },
+    ...dbOverrides(null), [envKey]: { serverEnv: {}, isValidTelegramSecret: value => value === 'fixture' },
+    '@/backend/services/telegram-submission.service': {
+      beginTelegramSubmission: async token => { assert.equal(token, 'fixture'); return { ready: true, purpose: 'company-voice' }; },
+      attachTelegramSubmission: async input => { received.push(input); return { data: { id: 'existing-reward' }, purpose: 'company-voice' }; },
+    },
+    '@/backend/services/telegram-link.service': {},
+    '@/backend/services/telegram-notifications.service': { sendTelegramMessage: async (_id, message) => { messages.push(message); return { ok: true }; }, scheduleTelegramDelivery: () => deliveries++ },
+  });
+  const send = message => controller.receiveTelegramUpdate(new Request('https://fixture.test', { method: 'POST', headers: { 'x-telegram-bot-api-secret-token': 'fixture' }, body: JSON.stringify({ update_id: 90, message: { from: { id: 111 }, chat: { id: 111, type: 'private' }, message_id: 91, ...message } }) }));
+  assert.equal((await send({ text: '/start company_voice_fixture' })).status, 200);
+  assert.match(messages[0], /микрофон/); assert.equal(deliveries, 0);
+  assert.equal((await send({ voice: { file_id: 'voice-file', duration: 45 } })).status, 200);
+  assert.equal(received[0].mediaType, 'voice'); assert.equal(received[0].telegramFileId, 'voice-file'); assert.equal(received[0].answerText, '');
+  assert.equal(deliveries, 1); assert.match(messages[1], /очередь доставки/);
+});
+
+test('company voice delivery rechecks ancestor access, retries failed copying with file_id, and never downloads audio', async () => {
+  for (const revoked of [false, true]) {
+    const db = database({ users: { data: { id: 'mentor', role: 'admin', team_id: 'team', telegram_id: '999' } },
+      submissions: { data: { company_voice_file_id: 'voice-file', company_voice_chat_id: '111', company_voice_message_id: 8, users: { name: 'Alice' } } },
+    });
+    let claimed = false, checks = 0;
+    db.rpc = async name => name === 'tg_can_receive_company_voice' ? { data: !revoked || ++checks === 1 } : { data: claimed ? [] : (claimed = true, [{ id: 'job', kind: 'company-voice', recipient_id: 'mentor', submission_id: 's', attempts: 1, lock_token: 'lock' }]) };
+    const requests = [], original = global.fetch;
+    global.fetch = async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); return { ok: !url.endsWith('/copyMessage'), status: 200, json: async () => ({ ok: !url.endsWith('/copyMessage') }) }; };
+    try {
+      const service = load('backend/services/telegram-notifications.service.ts', { ...dbOverrides(db), 'next/server': { after: () => {} }, [envKey]: { serverEnv: { telegramBotToken: 'fixture' } } });
+      const result = await service.deliverTelegramNotifications();
+      if (revoked) { assert.equal(result.delivered, 0); assert.equal(requests.length, 1); }
+      else { assert.equal(result.delivered, 1); assert.deepEqual(requests.map(item => item.url.split('/').at(-1)), ['sendMessage','copyMessage','sendVoice']); assert.equal(requests[2].body.voice, 'voice-file'); }
+    } finally { global.fetch = original; }
+  }
+});

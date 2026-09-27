@@ -6,7 +6,7 @@ export type SubmissionSource = "telegram" | "interactive";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
-export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules", "heart-survey"] as const;
+export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules", "heart-survey", "company-voyage"] as const;
 export type ReadyProgramKey = typeof READY_PROGRAM_KEYS[number];
 export type TaskInteractiveKind = ReadyProgramKey;
 export function isReadyProgramKey(value: unknown): value is ReadyProgramKey {

@@ -17,6 +17,7 @@ export type ReadyAttempt = {
   reset?: boolean;
   message?: string;
   submission?: Submission;
+  storyChoices?: number[];
 };
 
 type ApiRow = Record<string, unknown>;
@@ -39,6 +40,7 @@ function mapAttempt(row: ApiRow): ReadyAttempt {
     reset: Boolean(row.reset),
     message: typeof row.message === "string" ? row.message : undefined,
     submission: rawSubmission && typeof rawSubmission === "object" ? mapSubmission(rawSubmission as ApiRow) : undefined,
+    storyChoices: Array.isArray(row.storyChoices) && row.storyChoices.length === 3 && row.storyChoices.every(Number.isInteger) ? row.storyChoices as number[] : undefined,
   };
 }
 
@@ -52,3 +54,7 @@ export function advanceReadyProgram(taskId: string, step: number) { return mutat
 export function answerReadyProgram(taskId: string, answer: number, questionIndex?: number) { return mutate(taskId, { action: "answer", answer, questionIndex }); }
 export function restartReadyProgramQuiz(taskId: string) { return mutate(taskId, { action: "restart-quiz" }); }
 export function completeReadyProgram(taskId: string) { return mutate(taskId, { action: "complete" }); }
+export function saveCompanyStory(taskId: string, choices: number[]) { return mutate(taskId, { action: "save-story", choices }); }
+export async function createCompanyVoiceLink(taskId: string) {
+  return request<{ url: string }>(`/api/ready-programs/${encodeURIComponent(taskId)}/attempt`, { method: "POST", body: JSON.stringify({ action: "voice-link" }) });
+}

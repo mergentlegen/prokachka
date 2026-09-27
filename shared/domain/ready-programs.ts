@@ -1,5 +1,6 @@
 import type { ReadyProgramKey, TaskInteractiveKind, TaskPublicationType } from "./types";
 import { HEART_SURVEY } from "@/shared/domain/heart-survey";
+import { COMPANY_VOYAGE_REWARD, COMPANY_VOYAGE_TITLE } from "@/shared/domain/company-voyage";
 
 export type ReadyProgramTask = {
   title: string;
@@ -57,6 +58,12 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     description: "Пять честных вопросов о твоих мечтах. За каждый ответ — 1 миля. Результат поможет наставникам лучше узнать тебя.",
     badge: "Без дедлайна", taskCount: 1,
     tasks: [{ title: HEART_SURVEY.title, description: "Узнай, какое путешествие тебе нужно. Здесь нет неправильных ответов: каждый сохранённый выбор приносит 1 милю, а итог автоматически приходит наставникам твоей ветки.", maxPoints: 5, publicationType: "evergreen", interactiveKind: "heart-survey" }],
+  },
+  {
+    key: "company-voyage", title: COMPANY_VOYAGE_TITLE, eyebrow: "О компании · правда или миф",
+    description: "Восемь карточек о компании, 17 вопросов и свой рассказ за 60 секунд. Узнай клуб и собери ответы на вопросы друзей.",
+    badge: "Без дедлайна", taskCount: 1,
+    tasks: [{ title: COMPANY_VOYAGE_TITLE, description: "Познакомься с компанией, пройди игру «Правда или миф» без ошибок и получи 10 миль автоматически. Затем собери свой рассказ для наставника.", maxPoints: COMPANY_VOYAGE_REWARD, publicationType: "evergreen", interactiveKind: "company-voyage" }],
   },
 ];
 

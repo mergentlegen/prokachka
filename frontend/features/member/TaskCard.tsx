@@ -10,6 +10,7 @@ import { TaskAttachments } from "@/frontend/shared/TaskAttachments";
 import { DreamPlanGame } from "./DreamPlanGame";
 import { StarterRulesGame } from "./StarterRulesGame";
 import { HeartSurvey } from "./HeartSurvey";
+import { CompanyVoyageGame } from "./CompanyVoyageGame";
 import styles from "./TaskCard.module.css";
 
 export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
@@ -54,6 +55,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, on
         <div className={styles.description}>{task.description}</div></>}
         {task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {task.interactiveKind === "company-voyage" && <CompanyVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} />}

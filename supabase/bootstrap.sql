@@ -23,3 +23,5 @@
 \ir 20261002-email-verification.sql
 \ir 20261003-password-recovery.sql
 \ir 20261004-task-feed-order.sql
+\ir 20261005-company-voyage.sql
+\ir 20261006-company-voice.sql

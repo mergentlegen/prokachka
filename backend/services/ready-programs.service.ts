@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 
-export type ReadyAttemptAction = "start" | "advance" | "answer" | "restart-quiz" | "complete";
+export type ReadyAttemptAction = "start" | "advance" | "answer" | "restart-quiz" | "complete" | "save-story" | "voice-link";
 
 type ReadyAttemptResult = { data: Record<string, unknown> } | { validationError: string } | { error: { message?: string; code?: string } } | { unavailable: true };
 
@@ -39,4 +39,10 @@ export function completeReadyProgramAttempt(userId: string, taskId: string): Pro
   const supabase = getSupabaseAdmin();
   if (!supabase) return Promise.resolve({ unavailable: true });
   return call(supabase, "app_complete_ready_program", { p_user_id: userId, p_task_id: taskId });
+}
+
+export function saveCompanyStory(userId: string, taskId: string, choices: number[]): Promise<ReadyAttemptResult> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return Promise.resolve({ unavailable: true });
+  return call(supabase, "app_save_company_story", { p_user_id: userId, p_task_id: taskId, p_choices: choices });
 }

@@ -1,7 +1,8 @@
 import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
-import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
+import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
+import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
@@ -16,9 +17,20 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await request.json() as { action?: ReadyAttemptAction; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown };
+    const body = await request.json() as { action?: ReadyAttemptAction; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown };
     const action = body?.action;
-    if (action !== "start" && action !== "advance" && action !== "answer" && action !== "restart-quiz" && action !== "complete") return failure("Неизвестное действие программы.", 400);
+    if (action !== "start" && action !== "advance" && action !== "answer" && action !== "restart-quiz" && action !== "complete" && action !== "save-story" && action !== "voice-link") return failure("Неизвестное действие программы.", 400);
+    if (action === "voice-link") {
+      const result = await prepareCompanyVoice(user.id, taskId);
+      if ("unavailable" in result) return failure("Telegram-бот или база данных пока не настроены.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Голосовое сейчас недоступно.", "linkRequired" in result ? 422 : 409);
+      if ("error" in result) return failure("Не удалось подготовить отправку голосового.");
+      return ok({ url: result.url, expiresAt: result.expiresAt });
+    }
+    if (action === "save-story") {
+      if (!Array.isArray(body.choices) || body.choices.length !== 3 || body.choices.some((choice) => !Number.isInteger(choice) || choice < 0 || choice > 4)) return failure("Выберите по одной фразе в каждой части рассказа.", 400);
+      return resultResponse(await saveCompanyStory(user.id, taskId, body.choices));
+    }
     if (action === "start") {
       if (body.restart !== undefined && typeof body.restart !== "boolean") return failure("Некорректный режим запуска.", 400);
       return resultResponse(await startReadyProgramAttempt(user.id, taskId, body.restart === true));
@@ -29,7 +41,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
     }
     if (action === "answer") {
       if (!Number.isInteger(body.answer) || Number(body.answer) < 0 || Number(body.answer) > 2) return failure("Некорректный ответ программы.", 400);
-      if (body.questionIndex !== undefined && (!Number.isInteger(body.questionIndex) || Number(body.questionIndex) < 0 || Number(body.questionIndex) > 4)) return failure("Некорректный вопрос программы.", 400);
+      if (body.questionIndex !== undefined && (!Number.isInteger(body.questionIndex) || Number(body.questionIndex) < 0 || Number(body.questionIndex) > 99)) return failure("Некорректный вопрос программы.", 400);
       return resultResponse(await answerReadyProgramAttempt(user.id, taskId, Number(body.answer), body.questionIndex === undefined ? undefined : Number(body.questionIndex)));
     }
     if (action === "restart-quiz") return resultResponse(await restartReadyProgramQuizAttempt(user.id, taskId));

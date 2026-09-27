@@ -22,6 +22,36 @@ function fixture() {
   return { team, root, alice, bob, task };
 }
 
+test('parallel company completions create one ten-mile reward; story saves cannot duplicate it', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  query(`update users set parent_user_id='${root}' where id='${alice}';`);
+  const published = JSON.parse(query(`select app_create_program('${JSON.stringify({
+    teamId: team, publisherId: root, title: 'Company voyage', deadlineHours: 720, templateKey: 'company-voyage',
+    tasks: [{ title: 'Company voyage', description: 'Read the cards and answer.', maxPoints: 10, publicationType: 'evergreen', interactiveKind: 'company-voyage' }],
+  })}'::jsonb);`));
+  const task = published.tasks[0].id;
+  query(`select app_start_ready_program('${alice}','${task}');`);
+  for (let step = 1; step <= 8; step++) query(`select app_advance_ready_program('${alice}','${task}',${step});`);
+  const answers = [1,1,1,0,0,1,1,1,1,2,1,1,2,0,1,1,1];
+  answers.forEach((answer, index) => query(`select app_answer_ready_program('${alice}','${task}',${answer},${index});`));
+  const results = await Promise.all(Array.from({ length: 8 }, () => parallel(`select app_complete_ready_program('${alice}','${task}');`)));
+  assert.equal(new Set(results.map(result => JSON.parse(result).submission.id)).size, 1);
+  assert.ok(results.every(result => JSON.parse(result).earnedPoints === 10));
+  await Promise.all(Array.from({ length: 4 }, () => parallel(`select app_save_company_story('${alice}','${task}',array[2,4,1]);`)));
+  const telegramId = String(900000000000000 + parseInt(alice.replaceAll('-','').slice(0,12),16));
+  const updateId = parseInt(alice.replaceAll('-','').slice(0,12),16);
+  const tokenHash = randomUUID();
+  query(`update users set telegram_id='${telegramId}' where id='${alice}';
+    insert into telegram_submission_sessions(token_hash,user_id,task_id,telegram_id,expires_at,purpose)
+    values('${tokenHash}','${alice}','${task}','${telegramId}',now()+interval '15 minutes','company-voice');
+    select tg_begin_submission('${tokenHash}','${telegramId}',100);`);
+  const voices = await Promise.all(Array.from({ length: 8 }, () => parallel(`select tg_submit_answer('${telegramId}','${telegramId}',101,${updateId},'voice','','fixture-voice');`)));
+  assert.equal(voices.filter(value => JSON.parse(value).duplicate === false).length, 1);
+  assert.equal(voices.filter(value => JSON.parse(value).duplicate === true).length, 7);
+  assert.equal(query(`select count(*) from telegram_notification_jobs where submission_id='${JSON.parse(results[0]).submission.id}' and kind='company-voice'`), '1');
+  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${task}'`), '1:10');
+});
+
 test('parallel first task-order saves accept one revision without overwriting the winner', { skip: !port }, async () => {
   const { team, root, task } = fixture(), other = randomUUID();
   query(`insert into tasks(id,team_id,title,description,publication_type) values('${other}','${team}','Second task','Description','evergreen');`);

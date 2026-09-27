@@ -82,7 +82,7 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 }
 
 type NotificationJob = {
-  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission" | "survey";
+  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission" | "survey" | "company-voice";
   payload: { canReview?: boolean; canPublishTasks?: boolean }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
@@ -139,6 +139,37 @@ export async function deliverTelegramNotifications() {
         const text = String(result.data.answer_text);
         if (text.length > 4000) throw new Error("Survey message is too long");
         delivery = await sendTelegramMessage(chatId, text);
+      } else if (job.kind === "company-voice") {
+        const checkAccess = () => supabase.rpc("tg_can_receive_company_voice", { p_recipient: user.id, p_submission: job.submission_id });
+        const allowed = await checkAccess();
+        if (allowed.error) throw new Error("Cannot verify voice recipient access");
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const result = await supabase.from("submissions").select("company_voice_chat_id,company_voice_message_id,company_voice_file_id,users(name),tasks(title)").eq("id", job.submission_id).maybeSingle();
+        if (result.error || !result.data?.company_voice_file_id) throw new Error("Cannot load company voice");
+        const voice = result.data;
+        const participant = Array.isArray(voice.users) ? voice.users[0] : voice.users;
+        const task = Array.isArray(voice.tasks) ? voice.tasks[0] : voice.tasks;
+        if (!job.summary_sent) {
+          const summary = await sendTelegramMessage(chatId, ["🎙 Рассказ участника о компании", "Участник: " + String(participant?.name || "Участник").slice(0, 200), "Задание: " + String(task?.title || "Корабль, на который ты поднялся").slice(0, 200), "10 миль уже начислены за тест. Голосовое — для обратной связи, не для повторной оценки."].join("\n"));
+          if (!summary.ok) throw new Error(summary.error);
+          await save({ summary_sent: true });
+        }
+        const recheck = await checkAccess();
+        if (recheck.error) throw new Error("Cannot recheck voice recipient access");
+        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        delivery = await copyTelegramMessage(chatId, String(voice.company_voice_chat_id), String(voice.company_voice_message_id));
+        if (!delivery.ok) {
+          const fallbackAccess = await checkAccess();
+          if (fallbackAccess.error) throw new Error("Cannot verify fallback voice access");
+          if (!fallbackAccess.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+          // Reuse Telegram's file_id; no download or Supabase Storage copy.
+          const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/sendVoice`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, voice: voice.company_voice_file_id }), signal: AbortSignal.timeout(8_000),
+          });
+          const payload = await response.json() as TelegramApiResponse;
+          delivery = response.ok && payload.ok ? { ok: true } : { ok: false, error: payload.description || "Voice delivery failed" };
+        }
       } else {
         const allowed = await supabase.rpc("tg_can_review", { p_reviewer: user.id, p_submission: job.submission_id });
         if (allowed.error) throw new Error("Cannot verify recipient access");

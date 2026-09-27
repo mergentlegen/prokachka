@@ -75,10 +75,12 @@ export async function receiveTelegramUpdate(request: Request) {
         if (!("error" in linked) && confirmation.ok) await sendTelegramMessage(telegramId, telegramLinkWelcomeMessage);
         scheduleTelegramDelivery();
       } else {
-        const selected = await beginTelegramSubmission(payload?.startsWith("submit_") ? payload.slice(7) : "", telegramId, messageId);
+        const selected = await beginTelegramSubmission(payload?.startsWith("submit_") ? payload.slice(7) : payload?.startsWith("company_voice_") ? payload.slice(14) : "", telegramId, messageId);
         if ("unavailable" in selected || "error" in selected) return failure("Не удалось выбрать задание.", 503);
         if (!selected.duplicate) await sendTelegramMessage(telegramId, selected.ready
-          ? "Задание выбрано. Отправьте ответ одним сообщением: текст, фото, видео или файл. Пояснение к файлу добавьте в подпись."
+          ? selected.purpose === "company-voice"
+            ? "Запишите здесь голосовое на 30–60 секунд о компании, в которой вы теперь. Нажмите на микрофон и отправьте одно голосовое сообщение. Бот передаст его наставникам вашей ветки. 10 миль за тест уже начислены — повторной проверки и начисления не будет."
+            : "Задание выбрано. Отправьте ответ одним сообщением: текст, фото, видео или файл. Пояснение к файлу добавьте в подпись."
           : payload ? selected.validationError || "Откройте задание на сайте ещё раз."
           : "Выберите задание в своём аккаунте на сайте и нажмите «Отправить работу». После этого отправьте сюда ответ.");
       }
@@ -89,8 +91,8 @@ export async function receiveTelegramUpdate(request: Request) {
       return NextResponse.json({ ok: true });
     }
     const photo = Array.isArray(message.photo) ? message.photo.at(-1) : undefined;
-    const media = photo || message.video || message.document;
-    const mediaType = media ? photo ? "photo" : message.video ? "video" : "document" : "text";
+    const media = photo || message.video || message.document || message.voice;
+    const mediaType = media ? photo ? "photo" : message.video ? "video" : message.document ? "document" : "voice" : "text";
     const answerText = media ? (typeof message.caption === "string" ? message.caption : "") : text;
     if (!media && !answerText.trim()) {
       await sendTelegramMessage(telegramId, "Отправьте текст, фото, видео или документ.");
@@ -105,7 +107,9 @@ export async function receiveTelegramUpdate(request: Request) {
       await sendTelegramMessage(telegramId, result.validationError);
     } else if (result.data) {
       scheduleTelegramDelivery();
-      if (!result.duplicate) await sendTelegramMessage(telegramId, "Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.");
+      if (!result.duplicate) await sendTelegramMessage(telegramId, result.purpose === "company-voice"
+        ? "Голосовое сохранено и поставлено в очередь доставки наставникам вашей ветки. Мили за тест не изменились."
+        : "Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.");
     } else {
       return failure("Не удалось подтвердить сохранение ответа.", 503);
     }
