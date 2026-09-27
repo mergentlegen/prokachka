@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { clearDevSession } from "@/frontend/shared/api/client";
 import { dataCache } from "@/frontend/shared/api/data-cache";
 import { userScope } from "@/shared/domain/live-updates";
@@ -11,6 +11,7 @@ import type { AuthUser } from "@/shared/domain/types";
 import styles from "./AuthScreen.module.css";
 import { EmailConfirmation, emailConfirmationSnapshot, rememberEmailConfirmation, restoreEmailConfirmation, subscribeEmailConfirmation } from "./EmailConfirmation";
 import { AuthField } from "./AuthField";
+import { AuthLayout } from "./AuthLayout";
 import { PasswordRecovery, passwordRecoverySnapshot, rememberPasswordRecovery, restorePasswordRecovery, subscribePasswordRecovery } from "./PasswordRecovery";
 
 export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthenticated: (user: AuthUser) => void; initialMode?: AuthMode }) {
@@ -84,10 +85,10 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
     if (pending) return;
     setMode(next); setTouched(new Set()); setAttempted(false); setServerErrors({}); setError(""); setCredentialsInvalid(false); setSuccess("");
   }
-  function field(name: AuthFieldName, label: string, autocomplete: string, placeholder: string, type = "text") {
+  function field(name: AuthFieldName, label: string, autocomplete: string, placeholder: string, type = "text", action?: ReactNode) {
     const message = serverErrors[name] || ((attempted || touched.has(name)) ? validation[name] : undefined);
     const credentialError = credentialsInvalid && (name === "email" || name === "password");
-    return <AuthField name={name} label={label} value={values[name]} type={type} autoComplete={autocomplete} placeholder={placeholder}
+    return <AuthField key={name} name={name} label={label} value={values[name]} type={type} autoComplete={autocomplete} placeholder={placeholder} action={action}
       error={message} credentialError={credentialError} onChange={(value) => change(name, value)}
       onBlur={() => setTouched((current) => new Set(current).add(name))} />;
   }
@@ -102,29 +103,25 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
     rememberEmailConfirmation(null); setValues((current) => ({ ...current, email: confirmation.email }));
     setAttempted(false); setError("");
   }} />;
-  return <main className={`login-shell ${styles.screen}`}>
-    <div className="login-decor decor-one" aria-hidden="true" /><div className="login-decor decor-two" aria-hidden="true" />
-    <div className={`login-panel ${styles.panel}`}>
-      <div className={`login-brand ${styles.brand}`}><img className="brand-logo" src="/brand/logo-light.svg" alt="Прокачка" /></div>
+  return <AuthLayout>
       <h1 className={styles.heading}>{mode === "login" ? "Войти в аккаунт" : "Создать аккаунт"}</h1>
       <p className={styles.intro}>{mode === "login" ? "С возвращением! Продолжайте выполнять задания и расти вместе с командой." : "Присоединяйтесь к команде: выполняйте задания, получайте обратную связь и следите за своим прогрессом."}</p>
-      <form ref={formRef} className={`login-form ${styles.form}`} noValidate onSubmit={submit} aria-busy={pending}>
-        <div className={`auth-tabs ${styles.tabs}`}><button type="button" disabled={pending} className={mode === "login" ? "active" : ""} aria-pressed={mode === "login"} onClick={() => switchMode("login")}>Войти</button><button type="button" disabled={pending} className={mode === "register" ? "active" : ""} aria-pressed={mode === "register"} onClick={() => switchMode("register")}>Регистрация</button></div>
+      <form ref={formRef} className={styles.form} noValidate onSubmit={submit} aria-busy={pending}>
+        <div className={styles.tabs} role="group" aria-label="Вход или регистрация"><button type="button" disabled={pending} className={mode === "login" ? styles.activeTab : ""} aria-pressed={mode === "login"} onClick={() => switchMode("login")}>Войти</button><button type="button" disabled={pending} className={mode === "register" ? styles.activeTab : ""} aria-pressed={mode === "register"} onClick={() => switchMode("register")}>Регистрация</button></div>
         <fieldset className={styles.fields} disabled={pending}>
           {mode === "register" && <div className={styles.names}>{field("firstName", "Имя", "given-name", "Имя")}{field("lastName", "Фамилия", "family-name", "Фамилия")}</div>}
           {field("email", "Email", "email", "name@example.com", "email")}
-          {field("password", "Пароль", mode === "login" ? "current-password" : "new-password", mode === "register" ? "Минимум 6 символов" : "Ваш пароль", "password")}
+          {field("password", "Пароль", mode === "login" ? "current-password" : "new-password", mode === "register" ? "Минимум 6 символов" : "Ваш пароль", "password", mode === "login" &&
+            <button type="button" className={styles.forgotAction} disabled={pending} onClick={() => {
+              setValues((current) => ({ ...current, password: "", passwordConfirmation: "" }));
+              rememberPasswordRecovery({ step: "email", email: values.email.trim().slice(0, 254), resendAt: 0, expiresAt: Date.now() + 600_000 });
+            }}>Забыли пароль?</button>)}
           {mode === "register" && field("passwordConfirmation", "Повторите пароль", "new-password", "Повторите пароль", "password")}
         </fieldset>
-        {mode === "login" && <button type="button" className={styles.forgotAction} disabled={pending} onClick={() => {
-          setValues((current) => ({ ...current, password: "", passwordConfirmation: "" }));
-          rememberPasswordRecovery({ step: "email", email: values.email.trim().slice(0, 254), resendAt: 0, expiresAt: Date.now() + 600_000 });
-        }}>Забыли пароль?</button>}
-        {mode === "login" && <p className={styles.registerPrompt}>Нет аккаунта? <button type="button" disabled={pending} onClick={() => switchMode("register")}>Зарегистрируйтесь</button></p>}
         {error && <div className={styles.notice} role="alert" id="auth-request-error"><span aria-hidden="true">!</span><div><strong>{mode === "login" ? "Не удалось войти" : "Не удалось зарегистрироваться"}</strong><p>{error}</p></div></div>}
         {success && <p className={styles.successNotice} role="status">{success}</p>}
-        <button type="submit" className={`primary-button login-button ${styles.submit}`} disabled={pending}>{pending ? "Проверяем..." : mode === "login" ? "Войти" : "Создать аккаунт"}</button>
+        <button type="submit" className={styles.submit} disabled={pending}>{pending ? "Проверяем..." : mode === "login" ? "Войти" : "Создать аккаунт"}</button>
+        <p className={styles.registerPrompt}>{mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"} <button type="button" disabled={pending} onClick={() => switchMode(mode === "login" ? "register" : "login")}>{mode === "login" ? "Зарегистрируйтесь" : "Войти"}</button></p>
       </form>
-    </div>
-  </main>;
+  </AuthLayout>;
 }

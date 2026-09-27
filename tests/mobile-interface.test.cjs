@@ -385,13 +385,13 @@ test("mentor list actions stay compact and keep 44px touch targets", () => {
   }
 });
 
-test("login offers registration below the password; confirmation uses the requested wording", () => {
+test("login offers registration after the primary action; confirmation uses the requested wording", () => {
   const login = renderToStaticMarkup(React.createElement(AuthScreen, { onAuthenticated() {} }));
   assert.match(login, /С возвращением!/);
   assert.match(login, /Нет аккаунта\?/);
   assert.match(login, /<button[^>]*type="button"[^>]*>Зарегистрируйтесь<\/button>/);
   assert.ok(login.indexOf('name="password"') < login.indexOf("Зарегистрируйтесь"));
-  assert.ok(login.indexOf("Зарегистрируйтесь") < login.indexOf('type="submit"'));
+  assert.ok(login.indexOf('type="submit"') < login.indexOf("Зарегистрируйтесь"));
   const registration = renderToStaticMarkup(React.createElement(AuthScreen, { initialMode: "register", onAuthenticated() {} }));
   assert.match(registration, /placeholder="Повторите пароль"/);
   assert.ok(!registration.includes("Пароль ещё раз"));

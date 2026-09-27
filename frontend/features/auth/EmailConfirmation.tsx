@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { AuthUser } from "@/shared/domain/types";
-import Image from "next/image";
+import { AuthLayout } from "./AuthLayout";
 import styles from "./AuthScreen.module.css";
 
 export type PendingEmailConfirmation = { email: string; resendAt: number };
@@ -96,10 +96,7 @@ export function EmailConfirmation({ initial, onBack, onAuthenticated }: {
   }
   function submit(event: FormEvent) { event.preventDefault(); void send("verify"); }
 
-  return <main className={`login-shell ${styles.screen}`}>
-    <div className="login-decor decor-one" aria-hidden="true" /><div className="login-decor decor-two" aria-hidden="true" />
-    <div className={`login-panel ${styles.panel}`}>
-      <div className={`login-brand ${styles.brand}`}><Image className="brand-logo" src="/brand/logo-light.svg" alt="Прокачка" width={180} height={52} unoptimized /></div>
+  return <AuthLayout>
       <div className={styles.mailIcon} aria-hidden="true">✉</div>
       <h1 className={styles.heading}>Подтвердите почту</h1>
       <p className={styles.intro}>Введите код из письма на <strong className={styles.emailAddress}>{initial.email}</strong>. Если письмо не пришло, проверьте папку «Спам».</p>
@@ -117,12 +114,11 @@ export function EmailConfirmation({ initial, onBack, onAuthenticated }: {
         </div>
         {error && <div id="email-code-error" className={styles.notice} role="alert"><p>{error}</p></div>}
         {notice && <p className={styles.successNotice} role="status">{notice}</p>}
-        <button type="submit" className={`primary-button login-button ${styles.submit}`} disabled={Boolean(pending)}>{pending === "verify" ? "Подтверждаем…" : "Подтвердить почту"}</button>
+        <button type="submit" className={styles.submit} disabled={Boolean(pending)}>{pending === "verify" ? "Подтверждаем…" : "Подтвердить почту"}</button>
         <button type="button" className={styles.secondaryAction} disabled={Boolean(pending) || seconds > 0} onClick={() => void send("resend")}>
           {pending === "resend" ? "Отправляем…" : seconds > 0 ? `Отправить код повторно через ${seconds} с` : "Отправить код повторно"}
         </button>
         <button type="button" className={styles.backAction} disabled={Boolean(pending)} onClick={onBack}>Изменить почту или вернуться ко входу</button>
       </form>
-    </div>
-  </main>;
+  </AuthLayout>;
 }

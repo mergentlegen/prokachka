@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import Image from "next/image";
+import { AuthLayout } from "./AuthLayout";
 import { AuthField } from "./AuthField";
 import styles from "./AuthScreen.module.css";
 
@@ -110,10 +110,7 @@ export function PasswordRecovery({ initial, onBack, onDone }: {
   }
   function submit(event: FormEvent) { event.preventDefault(); void send(state.step === "email" ? "request" : state.step === "code" ? "verify" : "reset"); }
   const title = state.step === "email" ? "Восстановить пароль" : state.step === "code" ? "Проверьте почту" : "Новый пароль";
-  return <main className={`login-shell ${styles.screen}`}>
-    <div className="login-decor decor-one" aria-hidden="true" /><div className="login-decor decor-two" aria-hidden="true" />
-    <div className={`login-panel ${styles.panel}`}>
-      <div className={`login-brand ${styles.brand}`}><Image className="brand-logo" src="/brand/logo-light.svg" alt="Прокачка" width={180} height={52} unoptimized /></div>
+  return <AuthLayout>
       <h1 className={styles.heading}>{title}</h1>
       <p className={styles.intro}>{state.step === "email" ? "Укажите почту вашего аккаунта. Мы отправим код для восстановления доступа."
         : state.step === "code" ? <>Если аккаунт <strong className={styles.emailAddress}>{state.email}</strong> существует, на эту почту отправлен код. Проверьте также папку «Спам».</>
@@ -138,7 +135,7 @@ export function PasswordRecovery({ initial, onBack, onDone }: {
         </fieldset>
         {error && <div className={styles.notice} role="alert"><p>{error}</p></div>}
         {notice && <p className={styles.successNotice} role="status">{notice}</p>}
-        <button type="submit" className={`primary-button login-button ${styles.submit}`} disabled={pending || (state.step === "email" && seconds > 0)}>
+        <button type="submit" className={styles.submit} disabled={pending || (state.step === "email" && seconds > 0)}>
           {pending ? "Подождите…" : state.step === "email" ? seconds > 0 ? `Отправить код через ${seconds} с` : "Отправить код" : state.step === "code" ? "Подтвердить код" : "Сохранить новый пароль"}
         </button>
         {state.step === "code" && <button type="button" className={styles.secondaryAction} disabled={pending || seconds > 0} onClick={() => void send("request")}>
@@ -149,6 +146,5 @@ export function PasswordRecovery({ initial, onBack, onDone }: {
         }}>Изменить email</button>}
         <button type="button" className={styles.backAction} disabled={pending} onClick={() => onBack(state.step === "email" ? email : state.email)}>Вернуться ко входу</button>
       </form>
-    </div>
-  </main>;
+  </AuthLayout>;
 }

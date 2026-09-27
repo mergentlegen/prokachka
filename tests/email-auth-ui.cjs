@@ -46,7 +46,53 @@ fs.mkdirSync(artifacts, { recursive: true });
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base + '/?invite=abcdefghijklmnopqrstuvwx');
+    await page.getByRole('heading', { name: 'Войти в аккаунт' }).waitFor();
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: width > 700 ? 900 : 812 });
+      const layout = await page.evaluate(() => {
+        const bounds = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+        return { width: innerWidth, scroll: document.documentElement.scrollWidth, email: bounds('[name=email]'), password: bounds('[name=password]'), submit: bounds('button[type=submit]') };
+      });
+      assert.ok(layout.scroll <= layout.width, `Login overflow at ${width}`);
+      assert.equal(layout.email.height, layout.password.height, 'inputs retain a consistent height');
+      assert.equal(layout.email.x, layout.password.x, 'inputs share the same left edge');
+      const forgot = await page.getByRole('button', { name: 'Забыли пароль?' }).boundingBox();
+      assert.ok(forgot.y + forgot.height <= layout.password.y, 'recovery action stays beside the password label');
+      const register = await page.getByRole('button', { name: 'Зарегистрируйтесь' }).boundingBox();
+      assert.ok(register.y >= layout.submit.bottom, 'registration prompt follows the primary action');
+      await page.screenshot({ path: path.join(artifacts, `login-${width}.png`), fullPage: true });
+    }
+    await page.getByLabel('Пароль', { exact: true }).fill('temporary-password');
+    await page.getByRole('button', { name: 'Показать пароль', exact: true }).click();
+    assert.equal(await page.locator('[name=password]').getAttribute('type'), 'text');
+    await page.getByRole('button', { name: 'Скрыть пароль', exact: true }).click();
+    assert.equal(await page.locator('[name=password]').getAttribute('type'), 'password');
     await page.getByRole('button', { name: 'Регистрация', exact: true }).click();
+    for (const invalidName of ['firstName', 'lastName']) {
+      await page.locator('[name=firstName]').fill('Анна');
+      await page.locator('[name=lastName]').fill('Участница');
+      await page.locator(`[name=${invalidName}]`).fill('a');
+      await page.getByLabel('Email', { exact: true }).focus();
+      await page.locator(`#auth-${invalidName}-error`).waitFor();
+      for (const width of [320, 375, 390, 430, 520, 521, 768, 1440]) {
+        await page.setViewportSize({ width, height: width > 700 ? 900 : 812 });
+        const layout = await page.evaluate(() => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+          return { width: innerWidth, scroll: document.documentElement.scrollWidth, first: rect('[name=firstName]'), last: rect('[name=lastName]'), email: rect('[name=email]') };
+        });
+        assert.ok(layout.scroll <= layout.width, `Registration overflow at ${width}`);
+        assert.equal(layout.first.height, layout.last.height, `An error must not stretch its neighbour at ${width}`);
+        assert.equal(layout.first.height, layout.email.height, 'All input heights remain equal');
+        if (width > 520) assert.equal(layout.first.y, layout.last.y, `Name inputs must align despite ${invalidName} error at ${width}`);
+        else {
+          assert.equal(layout.first.x, layout.last.x, 'Phone name fields use one column');
+          assert.ok(layout.last.top >= layout.first.bottom, 'Name inputs must not overlap');
+        }
+        if ([320, 390, 1440].includes(width)) await page.screenshot({ path: path.join(artifacts, `registration-${invalidName}-error-${width}.png`), fullPage: true });
+      }
+    }
+    assert.equal(writes.length, 0, 'Layout and local validation must not submit accounts');
+    await page.setViewportSize({ width: 375, height: 812 });
     await page.getByLabel('Имя', { exact: true }).fill('Анна');
     await page.getByLabel('Фамилия', { exact: true }).fill('Участница');
     await page.getByLabel('Email', { exact: true }).fill(email);
@@ -87,6 +133,6 @@ fs.mkdirSync(artifacts, { recursive: true });
     assert.equal(writes.filter(item => item.path === '/api/auth/verify-email').length, 2);
     assert.equal(writes.find(item => item.path === '/api/auth/verify-email').payload.email, email);
     assert.deepEqual(errors, []);
-    console.log(`Email UI QA passed: registration, invitation, mobile widths, error, reload, resend, leading-zero OTP, completion. Screenshots: ${artifacts}`);
+    console.log(`Email UI QA passed: login layout, password visibility, registration field alignment with errors, invitation, mobile widths, OTP error, reload, resend, leading-zero OTP, completion. Screenshots: ${artifacts}`);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

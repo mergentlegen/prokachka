@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import styles from "./AuthScreen.module.css";
 
-export function AuthField({ name, label, value, type, autoComplete, placeholder, error, credentialError = false, onChange, onBlur }: {
+export function AuthField({ name, label, value, type, autoComplete, placeholder, error, credentialError = false, action, onChange, onBlur }: {
   name: string; label: string; value: string; type: string; autoComplete: string; placeholder: string;
-  error?: string; credentialError?: boolean; onChange: (value: string) => void; onBlur?: () => void;
+  error?: string; credentialError?: boolean; action?: ReactNode; onChange: (value: string) => void; onBlur?: () => void;
 }) {
   const [revealed, setRevealed] = useState(false);
   const invalid = Boolean(error) || credentialError;
   const id = `auth-${name}`;
   return <div className={styles.field}>
-    <label htmlFor={id}>{label}</label>
+    <div className={styles.fieldHeading}><label htmlFor={id}>{label}</label>{action}</div>
     <div className={`${styles.input} ${invalid ? styles.invalid : ""}`}>
       <input id={id} name={name} type={type === "password" && revealed ? "text" : type} value={value} required autoComplete={autoComplete}
         autoCapitalize={type === "email" ? "none" : undefined} spellCheck={type === "email" ? false : undefined}
