@@ -5,6 +5,7 @@ import { isUuid } from "@/backend/http/security";
 import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
 import { captainCruiseAction, type CaptainAction } from "@/backend/services/captain-cruise.service";
 import { countYourDreamAction } from "@/backend/services/count-your-dream.service";
+import { orgEnvironmentAction, type OrgAction } from "@/backend/services/org-environment.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
@@ -20,8 +21,19 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "org-environment"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | OrgAction | "save" | "complete"; index?: unknown; payload?: unknown };
     const action = body?.action;
+    if (action === "org-environment") {
+      if (!body.operation || !["start", "begin", "answer", "advance", "finish"].includes(body.operation)
+        || (body.index !== undefined && (!Number.isInteger(body.index) || Number(body.index) < 0 || Number(body.index) > 500))
+        || (body.answer !== undefined && body.answer !== null && (!Number.isInteger(body.answer) || Number(body.answer) < 0 || Number(body.answer) > 3))
+        || (body.operation === "answer" && body.index === undefined)) return failure("Некорректное действие игры.", 400);
+      const result = await orgEnvironmentAction(user.id, taskId, body.operation as OrgAction, body.index as number | undefined, body.answer as number | null | undefined);
+      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Некорректное действие игры.", 409);
+      if ("error" in result) return failure("Не удалось сохранить ход игры. Попробуйте ещё раз.");
+      return ok({ attempt: result.data });
+    }
     if (action === "count-dream") {
       if (!body.operation || !["start", "save", "complete"].includes(body.operation)
         || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 12))

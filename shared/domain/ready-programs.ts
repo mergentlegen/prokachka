@@ -78,6 +78,12 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     badge: "Без дедлайна", taskCount: 1,
     tasks: [{ title: "Посчитай свою мечту", description: "Пройди интерактивный тренажёр: посчитай стоимость мечты, срок накопления и второй путь. За завершение — 10 миль. После прохождения можно записать голосовое наставнику в Telegram.", maxPoints: 10, publicationType: "evergreen", interactiveKind: "count-your-dream" }],
   },
+  {
+    key: "org-environment", title: "Ұйым ортасы: Миль жарысы", eyebrow: "Үш раундтық ойын",
+    description: "Ұйымның ішкі және сыртқы ортасын таны: уақытқа қарсы квиз, факторларды сұрыптау және блиц. Қате жауап үшін кері қайтпайсың — жинаған милің сақталады.",
+    badge: "Без дедлайна", taskCount: 1,
+    tasks: [{ title: "Ұйым ортасы: Миль жарысы", description: "Үш раундтан өт: білім квизі, сұрыптау және блиц. Дұрыс жауап пен жылдамдық үшін миль жина. Ойын соңында нақты нәтиже бір рет сақталады; оны қайта ауыстыруға болмайды.", maxPoints: 15900, publicationType: "evergreen", interactiveKind: "org-environment" }],
+  },
 ];
 
 export function readyProgramByKey(key: unknown) {
