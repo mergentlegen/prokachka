@@ -192,7 +192,7 @@ export async function deliverTelegramNotifications() {
         const participant = Array.isArray(voice.users) ? voice.users[0] : voice.users;
         const task = Array.isArray(voice.tasks) ? voice.tasks[0] : voice.tasks;
         if (!job.summary_sent) {
-          const summary = await sendTelegramMessage(chatId, ["🎙 Рассказ участника о компании", "Участник: " + String(participant?.name || "Участник").slice(0, 200), "Задание: " + String(task?.title || "Корабль, на который ты поднялся").slice(0, 200), "10 миль уже начислены за тест. Голосовое — для обратной связи, не для повторной оценки."].join("\n"));
+          const summary = await sendTelegramMessage(chatId, ["🎙 Голосовое участника по заданию", "Участник: " + String(participant?.name || "Участник").slice(0, 200), "Задание: " + String(task?.title || "Готовое задание").slice(0, 200), "Мили за прохождение уже начислены. Голосовое — для обратной связи, не для повторной оценки."].join("\n"));
           if (!summary.ok) throw new Error(summary.error);
           await save({ summary_sent: true });
         }

@@ -3,13 +3,13 @@
 import { Avatar } from "@/frontend/shared/Avatar";
 import { Toast } from "@/frontend/shared/Toast";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
 import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
 import { dataCache } from "@/frontend/shared/api/data-cache";
 import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
-import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, reviewCeoRequest, updateCeoTeam, updateCeoUser } from "@/frontend/shared/api/ceo-client";
+import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, previewCeoUserDeletion, reviewCeoRequest, updateCeoTeam, updateCeoUser, type UserDeletionImpact } from "@/frontend/shared/api/ceo-client";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { formatDate, formatDateTime } from "@/frontend/shared/lib/format";
 import type { AuthUser, Team, TeamJoinRequest, User, UserRole } from "@/shared/domain/types";
@@ -36,13 +36,17 @@ export function CEOApp() {
   const [userDraft, setUserDraft] = useState<UserDraft | null>(null);
   const [actionId, setActionId] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [deleteImpact, setDeleteImpact] = useState<UserDeletionImpact | null>(null);
+  const [deleteImpactError, setDeleteImpactError] = useState("");
+  const refreshRevision = useRef(0);
 
   async function refresh(silent = false) {
     if (!silent) setDataLoading(true);
     const epoch = dataCache.epoch;
+    const revision = refreshRevision.current;
     try {
       const data = await loadCeoData();
-      if (epoch !== dataCache.epoch) return;
+      if (epoch !== dataCache.epoch || revision !== refreshRevision.current) return;
       setTeams(data.teams);
       setUsers(data.users);
       setRequests(data.requests);
@@ -78,6 +82,18 @@ export function CEOApp() {
     const timer = window.setTimeout(() => setToast(""), 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (deleteTarget?.type !== "user") return;
+    let cancelled = false;
+    const id = deleteTarget.item.id;
+    void previewCeoUserDeletion(id).then((impact) => {
+      if (!cancelled) setDeleteImpact(impact);
+    }).catch((error) => {
+      if (!cancelled) setDeleteImpactError(error instanceof ApiError ? error.message : "Не удалось проверить последствия удаления.");
+    });
+    return () => { cancelled = true; };
+  }, [deleteTarget]);
 
   useLiveUpdates(authUser, async (topics) => {
     try {
@@ -178,21 +194,28 @@ export function CEOApp() {
   }
 
   async function permanentlyDeleteUser(user: User) {
+    if (!deleteImpact || actionId) return;
     setActionId(`delete-user:${user.id}`);
+    refreshRevision.current++;
     try {
-      await deleteCeoUser(user.id);
+      const result = await deleteCeoUser(user.id);
+      refreshRevision.current++;
       setUsers((current) => current.filter((item) => item.id !== user.id));
       setRequests((current) => current.filter((request) => request.userId !== user.id));
       setUserDraft((current) => current?.id === user.id ? null : current);
-      setToast("Пользователь удалён.");
-    } catch {
-      setToast("Не удалось удалить пользователя.");
+      setDeleteTarget(null);
+      setToast(result.cleanupPending ? "Профиль удалён. Очистка учётной записи завершится автоматически." : "Пользователь удалён.");
+      void refresh(true);
+    } catch (error) {
+      setToast(error instanceof ApiError ? error.message : "Не удалось удалить пользователя.");
     } finally {
       setActionId("");
     }
   }
 
   function requestDeleteUser(user: User) {
+    setDeleteImpact(null);
+    setDeleteImpactError("");
     setDeleteTarget({ type: "user", item: user });
   }
 
@@ -238,7 +261,7 @@ export function CEOApp() {
     {teamDraft && <TeamModal draft={teamDraft} setDraft={setTeamDraft} onSubmit={saveTeam} pending={actionId === "team"} onClose={() => setTeamDraft(null)} />}
     {userDraft && <UserModal draft={userDraft} setDraft={setUserDraft} users={users} teams={teams} onSubmit={saveUserAccess} pending={actionId === userDraft.id} onClose={() => setUserDraft(null)} />}
     {deleteTarget?.type === "team" && <ConfirmModal title="Удалить команду?" description={<>Команда «{deleteTarget.item.name}», её задания, программы, объявления, заявки и рейтинги будут удалены без возможности восстановления.</>} confirmLabel="Удалить команду" busy={actionId === `delete-team:${deleteTarget.item.id}`} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteTeam(deleteTarget.item); }} />}
-    {deleteTarget?.type === "user" && <ConfirmModal title="Удалить пользователя?" description={<>Профиль «{deleteTarget.item.name}», отправленные работы, звёзды и история будут удалены без возможности восстановления.</>} confirmLabel="Удалить пользователя" busy={actionId === `delete-user:${deleteTarget.item.id}`} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteUser(deleteTarget.item); }} />}
+    {deleteTarget?.type === "user" && <ConfirmModal title="Удалить пользователя?" description={<>Профиль «{deleteTarget.item.name}», его работы, звёзды и история будут удалены без восстановления.<br />{deleteImpact ? <>Также будут удалены материалы его ветки: заданий — {deleteImpact.tasks}, программ — {deleteImpact.programs}, объявлений — {deleteImpact.announcements}. Ответов других участников к ним — {deleteImpact.otherSubmissions}. Прямых подопечных — {deleteImpact.children}; их аккаунты сохранятся {deleteTarget.item.parentUserId ? "и перейдут к вышестоящему наставнику" : "как самостоятельные ветки"}.</> : deleteImpactError || "Проверяем связанные данные..."}</>} confirmLabel="Удалить пользователя" busy={actionId === `delete-user:${deleteTarget.item.id}`} confirmDisabled={!deleteImpact} onClose={() => setDeleteTarget(null)} onConfirm={() => { void permanentlyDeleteUser(deleteTarget.item); }} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
   </main>;
 }

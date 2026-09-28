@@ -86,7 +86,7 @@ test('administrative writes revalidate revoked or demoted users instead of trust
       const teams = load('backend/controllers/teams.controller.ts', overrides);
       const users = load('backend/controllers/users.controller.ts', overrides);
       for (const action of [teams.createTeamController, teams.updateTeamController, teams.deleteTeamController, teams.permanentlyDeleteTeamController,
-        users.upsertUser, users.updateUserAccessController, users.deleteUserController]) {
+        users.upsertUser, users.updateUserAccessController, users.previewUserDeletionController, users.deleteUserController]) {
         const response = await action(new Request('https://prokachka.kz/api/teams', { method: 'POST', body: '{}' }), uuid);
         assert.ok([401, 403].includes(response.status));
       }

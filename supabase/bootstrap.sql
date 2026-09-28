@@ -30,3 +30,5 @@
 \ir 20261009-reviewer-branch-join-requests.sql
 \ir 20261010-task-feedback.sql
 \ir 20261011-feedback-scopes.sql
+\ir 20261012-count-your-dream.sql
+\ir 20261013-user-deletion.sql

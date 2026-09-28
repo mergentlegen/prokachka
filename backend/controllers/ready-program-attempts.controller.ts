@@ -4,6 +4,7 @@ import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
 import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
 import { captainCruiseAction, type CaptainAction } from "@/backend/services/captain-cruise.service";
+import { countYourDreamAction } from "@/backend/services/count-your-dream.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
@@ -19,14 +20,25 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
     const action = body?.action;
+    if (action === "count-dream") {
+      if (!body.operation || !["start", "save", "complete"].includes(body.operation)
+        || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 12))
+        || (body.payload !== undefined && (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)))
+        || JSON.stringify(body.payload || {}).length > 8000) return failure("Некорректные данные тренажёра.", 400);
+      const result = await countYourDreamAction(user.id, taskId, body.operation as "start" | "save" | "complete", Number(body.step || 0), body.payload as Record<string, unknown> | undefined);
+      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Некорректные ответы тренажёра.", 409);
+      if ("error" in result) return failure("Не удалось сохранить прогресс тренажёра. Попробуйте ещё раз.");
+      return ok({ attempt: result.data });
+    }
     if (action === "captain") {
       if (!body.operation || !["start", "checkpoint", "retry", "finish", "save-details", "telegram-link"].includes(body.operation)
         || (body.index !== undefined && (!Number.isInteger(body.index) || Number(body.index) < 0 || Number(body.index) > 15))
         || (body.payload !== undefined && (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)))
         || JSON.stringify(body.payload || {}).length > 3000) return failure("Некорректное действие тренировки.", 400);
-      const result = await captainCruiseAction(user.id, taskId, body.operation, body.index as number | undefined, body.payload as Record<string, unknown> | undefined);
+      const result = await captainCruiseAction(user.id, taskId, body.operation as CaptainAction, body.index as number | undefined, body.payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных или Telegram пока не настроены.", 503);
       if ("validationError" in result) return failure(result.validationError || "Отправка пока недоступна.", "linkRequired" in result ? 422 : 409);
       if ("error" in result) return failure("Не удалось сохранить тренировку. Попробуйте ещё раз.");

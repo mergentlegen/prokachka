@@ -2,7 +2,7 @@ import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body
 import { hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { deleteUser, findUsers, saveUser, updateUserAccess } from "@/backend/services/users.service";
+import { deleteUser, findUsers, previewUserDeletion, saveUser, updateUserAccess } from "@/backend/services/users.service";
 import { getCurrentUser } from "@/backend/http/current-user";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
@@ -60,6 +60,18 @@ export async function updateUserAccessController(request: Request, id: string) {
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 
+export async function previewUserDeletionController(request: Request, id: string) {
+  const currentUser = await getCurrentUser(request);
+  if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
+  if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
+  const result = await previewUserDeletion(id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if (result.error) return failure("Не удалось проверить связанные данные пользователя.", 500);
+  if (result.data?.notFound) return failure("Пользователь уже удалён.", 404);
+  if (result.data?.forbidden) return failure("Нельзя удалить учётную запись CEO.", 403);
+  return ok({ impact: result.data?.impact });
+}
+
 export async function deleteUserController(request: Request, id: string) {
   const currentUser = await getCurrentUser(request);
   if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
@@ -67,7 +79,9 @@ export async function deleteUserController(request: Request, id: string) {
   const result = await deleteUser(id);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure(result.error.code === "23503"
-    ? "Пользователь связан с материалами своей ветки. Сначала переназначьте аудиторию материалов; удаление не должно открыть их всей команде."
-    : "Не удалось удалить пользователя.", result.error.code === "23503" ? 409 : 500);
-  return ok({});
+    ? "Удаление остановлено базой: остались связанные данные. Ничего не удалено; обратитесь к администратору."
+    : "Не удалось удалить пользователя. Ничего не удалено.", result.error.code === "23503" ? 409 : 500);
+  if (result.data?.notFound) return failure("Пользователь уже удалён. Обновите список.", 404);
+  if (result.data?.forbidden) return failure("Нельзя удалить учётную запись CEO.", 403);
+  return ok({ cleanupPending: result.data?.cleanupPending === true });
 }

@@ -46,9 +46,32 @@ export async function updateUserAccess(id: string, input: { role?: "admin" | "me
   return result.error ? { error: result.error } : { data: result.data };
 }
 
+type DeletionImpact = { children: number; tasks: number; programs: number; announcements: number; otherSubmissions: number };
+type DeletionResult = { notFound?: boolean; forbidden?: boolean; deleted?: boolean; impact?: DeletionImpact; authUserId?: string | null };
+
+export async function previewUserDeletion(id: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const result = await supabase.rpc("app_delete_user", { p_target: id, p_preview: true });
+  return result.error ? { error: result.error } : { data: result.data as DeletionResult };
+}
+
 export async function deleteUser(id: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await supabase.from("users").delete().eq("id", id);
-  return result.error ? { error: result.error } : { data: true };
+  const result = await supabase.rpc("app_delete_user", { p_target: id, p_preview: false });
+  if (result.error) return { error: result.error };
+  const data = result.data as DeletionResult;
+  if (!data.deleted || !data.authUserId) return { data: { ...data, cleanupPending: false } };
+
+  // The SQL transaction already removed the app account and queued this Auth ID.
+  // A failed Auth API call cannot resurrect the profile; the cleanup worker retries.
+  try {
+    const removed = await supabase.auth.admin.deleteUser(data.authUserId);
+    if (removed.error && removed.error.status !== 404) return { data: { ...data, cleanupPending: true } };
+    const cleared = await supabase.from("user_auth_cleanup_queue").delete().eq("auth_user_id", data.authUserId);
+    return { data: { ...data, cleanupPending: Boolean(cleared.error) } };
+  } catch {
+    return { data: { ...data, cleanupPending: true } };
+  }
 }

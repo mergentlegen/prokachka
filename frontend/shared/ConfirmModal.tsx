@@ -7,6 +7,7 @@ type ConfirmModalProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -18,6 +19,7 @@ export function ConfirmModal({
   confirmLabel = "Удалить",
   cancelLabel = "Отмена",
   busy = false,
+  confirmDisabled = false,
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
@@ -35,7 +37,7 @@ export function ConfirmModal({
         <p className="modal-description">{description}</p>
         <div className="modal-actions">
           <button type="button" className="button button-muted" onClick={close} disabled={busy}>{cancelLabel}</button>
-          <button type="button" className="button button-danger" onClick={onConfirm} disabled={busy}>{busy ? "Удаляем..." : confirmLabel}</button>
+          <button type="button" className="button button-danger" onClick={onConfirm} disabled={busy || confirmDisabled}>{busy ? "Удаляем..." : confirmLabel}</button>
         </div>
       </div>
     </div>

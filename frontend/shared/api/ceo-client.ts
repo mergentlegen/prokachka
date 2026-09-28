@@ -36,7 +36,13 @@ export async function updateCeoUser(id: string, input: { role: "admin" | "member
 }
 
 export async function deleteCeoUser(id: string) {
-  await request<ApiResponse<Record<string, never>>>(`/api/users/${id}`, { method: "DELETE" });
+  return request<ApiResponse<{ cleanupPending: boolean }>>(`/api/users/${id}`, { method: "DELETE" });
+}
+
+export type UserDeletionImpact = { children: number; tasks: number; programs: number; announcements: number; otherSubmissions: number };
+export async function previewCeoUserDeletion(id: string) {
+  const response = await request<ApiResponse<{ impact: UserDeletionImpact }>>(`/api/users/${id}`, { cache: "no-store" });
+  return response.impact;
 }
 
 export async function reviewCeoRequest(id: string, status: "approved" | "rejected") {

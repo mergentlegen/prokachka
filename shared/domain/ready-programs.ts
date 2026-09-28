@@ -72,6 +72,12 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     badge: "Без дедлайна", taskCount: 1,
     tasks: [{ title: CAPTAIN_CRUISE_TITLE, description: "Пройди тренировку и получи 19 миль. Найди круиз в своём кабинете inCruises и отправь скриншот наставникам через Telegram — ещё 1 миля автоматически.", maxPoints: CAPTAIN_CRUISE_REWARD, publicationType: "evergreen", interactiveKind: "captain-cruise" }],
   },
+  {
+    key: "count-your-dream", title: "Посчитай свою мечту", eyebrow: "Интерактивный расчёт мечты",
+    description: "Назови мечту, рассчитай путь к ней, сравни два сценария и расскажи наставнику, что для тебя важно.",
+    badge: "Без дедлайна", taskCount: 1,
+    tasks: [{ title: "Посчитай свою мечту", description: "Пройди интерактивный тренажёр: посчитай стоимость мечты, срок накопления и второй путь. За завершение — 10 миль. После прохождения можно записать голосовое наставнику в Telegram.", maxPoints: 10, publicationType: "evergreen", interactiveKind: "count-your-dream" }],
+  },
 ];
 
 export function readyProgramByKey(key: unknown) {
