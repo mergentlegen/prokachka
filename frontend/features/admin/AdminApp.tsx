@@ -378,7 +378,7 @@ export function AdminApp() {
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
         {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
-        {authUser.role === "admin" && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
+        {canReview && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav></aside>
       <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit" onClick={() => setTaskOrderOpen(true)}>↕ Изменить порядок</button><button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button></>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
         <SectionBoundary loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
@@ -400,7 +400,7 @@ export function AdminApp() {
         <button type="button" onClick={() => { setProfileOpen(true); setMobileMenuOpen(false); }}><span>◌</span>Мой профиль</button>
         <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
         {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
-        {authUser.role === "admin" && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
+        {canReview && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav>
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
     </MobileDrawer>

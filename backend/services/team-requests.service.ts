@@ -20,6 +20,24 @@ export async function findJoinRequests(options: { userId?: string; teamId?: stri
   return result.error ? { error: result.error } : { data: await requestAvatars(result.data || []) };
 }
 
+// Resolve the hierarchy and permission in the database for each page. Never send
+// team-wide, service-role application data to a delegated reviewer.
+export async function findReviewableJoinRequests(viewerId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const rows: Record<string, unknown>[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const result = await supabase.rpc("app_reviewable_join_requests", { p_viewer: viewerId, p_offset: offset, p_limit: pageSize });
+    if (result.error) return { error: result.error };
+    if (!Array.isArray(result.data)) return { error: new Error("Invalid join-request page") };
+    const page = result.data as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return { data: await requestAvatars(rows) };
+}
+
 export async function createJoinRequest(userId: string, teamId: string, inviteToken?: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
@@ -44,7 +62,7 @@ export async function createJoinRequest(userId: string, teamId: string, inviteTo
 }
 
 export async function reviewJoinRequest(id: string, status: "approved" | "rejected", actor: AuthUser) {
-  if (!actor || (actor.role !== "ceo" && (actor.role !== "admin" || !actor.teamId))) return { forbidden: true as const };
+  if (!actor || (actor.role !== "ceo" && (!actor.teamId || (actor.role !== "admin" && !(actor.role === "member" && actor.canReview))))) return { forbidden: true as const };
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const result = await supabase.rpc("app_review_join_request", {

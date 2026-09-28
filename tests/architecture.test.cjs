@@ -72,6 +72,45 @@ test('teamless mentor is rejected by both request controller and service before 
   });
   assert.equal((await controller.reviewTeamRequest(req(), 'request')).status, 403);
 });
+test('delegated reviewer uses a database-scoped application list and review RPC', async () => {
+  const actor = { id: 'reviewer', role: 'member', teamId: 'team', canReview: true };
+  const calls = [];
+  const db = { rpc: async (name, args) => {
+    calls.push([name, args]);
+    return name === 'app_reviewable_join_requests'
+      ? { data: [{ id: 'application', users: { name: 'Applicant' }, teams: { name: 'Team' } }], error: null }
+      : { data: { processed: true }, error: null };
+  }, from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'application' }, error: null }) }) }) }) };
+  const service = load('backend/services/team-requests.service.ts', {
+    [dbKey]: { getSupabaseAdmin: () => db },
+    '@/backend/services/avatar-urls.service': { withAvatarUrls: async (people) => people },
+    '@/backend/services/network.service': {},
+  });
+  assert.equal((await service.findReviewableJoinRequests(actor.id)).data.length, 1);
+  assert.deepEqual(calls[0], ['app_reviewable_join_requests', { p_viewer: actor.id, p_offset: 0, p_limit: 500 }]);
+  assert.equal((await service.reviewJoinRequest('application', 'approved', actor)).data.id, 'application');
+  assert.deepEqual(calls[1], ['app_review_join_request', { p_id: 'application', p_status: 'approved', p_reviewer: actor.id, p_ceo: false }]);
+});
+test('join-request controller exposes reviewer branch but not ordinary member requests', async () => {
+  const actor = { id: 'reviewer', role: 'member', teamId: 'team', canReview: true };
+  const seen = [];
+  const controller = load('backend/controllers/team-requests.controller.ts', {
+    [currentKey]: { getCurrentUser: async () => actor },
+    '@/backend/services/team-requests.service': {
+      findReviewableJoinRequests: async (id) => { seen.push(id); return { data: [{ id: 'application' }] }; },
+      findJoinRequests: () => assert.fail('unscoped list'),
+      reviewJoinRequest: async () => ({ data: { id: 'application' } }),
+    },
+  });
+  const listed = await controller.listTeamRequests(req());
+  assert.deepEqual((await listed.json()).requests, [{ id: 'application' }]);
+  assert.deepEqual(seen, [actor.id]);
+  const id = '00000000-0000-4000-8000-000000000001';
+  const response = await controller.reviewTeamRequest(new Request('http://localhost/api/team-requests/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'approved' }) }), id);
+  assert.equal(response.status, 200);
+  actor.canReview = false;
+  assert.equal((await controller.reviewTeamRequest(new Request('http://localhost/api/team-requests/' + id, { method: 'PATCH', body: '{}' }), id)).status, 403);
+});
 test('program creation is one RPC, never a partially saved program plus compensation delete', async () => {
   const input = { teamId: 'team', title: 'Program', deadlineHours: 24, tasks: [{ title: 'Step', description: 'Answer', maxPoints: 10 }] };
   const calls = [];

@@ -27,3 +27,4 @@
 \ir 20261006-company-voice.sql
 \ir 20261007-captain-cruise.sql
 \ir 20261008-security-hardening.sql
+\ir 20261009-reviewer-branch-join-requests.sql

@@ -1,17 +1,17 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
-import { hasRole } from "@/backend/http/auth-guard";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { createJoinRequest, findJoinRequests, reviewJoinRequest } from "@/backend/services/team-requests.service";
+import { createJoinRequest, findJoinRequests, findReviewableJoinRequests, reviewJoinRequest } from "@/backend/services/team-requests.service";
 
 
 export async function listTeamRequests(request: Request) {
   const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
-  const options = user.role === "ceo" ? {} : user.role === "admin" ? { teamId: user.teamId } : { userId: user.id };
-  if (user.role === "admin" && !user.teamId) return ok({ requests: [] });
-  const result = await findJoinRequests(options);
+  if ((user.role === "admin" || user.canReview) && user.role !== "ceo" && !user.teamId) return ok({ requests: [] });
+  const result = user.role === "member" && user.canReview
+    ? await findReviewableJoinRequests(user.id)
+    : await findJoinRequests(user.role === "ceo" ? {} : user.role === "admin" ? { teamId: user.teamId } : { userId: user.id });
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure("Не удалось загрузить заявки.");
   return ok({ requests: result.data });
@@ -36,7 +36,7 @@ export async function createTeamRequest(request: Request) {
 
 export async function reviewTeamRequest(request: Request, id: string) {
   const user = await currentUser(request);
-  if (!user || !hasRole(user, ["ceo", "admin"])) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (!user || (user.role !== "ceo" && user.role !== "admin" && !(user.role === "member" && user.canReview))) return failure("Недостаточно прав.", user ? 403 : 401);
   if (user.role !== "ceo" && !user.teamId) return failure("За наставником не закреплена команда.", 403);
   try {
     const body = await readLimitedJson(request);
@@ -45,7 +45,7 @@ export async function reviewTeamRequest(request: Request, id: string) {
     if (!status) return failure("Неизвестный статус заявки.", 400);
     const result = await reviewJoinRequest(id, status, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
-    if ("forbidden" in result) return failure("Заявка относится к другой команде.", 403);
+    if ("forbidden" in result) return failure("Заявка не относится к вашей ветке или команде.", 403);
     if ("validationError" in result) return failure(result.validationError || "Заявка не может быть обработана.", 400);
     if ("error" in result) return failure("Не удалось обработать заявку.");
     return ok({ request: result.data });
