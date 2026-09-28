@@ -155,6 +155,25 @@ for (const width of [320, 375, 390, 430, 560, 760, 761, 768, 820, 850, 851, 1024
   });
 }
 
+test("important member copy stays readable on narrow and wide screens", () => {
+  const member = el("member-shell member-tab-home");
+  for (const width of [320, 390, 760, 761, 1440]) {
+    const announcement = [member, el("member-section-announcements"), el("announcement-card")];
+    const body = style([...announcement, el("announcement-body"), el("", "p")], width);
+    const heading = style([...announcement, el("announcement-body"), el("", "h3")], width);
+    const meta = style([...announcement, el("announcement-body"), el("announcement-meta")], width);
+    assert.ok(parseFloat(body["font-size"]) >= 16, `announcement body at ${width}px`);
+    assert.ok(parseFloat(heading["font-size"]) >= 19, `announcement title at ${width}px`);
+    assert.ok(parseFloat(meta["font-size"]) >= 12, `announcement metadata at ${width}px`);
+    const task = style([member, el("task-card"), el("", "p")], width);
+    assert.ok(parseFloat(task["font-size"]) >= 15, `task description at ${width}px`);
+    const status = style([member, el("task-card"), el("status-pill")], width);
+    const action = style([member, el("task-card"), el("primary-button", "button")], width);
+    assert.ok(parseFloat(status["font-size"]) >= 12, `task status at ${width}px`);
+    assert.ok(parseFloat(action["font-size"]) >= 14, `task action at ${width}px`);
+  }
+});
+
 test("program builder never reorders its fields/actions using legacy flex order", () => {
   stylesheet.walkRules((rule) => {
     if (!rule.selector.includes("program-builder")) return;
