@@ -138,7 +138,7 @@ test('admin dataset loader requests only selected datasets and deduplicates them
   assert.deepEqual(calls, ['/api/tasks']);
 });
 
-test('program history uses the actual audience and shows the author to the root mentor', async () => {
+test('program history excludes ready games and empty programs while preserving audience and author', async () => {
   const members = [
     { id: 'branch', name: 'Publisher', role: 'member', team_id: 'team' },
     { id: 'child', name: 'Child', role: 'member', team_id: 'team', parent_user_id: 'branch' },
@@ -146,13 +146,19 @@ test('program history uses the actual audience and shows the author to the root 
   ];
   const tables = {
     users: members,
-    task_programs: [{ id: 'program', team_id: 'team', publisher_id: 'branch', audience_root_id: 'branch', title: 'Program', created_at: '2026-09-01T00:00:00Z', deadline_hours: 24 }],
+    task_programs: [
+      { id: 'program', team_id: 'team', publisher_id: 'branch', audience_root_id: 'branch', title: 'Program', created_at: '2026-09-01T00:00:00Z', deadline_hours: 24 },
+      { id: 'ready-game', team_id: 'team', template_key: 'dream-plan', deadline_hours: 720 },
+      { id: 'empty-program', team_id: 'team', deadline_hours: 24 },
+    ],
     tasks: [{ id: 'step', program_id: 'program', position: 1, title: 'Step' }],
     member_program_progress: [], submissions: [],
   };
   const db = { from(table) {
+    let nullColumn;
     const query = new Proxy({}, { get: (_, key) => key === 'range'
-      ? async () => ({ data: tables[table], error: null }) : () => query });
+      ? async () => ({ data: nullColumn ? tables[table].filter((row) => row[nullColumn] == null) : tables[table], error: null })
+      : key === 'is' ? (column, value) => { if (value === null) nullColumn = column; return query; } : () => query });
     return query;
   } };
   const network = load('backend/services/network.service.ts', { [dbKey]: { getSupabaseAdmin: () => db } });
@@ -161,6 +167,7 @@ test('program history uses the actual audience and shows the author to the root 
     '@/backend/services/network.service': { ...network, findTeamNetwork: async () => ({ data: members }) },
   });
   const result = await history.findProgramHistory('team', { id: 'root', role: 'admin' });
+  assert.equal(result.data.length, 1);
   assert.equal(result.data[0].publisherName, 'Publisher');
   assert.deepEqual(result.data[0].members.map((member) => member.userId), ['branch','child']);
   assert.deepEqual(result.data[0].steps[0].members.map((member) => member.userId), ['branch','child']);

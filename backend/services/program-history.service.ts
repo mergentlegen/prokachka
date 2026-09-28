@@ -29,7 +29,7 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
   if (!supabase) return { unavailable: true as const };
 
   const [programsResult, tasksResult, usersResult] = await Promise.all([
-    readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).order("created_at", { ascending: false }).order("id")),
+    readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).is("template_key", null).order("created_at", { ascending: false }).order("id")),
     readPages(supabase.from("tasks").select("id,title,max_points,program_id,position,deadline_hours").eq("team_id", teamId).eq("publication_type", "sequential").order("position", { ascending: true }).order("id")),
     readPages(supabase.from("users").select("id,name,avatar_path,role,team_id,team_joined_at").eq("team_id", teamId).eq("role", "member").order("created_at", { ascending: true }).order("id")),
   ]);
@@ -50,9 +50,11 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
   const visibleUsers = visibleAuthors && "data" in network
     ? new Set(network.data.filter((row) => String(row.role) === "member" && visibleAuthors!.has(String(row.id))).map((row) => String(row.id)))
     : null;
+  const programIdsWithSteps = new Set(tasks.map((task) => String(task.program_id)));
+  const programsWithSteps = programs.filter((program) => programIdsWithSteps.has(String(program.id)));
   const visiblePrograms = visibleUsers && network && "data" in network
-    ? programs.filter((program) => program.publisher_id ? visibleAuthors?.has(String(program.publisher_id)) : isAudienceVisible(network.data, viewer?.id || "", program.audience_root_id))
-    : programs;
+    ? programsWithSteps.filter((program) => program.publisher_id ? visibleAuthors?.has(String(program.publisher_id)) : isAudienceVisible(network.data, viewer?.id || "", program.audience_root_id))
+    : programsWithSteps;
   const authorNames = network && "data" in network ? new Map(network.data.map((row) => [String(row.id), String(row.name || "")])) : new Map<string, string>();
   const users = await withAvatarUrls((usersResult.data || []).filter((row) => !visibleUsers || visibleUsers.has(String(row.id))));
 
