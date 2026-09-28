@@ -5,6 +5,7 @@ import { isUuid } from "@/backend/http/security";
 import { findSubmissionMedia, findSubmissions, findMentorCounts, saveReview } from "@/backend/services/submissions.service";
 import { prepareTelegramSubmission } from "@/backend/services/telegram-submission.service";
 import { serverEnv } from "@/backend/config/env";
+import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 
 
 export async function listSubmissions(request: Request) {
@@ -51,6 +52,7 @@ export async function reviewSubmission(request: Request, id: string) {
     const body = await readLimitedJson(request);
     if (!isUuid(id)) return failure("Некорректная работа.", 400);
     const status = body.status === "accepted" || body.status === "revision" ? body.status : null;
+    if (status === "revision" && (typeof body.comment !== "string" || !body.comment.trim())) return failure("Напишите участнику, что нужно исправить.", 400);
     if (!status) return failure("Неизвестный статус.", 400);
     if (typeof body.comment === "string" && body.comment.length > 4000) return failure("Комментарий слишком длинный.", 400);
     if (body.points !== undefined && (!Number.isFinite(Number(body.points)) || Number(body.points) < 0 || Number(body.points) > 100)) return failure("Некорректное количество миль.", 400);
@@ -60,6 +62,7 @@ export async function reviewSubmission(request: Request, id: string) {
     if ("forbidden" in result) return failure("Работа относится к другой команде.", 403);
     if ("validationError" in result) return failure(result.validationError || "Работа уже проверена.", 409);
     if ("error" in result) return failure("Не удалось сохранить проверку.");
+    scheduleTelegramDelivery();
     return ok({ submission: result.data });
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

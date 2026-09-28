@@ -1,6 +1,6 @@
 import type { AuthUser } from "./types";
 
-export const changeTopics = ["tasks", "programs", "submissions", "stars", "users", "network", "requests", "announcements", "teams", "session", "resync"] as const;
+export const changeTopics = ["tasks", "programs", "submissions", "feedback", "stars", "users", "network", "requests", "announcements", "teams", "session", "resync"] as const;
 export type ChangeTopic = typeof changeTopics[number];
 export function isChangeTopic(value: unknown): value is ChangeTopic {
   return typeof value === "string" && (changeTopics as readonly string[]).includes(value);
@@ -10,6 +10,7 @@ export function userScope(user: AuthUser | null) {
 }
 export function resourceTopics(url: string): ChangeTopic[] {
   const [path, query = ""] = url.split("?");
+  if (path === "/api/feedback" || path.startsWith("/api/feedback/")) return ["feedback", "submissions", "network"];
   if (path === "/api/ranking") return ["submissions", "stars", "users"];
   if (path === "/api/submissions" && new URLSearchParams(query).has("summary")) return ["submissions", "requests", "users", "network"];
   if (path === "/api/submissions") return ["submissions", "tasks", "network"];
@@ -28,6 +29,7 @@ export function resourceTopics(url: string): ChangeTopic[] {
   return [];
 }
 export function mutationTopics(url: string, method: string): ChangeTopic[] {
+  if (url.startsWith("/api/feedback/")) return ["feedback"];
   if (url === "/api/profile") return ["users", "network", "requests"];
   if (url.startsWith("/api/network/users/")) return ["users", "network"];
   if (url.startsWith("/api/team-requests")) return ["requests", "users", "network"];

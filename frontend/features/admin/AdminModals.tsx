@@ -34,7 +34,7 @@ export function ReviewModal({ draft, status, maxPoints, busy, onChange, onClose,
     <h2>{accepting ? "Принять работу?" : "Вернуть на доработку?"}</h2>
     <p className="modal-description">{accepting ? "Укажи результат проверки. Мили автоматически попадут в рейтинг участника." : "Напиши понятный комментарий, чтобы участник знал, что исправить."}</p>
     <label>Мили <span className="field-hint">максимум {formatMiles(maxPoints)}</span><input type="number" min="0" max={maxPoints} step="1" value={draft.points} onChange={(event) => onChange("points", event.target.value)} /></label>
-    <label>{accepting ? "Комментарий наставника" : "Что нужно доработать"}<textarea value={draft.comment} onChange={(event) => onChange("comment", event.target.value)} placeholder={accepting ? "Например, отличный разбор..." : "Например, подробнее раскрой второй пункт..."} rows={5} /></label>
+<label>{accepting ? "Комментарий наставника" : "Что нужно доработать"}<textarea value={draft.comment} onChange={(event) => onChange("comment", event.target.value)} placeholder={accepting ? "Например, отличный разбор..." : "Например, подробнее раскрой второй пункт..."} rows={5} required={!accepting} maxLength={4000} /></label>
     <div className="modal-actions"><button type="button" className="button button-muted" onClick={onClose}>Отмена</button><button type="submit" className={"button " + (accepting ? "button-success" : "button-warning")} disabled={busy}>{busy ? "Сохраняем..." : accepting ? "Принять работу" : "Вернуть на доработку"}</button></div>
   </form></div>;
 }

@@ -2,12 +2,12 @@
 begin;
 
 alter table public.task_programs drop constraint if exists task_programs_template_key_check;
-alter table public.task_programs add constraint task_programs_template_key_check check (template_key is null or template_key in ('dream-plan','starter-rules','heart-survey'));
+alter table public.task_programs add constraint task_programs_template_key_check check (template_key is null or template_key in ('dream-plan','starter-rules','heart-survey','company-voyage','captain-cruise'));
 alter table public.tasks drop constraint if exists tasks_interactive_kind_check;
-alter table public.tasks add constraint tasks_interactive_kind_check check (interactive_kind is null or interactive_kind in ('dream-plan','starter-rules','heart-survey'));
+alter table public.tasks add constraint tasks_interactive_kind_check check (interactive_kind is null or interactive_kind in ('dream-plan','starter-rules','heart-survey','company-voyage','captain-cruise'));
 alter table public.submissions add column if not exists interactive_completed boolean not null default true;
 alter table public.telegram_notification_jobs drop constraint if exists telegram_notification_jobs_kind_check;
-alter table public.telegram_notification_jobs add constraint telegram_notification_jobs_kind_check check (kind in ('permissions','submission','survey'));
+alter table public.telegram_notification_jobs add constraint telegram_notification_jobs_kind_check check (kind in ('permissions','submission','survey','company-voice','captain-screenshot','feedback'));
 
 create or replace function public.app_program_interactive_valid(p_kind text)
 returns boolean language sql immutable security definer set search_path=public as $$

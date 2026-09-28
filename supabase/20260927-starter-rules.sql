@@ -3,10 +3,10 @@ begin;
 
 alter table public.task_programs drop constraint if exists task_programs_template_key_check;
 alter table public.task_programs add constraint task_programs_template_key_check
-  check (template_key is null or template_key in ('dream-plan', 'starter-rules'));
+  check (template_key is null or template_key in ('dream-plan', 'starter-rules', 'heart-survey', 'company-voyage', 'captain-cruise'));
 alter table public.tasks drop constraint if exists tasks_interactive_kind_check;
 alter table public.tasks add constraint tasks_interactive_kind_check
-  check (interactive_kind is null or interactive_kind in ('dream-plan', 'starter-rules'));
+  check (interactive_kind is null or interactive_kind in ('dream-plan', 'starter-rules', 'heart-survey', 'company-voyage', 'captain-cruise'));
 
 -- Answer keys stay server-only. No database table or public API exposes them.
 create or replace function public.app_ready_program_spec(p_kind text)

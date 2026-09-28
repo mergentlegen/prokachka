@@ -226,9 +226,15 @@ test('parallel webhook retries and competing reviews save one answer and one dec
   assert.equal(parsed.filter((value) => value.duplicate === true).length, 4);
   assert.equal(query(`select count(*) from submissions where user_id = '${alice}' and task_id = '${task}'`), '1');
   const id = parsed[0].data.id;
-  const reviews = await Promise.all(['accepted', 'revision'].map((status) => parallel(`select tg_review_submission('${id}','${root}',false,'${status}',10,'Concurrent review');`)));
+  const reviews = await Promise.all(['accepted', 'revision'].map((status) => parallel(`select app_feedback_review_submission('${id}','${root}',false,'${status}',10,'Concurrent review',0);`)));
   assert.equal(reviews.filter((value) => JSON.parse(value).data).length, 1);
   assert.equal(reviews.filter((value) => JSON.parse(value).validationError).length, 1);
+  assert.equal(query(`select count(*) from feedback_events where submission_id='${id}' and kind='review'`), '1');
+  const thread = query(`select id from feedback_threads where member_user_id='${alice}' and task_id='${task}'`);
+  const nonce = randomUUID();
+  const replies = await Promise.all(Array.from({ length: 5 }, () => parallel(`select app_feedback_send('${thread}','${alice}',false,'My reply','${nonce}');`)));
+  assert.equal(new Set(replies.map((value) => JSON.parse(value).seq)).size, 1);
+  assert.equal(query(`select count(*) from feedback_events where thread_id='${thread}' and client_nonce='${nonce}'`), '1');
 });
 
 test('concurrent hierarchy moves cannot create a two-user cycle', { skip: !port }, async () => {

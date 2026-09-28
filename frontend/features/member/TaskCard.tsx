@@ -14,7 +14,7 @@ import { CompanyVoyageGame } from "./CompanyVoyageGame";
 import { CaptainCruiseGame } from "./CaptainCruiseGame";
 import styles from "./TaskCard.module.css";
 
-export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
+export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const isInteractive = Boolean(task.interactiveKind);
@@ -65,6 +65,7 @@ export function TaskCard({ task, submission, onSubmit, onInteractiveComplete, on
         {resource && <ResourceCard url={resource} />}
         {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
+        {submission && !isInteractive && onFeedback && <button type="button" className={styles.read} onClick={() => { setOpen(false); onFeedback(task.id); }}>Открыть переписку с наставником →</button>}
         {submission && !isInteractive && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}
         {!isInteractive && <div className={styles.detailAction}>{action(true)}</div>}
       </div>

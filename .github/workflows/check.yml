@@ -109,6 +109,9 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/starter-rules.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20260927-heart-survey.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/heart-survey.sql
+          # Replaying this older migration also resets the interactive guard;
+          # restore the latest captain rules before later integration tests.
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261007-captain-cruise.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20260928-publication-audiences.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/publication-audiences.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20260929-publication-pin-order.sql
@@ -122,6 +125,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261008-security-hardening.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/security.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/reviewer-branch-join-requests.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/feedback.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

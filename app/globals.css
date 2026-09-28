@@ -902,22 +902,30 @@ html, body { width:100%; max-width:100%; overflow-x:clip; }
 .member-shell .member-section { display:none; }
 .member-shell.member-tab-home .member-section-announcements,
 .member-shell.member-tab-tasks .member-section-tasks,
+.member-shell.member-tab-feedback .member-section-feedback,
 .member-shell.member-tab-ranking .member-section-ranking,
 .member-shell.member-tab-network .member-section-network { display:block; }
 .member-shell:not(.member-tab-home) .welcome-section { display:none; }
 .member-shell.member-tab-home .content-grid,
 .member-shell.member-tab-tasks .content-grid,
+.member-shell.member-tab-feedback .content-grid,
 .member-shell.member-tab-ranking .content-grid,
 .member-shell.member-tab-network .content-grid { display:block; }
 .member-shell.member-tab-home .main-column,
 .member-shell.member-tab-tasks .main-column,
+.member-shell.member-tab-feedback .main-column,
 .member-shell.member-tab-network .main-column { max-width:840px; }
 .member-shell.member-tab-ranking .main-column { display:none; }
 .member-shell.member-tab-ranking .side-column { max-width:840px; padding-left:0; }
 .member-shell.member-tab-home .side-column,
 .member-shell.member-tab-tasks .side-column,
+.member-shell.member-tab-feedback .side-column,
 .member-shell.member-tab-network .side-column { display:none; }
 .member-shell .bottom-nav { display:none; }
+.member-shell .member-sidebar-nav button,.member-shell .bottom-nav button { position:relative; }
+.member-shell .feedback-unread-badge { display:inline-grid; place-items:center; min-width:19px; height:19px; padding:0 4px; border-radius:99px; background:#d68d15; color:#fff; font-size:10px; line-height:1; font-weight:800; }
+.member-shell .member-sidebar-nav .feedback-unread-badge { margin-left:auto; }
+.member-shell .bottom-nav .feedback-unread-badge { position:absolute; top:0; right:max(2px,calc(50% - 20px)); min-width:16px; height:16px; font-size:9px; }
 .member-shell .topbar { position:sticky; top:0; z-index:6; }
 .member-shell:not(.member-tab-home) .content-grid { padding-top:38px; }
 .member-shell .section-heading { display:flex; align-items:center; gap:16px; }
@@ -1160,7 +1168,7 @@ html:has(.login-shell),body:has(.login-shell) { min-height:100%; overflow:hidden
   .member-shell .logout-link { min-height:44px; }
   .member-shell .content-grid,.member-shell .welcome-section { width:calc(100% - 32px); }
   .member-shell:not(.member-tab-home) .content-grid { padding-top:28px; }
-  .member-shell .bottom-nav { position:fixed; inset:auto 0 0; z-index:8; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; width:100%; height:calc(64px + env(safe-area-inset-bottom)); padding:4px max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:#fffffff5; backdrop-filter:blur(14px); }
+  .member-shell .bottom-nav { position:fixed; inset:auto 0 0; z-index:8; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0; width:100%; height:calc(64px + env(safe-area-inset-bottom)); padding:4px max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:#fffffff5; backdrop-filter:blur(14px); }
   .member-shell .bottom-nav button { display:grid; place-items:center; align-content:center; gap:5px; width:100%; min-width:0; min-height:0; padding:4px 1px; border:0; border-radius:8px; background:none; color:#7b879b; font-size:clamp(9px,2.6vw,11px); }
   .member-shell .bottom-nav button > span:first-child { font-size:21px; line-height:1; }
   .member-shell .bottom-nav .bottom-nav-label { display:block; width:100%; min-width:0; font-size:inherit; line-height:1.25; white-space:nowrap; }
@@ -1278,6 +1286,7 @@ html:has(.login-shell),body:has(.login-shell) { min-height:100%; overflow:hidden
   .member-shell .welcome-section,.member-shell .content-grid { width:min(1040px,calc(100% - 64px)); margin-inline:auto; }
   .member-shell.member-tab-home .main-column,
   .member-shell.member-tab-tasks .main-column,
+  .member-shell.member-tab-feedback .main-column,
   .member-shell.member-tab-network .main-column,
   .member-shell.member-tab-ranking .side-column { max-width:none; }
   .member-shell .welcome-section { align-items:center; gap:28px; padding:32px 0 28px; }
@@ -1301,3 +1310,6 @@ html:has(.login-shell),body:has(.login-shell) { min-height:100%; overflow:hidden
   .member-shell .score-card { flex-basis:auto; }
   .member-shell .welcome-section,.member-shell .content-grid { width:calc(100% - 40px); }
 }
+
+.admin-content-feedback { font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif; }
+.admin-content-feedback .admin-heading h1 { font-family:inherit; font-weight:700; letter-spacing:-.025em; }

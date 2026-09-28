@@ -143,12 +143,15 @@ for (const width of [320, 375, 390, 430, 560, 760, 761, 768, 820, 850, 851, 1024
     assert.equal(nav.display, width <= 760 ? "grid" : "none");
     if (width <= 760) {
       assert.equal(nav.gap, "0");
-      assert.equal(nav["grid-template-columns"], "repeat(5,minmax(0,1fr))");
+      assert.equal(nav["grid-template-columns"], "repeat(6,minmax(0,1fr))");
       assert.equal(style([...member, el("bottom-nav", "nav"), el("", "button")], width)["min-width"], "0");
       assert.ok(!style([...member, el("bottom-nav", "nav"), el("", "button")], width).padding.includes("safe-area"));
     }
     assert.equal(style([...member, el("member-section-announcements"), el("section-heading")], width).display, "flex");
     assert.equal(style([...member, el("member-section-tasks"), el("section-heading")], width).display, "grid");
+    const feedback = [el("member-shell member-tab-feedback")];
+    assert.equal(style([...feedback, el("member-section-feedback")], width).display, "block");
+    assert.equal(style([...feedback, el("member-section member-section-ranking")], width).display, "none");
   });
 }
 

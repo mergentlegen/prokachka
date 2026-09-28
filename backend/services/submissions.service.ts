@@ -71,7 +71,7 @@ export async function saveReview(id: string, input: { status: "accepted" | "revi
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   if (!viewer) return { forbidden: true as const };
-  const result = await supabase.rpc("tg_review_submission", {
+  const result = await supabase.rpc("app_feedback_review_submission", {
     p_id: id, p_reviewer: viewer.id === "ceo" ? null : viewer.id,
     p_ceo: viewer.role === "ceo", p_status: input.status,
     p_points: Math.round(input.points), p_comment: input.comment.trim(), p_expected_version: input.expectedVersion,

@@ -8,7 +8,7 @@ alter table public.telegram_submission_sessions drop constraint if exists telegr
 alter table public.telegram_submission_sessions add constraint telegram_submission_sessions_purpose_check check(purpose in ('answer','company-voice','captain-screenshot'));
 alter table public.telegram_submission_sessions add column if not exists metadata jsonb not null default '{}';
 alter table public.telegram_notification_jobs drop constraint if exists telegram_notification_jobs_kind_check;
-alter table public.telegram_notification_jobs add constraint telegram_notification_jobs_kind_check check(kind in ('permissions','submission','survey','company-voice','captain-screenshot'));
+alter table public.telegram_notification_jobs add constraint telegram_notification_jobs_kind_check check(kind in ('permissions','submission','survey','company-voice','captain-screenshot','feedback'));
 
 create table if not exists public.ready_program_attachments (
   id uuid primary key default gen_random_uuid(),

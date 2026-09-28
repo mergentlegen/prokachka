@@ -82,7 +82,7 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 }
 
 type NotificationJob = {
-  id: string; recipient_id: string; submission_id: string | null; kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot";
+  id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null; kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback";
   payload: { canReview?: boolean; canPublishTasks?: boolean }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
@@ -115,7 +115,21 @@ export async function deliverTelegramNotifications() {
       const user = recipient.data;
       const chatId = String(user.telegram_id);
       let delivery: DeliveryResult;
-      if (job.kind === "permissions") {
+      if (job.kind === "feedback") {
+        const event = await supabase.from("feedback_events").select("thread_id,kind,author_user_id").eq("seq", job.feedback_event_seq).maybeSingle();
+        if (event.error || !event.data) throw new Error("Cannot load feedback event");
+        const allowed = await supabase.rpc("app_feedback_can_access", { p_thread: event.data.thread_id, p_actor: user.id, p_ceo: false });
+        if (allowed.error) throw new Error("Cannot verify feedback access");
+        if (!allowed.data || event.data.author_user_id === user.id) {
+          await save({ cancelled_at: new Date().toISOString(), locked_until: null });
+          continue;
+        }
+        const link = appUrl() ? appUrl() + (user.role === "admin" || user.can_review ? "/admin" : "/") + "?feedback=" + encodeURIComponent(event.data.thread_id) : "";
+        delivery = await sendTelegramMessage(chatId, [
+          event.data.kind === "review" ? "По вашей работе есть решение наставника." : "У вас новое сообщение по заданию.",
+          link ? "Открыть обратную связь: " + link : "Откройте раздел «Обратная связь» на сайте.",
+        ].join("\n"));
+      } else if (job.kind === "permissions") {
         const review = job.payload.canReview && (user.role === "admin" || user.can_review);
         const publish = job.payload.canPublishTasks && (user.role === "admin" || user.can_publish_tasks);
         if (!user.team_id || (!review && !publish)) {

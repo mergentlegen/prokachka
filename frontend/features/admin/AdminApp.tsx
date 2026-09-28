@@ -6,7 +6,7 @@ import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { userScope } from "@/shared/domain/live-updates";
 import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
-import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, uploadTaskAttachment } from "@/frontend/shared/api/client";
+import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, request, uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { createAdminTask, deleteAdminTask, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Avatar } from "@/frontend/shared/Avatar";
@@ -21,6 +21,7 @@ import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
 import { TaskOrderDialog } from "./TaskOrderDialog";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { WelcomeVideoSettingsPanel } from "@/frontend/features/admin/WelcomeVideoSettingsPanel";
+import { FeedbackPanel } from "@/frontend/features/feedback/FeedbackPanel";
 import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
 import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
 import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
@@ -54,6 +55,8 @@ export function AdminApp() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [section, setSection] = useState<AdminSection>("dashboard");
+  const [feedbackVersion, setFeedbackVersion] = useState(0);
+  const [feedbackNeedsReply, setFeedbackNeedsReply] = useState(0);
   const [toast, setToast] = useState("");
   const { store, setStore, requests, setRequests, programHistory, publicationHistory, ranking, counts, networkUsers, setNetworkUsers, dataError, dataLoading, refreshData } = useAdminData(authUser, section);
   const [modal, setModal] = useState<AdminModal>(null);
@@ -75,6 +78,21 @@ export function AdminApp() {
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [section]);
+
+  useEffect(() => {
+    if (!authUser || !(authUser.role === "admin" || authUser.canReview) || !new URLSearchParams(window.location?.search || "").has("feedback")) return;
+    const timer = window.setTimeout(() => setSection("feedback"), 0);
+    return () => window.clearTimeout(timer);
+  }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser || !(authUser.role === "admin" || authUser.canReview)) return;
+    let active = true;
+    void request<{ counts: { needsReply: number } }>("/api/feedback?scope=mentor&summary=1", { cache: "no-store" })
+      .then(({ counts }) => { if (active) setFeedbackNeedsReply(counts.needsReply || 0); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [authUser?.id, authUser?.role, authUser?.canReview, feedbackVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +123,7 @@ export function AdminApp() {
 
   useLiveUpdates(authUser, async (topics) => {
     try {
+      if (topics.includes("feedback") || topics.includes("resync")) setFeedbackVersion((value) => value + 1);
       if (topics.includes("session") || topics.includes("resync")) {
         const currentUser = await refreshAuthSession();
         setAuthUser(currentUser);
@@ -368,19 +387,19 @@ export function AdminApp() {
   const canPublishContent = authUser.role === "admin" || Boolean(authUser.canPublishTasks);
   const canReview = authUser.role === "admin" || Boolean(authUser.canReview);
   const sections: Array<[AdminSection, string, string]> = [
-    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["programs", "Программы", "▤"], ["review", "Проверка работ", "✓"], ["history", "История", "◷"],
+    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["programs", "Программы", "▤"], ["review", "Проверка работ", "✓"], ["feedback", "Обратная связь", "✉"], ["history", "История", "◷"],
     ["announcements", "Объявления", "✦"], ["welcome-video", "Приветственное видео", "▶"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
   ];
-  const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements" || id === "welcome-video") ? canPublishContent : id === "review" || id === "history" || id === "stars" ? canReview : true);
+  const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements" || id === "welcome-video") ? canPublishContent : id === "review" || id === "feedback" || id === "history" || id === "stars" ? canReview : true);
 
   return <><main className="admin-shell" ref={shellRef}>
     <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><button type="button" className="avatar-button" aria-label="Открыть профиль" onClick={() => setProfileOpen(true)}><Avatar name={authUser.name} src={authUser.avatarUrl} className="header-avatar" eager /></button><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
-        {visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
+{visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}{id === "feedback" && feedbackNeedsReply > 0 && <b>{feedbackNeedsReply}</b>}</button>)}
         {canReview && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav></aside>
-      <section className="admin-content"><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit" onClick={() => setTaskOrderOpen(true)}>↕ Изменить порядок</button><button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button></>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
+      <section className={`admin-content${section === "feedback" ? " admin-content-feedback" : ""}`}><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "feedback" ? "Обратная связь" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit" onClick={() => setTaskOrderOpen(true)}>↕ Изменить порядок</button><button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button></>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
         <SectionBoundary loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
         {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
@@ -388,6 +407,7 @@ export function AdminApp() {
           <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
         </div>}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
+{section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
         {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
@@ -399,7 +419,7 @@ export function AdminApp() {
       <nav className="admin-mobile-drawer-nav">
         <button type="button" onClick={() => { setProfileOpen(true); setMobileMenuOpen(false); }}><span>◌</span>Мой профиль</button>
         <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
-        {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}</button>)}
+        {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}{id === "feedback" && feedbackNeedsReply > 0 && <b>{feedbackNeedsReply}</b>}</button>)}
         {canReview && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
       </nav>
       <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>

@@ -7,10 +7,10 @@ import { dataCache } from "@/frontend/shared/api/data-cache";
 import { loadMemberData, type MemberData, type MemberDataset } from "@/frontend/shared/api/client";
 import { ScopeChangedError } from "@/frontend/shared/lib/query-cache";
 
-export type MemberTab = "home" | "tasks" | "ranking" | "network" | "profile";
+export type MemberTab = "home" | "tasks" | "feedback" | "ranking" | "network" | "profile";
 const datasets: Record<MemberTab, MemberDataset[]> = {
   home: ["announcements", "ranking"], tasks: ["tasks", "submissions"], ranking: ["ranking"],
-  network: ["network"], profile: ["tasks", "submissions", "stars", "ranking"],
+  network: ["network"], feedback: [], profile: ["tasks", "submissions", "stars", "ranking"],
 };
 const empty = (): MemberData => ({ store: { users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] }, ranking: [], starRanking: [], network: [] });
 const initial = () => ({ scope: "", data: empty(), loaded: {} as Partial<Record<MemberTab, boolean>>, errors: {} as Partial<Record<MemberTab, string>> });

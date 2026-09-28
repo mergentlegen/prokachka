@@ -9,7 +9,7 @@ alter table public.submissions add column if not exists company_voice_message_id
 alter table public.submissions add column if not exists company_voice_update_id bigint;
 create unique index if not exists submissions_company_voice_update_idx on public.submissions(company_voice_update_id) where company_voice_update_id is not null;
 alter table public.telegram_notification_jobs drop constraint if exists telegram_notification_jobs_kind_check;
-alter table public.telegram_notification_jobs add constraint telegram_notification_jobs_kind_check check(kind in ('permissions','submission','survey','company-voice'));
+alter table public.telegram_notification_jobs add constraint telegram_notification_jobs_kind_check check(kind in ('permissions','submission','survey','company-voice','captain-screenshot','feedback'));
 
 create or replace function public.tg_company_voice_error(p_user_id uuid,p_task_id uuid)
 returns text language plpgsql stable security definer set search_path=public as $$

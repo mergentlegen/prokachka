@@ -28,3 +28,5 @@
 \ir 20261007-captain-cruise.sql
 \ir 20261008-security-hardening.sql
 \ir 20261009-reviewer-branch-join-requests.sql
+\ir 20261010-task-feedback.sql
+\ir 20261011-feedback-scopes.sql

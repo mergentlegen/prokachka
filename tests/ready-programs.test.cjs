@@ -87,7 +87,7 @@ test("member Tasks view contains games and ordinary tasks, while Programs only c
     "./TaskCard": { TaskCard },
     "@/frontend/shared/hooks/use-live-updates": { useLiveUpdates() {} },
     "./use-member-data": { useMemberData: () => ({ store: { tasks, submissions: [], announcements: [], starAwards: [] }, ranking: [], starRanking: [], network: [], refreshData() {}, dataLoading: false }) },
-    "@/frontend/shared/api/client": { refreshAuthSession: async () => ({ id: "member", role: "member", name: "Участник", teamId: "team" }), mapAuthUserToUser: (user) => user },
+    "@/frontend/shared/api/client": { refreshAuthSession: async () => ({ id: "member", role: "member", name: "Участник", teamId: "team" }), mapAuthUserToUser: (user) => user, request: async () => ({ counts: { unread: 0 } }) },
   });
   try {
     harness.mount(MemberApp, {});
