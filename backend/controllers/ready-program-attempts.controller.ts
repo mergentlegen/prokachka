@@ -5,6 +5,7 @@ import { isUuid } from "@/backend/http/security";
 import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
 import { captainCruiseAction, type CaptainAction } from "@/backend/services/captain-cruise.service";
 import { countYourDreamAction } from "@/backend/services/count-your-dream.service";
+import { dreamRouteAction } from "@/backend/services/dream-route.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
@@ -20,8 +21,19 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
     const action = body?.action;
+    if (action === "dream-route") {
+      if (!body.operation || !["start", "save", "complete"].includes(body.operation)
+        || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 11))
+        || (body.payload !== undefined && (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)))
+        || JSON.stringify(body.payload || {}).length > 5000) return failure("Некорректные данные маршрута.", 400);
+      const result = await dreamRouteAction(user.id, taskId, body.operation as "start" | "save" | "complete", Number(body.step || 0), body.payload as Record<string, unknown> | undefined);
+      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс маршрута.", 409);
+      if ("error" in result) return failure("Не удалось сохранить маршрут. Попробуйте ещё раз.");
+      return ok({ attempt: result.data });
+    }
     if (action === "count-dream") {
       if (!body.operation || !["start", "save", "complete"].includes(body.operation)
         || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 12))

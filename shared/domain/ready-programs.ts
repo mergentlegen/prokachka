@@ -78,6 +78,12 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     badge: "Без дедлайна", taskCount: 1,
     tasks: [{ title: "Посчитай свою мечту", description: "Пройди интерактивный тренажёр: посчитай стоимость мечты, срок накопления и второй путь. За завершение — 10 миль. После прохождения можно записать голосовое наставнику в Telegram.", maxPoints: 10, publicationType: "evergreen", interactiveKind: "count-your-dream" }],
   },
+  {
+    key: "dream-route", title: "Мечта → маршрут", eyebrow: "Интерактивный маршрут новичка",
+    description: "Пройди путь от своей мечты до первого действия: сравни бизнес с нуля и готовую систему, открой четыре станции и проверь знания. В конце составь план и расскажи о нём наставнику.",
+    badge: "Без дедлайна", taskCount: 1,
+    tasks: [{ title: "Мечта → маршрут", description: "Пройди интерактивный маршрут, запиши мечту, изучи станции, ответь на пять вопросов и составь свой первый план. За завершение — 10 миль; после можно отправить голосовое наставникам своей ветки в Telegram.", maxPoints: 10, publicationType: "evergreen", interactiveKind: "dream-route" }],
+  },
 ];
 
 export function readyProgramByKey(key: unknown) {
