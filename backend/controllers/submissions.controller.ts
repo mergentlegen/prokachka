@@ -1,4 +1,5 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
+import { validMiles } from "@/shared/domain/miles";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
@@ -55,7 +56,7 @@ export async function reviewSubmission(request: Request, id: string) {
     if (status === "revision" && (typeof body.comment !== "string" || !body.comment.trim())) return failure("Напишите участнику, что нужно исправить.", 400);
     if (!status) return failure("Неизвестный статус.", 400);
     if (typeof body.comment === "string" && body.comment.length > 4000) return failure("Комментарий слишком длинный.", 400);
-    if (body.points !== undefined && (!Number.isFinite(Number(body.points)) || Number(body.points) < 0 || Number(body.points) > 100)) return failure("Некорректное количество миль.", 400);
+    if (body.points !== undefined && !validMiles(Number(body.points))) return failure("Некорректное количество миль.", 400);
     if (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 0) return failure("Обновите страницу перед проверкой работы.", 409);
     const result = await saveReview(id, { status, points: Math.max(0, Number(body.points) || 0), comment: typeof body.comment === "string" ? body.comment.trim() : "", expectedVersion: body.expectedVersion }, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);

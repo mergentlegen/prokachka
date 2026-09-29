@@ -1,5 +1,6 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { validMiles } from "@/shared/domain/miles";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 import { removeAttachmentPaths } from "@/backend/services/task-attachments.service";
 
@@ -37,9 +38,11 @@ export async function insertTask(input: Required<Pick<TaskInput, "title" | "desc
       return { forbidden: true as const };
     }
   }
+  const maxPoints = input.maxPoints === undefined ? 0 : Number(input.maxPoints);
+  if (!validMiles(maxPoints)) return { validationError: "Некорректное количество миль." };
   const result = await supabase.from("tasks").insert({
     title: input.title, description: input.description, team_id: input.teamId,
-    max_points: Math.min(100, Math.max(0, Number(input.maxPoints) || 0)),
+    max_points: maxPoints,
     deadline_at: input.publicationType === "sequential" ? null : input.deadlineAt || null,
     resource_url: input.resourceUrl || null,
     publisher_id: input.publisherId || null, audience_root_id: input.audienceRootId || null,
@@ -62,7 +65,10 @@ export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer
   const patch: Record<string, unknown> = {};
   if (typeof input.title === "string") patch.title = input.title.trim();
   if (typeof input.description === "string") patch.description = input.description.trim();
-  if (input.maxPoints !== undefined) patch.max_points = Math.min(100, Math.max(0, Number(input.maxPoints) || 0));
+  if (input.maxPoints !== undefined) {
+    if (!validMiles(Number(input.maxPoints))) return { validationError: "Некорректное количество миль." };
+    patch.max_points = Number(input.maxPoints);
+  }
   if (input.deadlineAt !== undefined) patch.deadline_at = input.deadlineAt || null;
   if (input.isActive !== undefined) patch.is_active = Boolean(input.isActive);
   if (input.isPinned !== undefined) patch.is_pinned = input.isPinned;

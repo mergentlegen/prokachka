@@ -26,6 +26,7 @@ import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
 import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
 import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
 import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest } from "@/shared/domain/types";
+import { validMiles } from "@/shared/domain/miles";
 import { TaskEditorModal, ReviewModal, DeleteModal } from "./AdminModals";
 import type { TaskDraft, ReviewDraft } from "./AdminModals";
 import { AccessDenied, Dashboard, TasksView, ReviewView, HistoryView, RequestsView } from "./AdminViews";
@@ -275,8 +276,8 @@ export function AdminApp() {
       setToast("Добавь описание задания.");
       return;
     }
-    if (!Number.isFinite(maxPoints) || maxPoints < 0) {
-      setToast("Максимум миль должен быть неотрицательным числом.");
+    if (!validMiles(maxPoints)) {
+      setToast("Укажите целое неотрицательное количество миль.");
       return;
     }
     let deadlineAt: string | null = null;

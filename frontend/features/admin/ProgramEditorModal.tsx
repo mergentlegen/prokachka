@@ -7,6 +7,7 @@ import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { formatMiles } from "@/frontend/shared/lib/format";
+import { MAX_MILES, validMiles } from "@/shared/domain/miles";
 import styles from "./ProgramsPanel.module.css";
 
 type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string; files: File[] };
@@ -29,7 +30,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
   const hasInvalidStep = draftTasks.some((task) =>
     task.title.trim().length < 2 || task.title.trim().length > 160 ||
     task.description.trim().length < 2 || task.description.trim().length > 5000 ||
-    !task.maxPoints.trim() || !Number.isInteger(Number(task.maxPoints)) || Number(task.maxPoints) < 0 || Number(task.maxPoints) > 100 || !validLink(task.resourceUrl));
+    !task.maxPoints.trim() || !validMiles(Number(task.maxPoints)) || !validLink(task.resourceUrl));
   const canPublish = title.trim().length >= 2 && title.trim().length <= 160 &&
     Number.isInteger(Number(deadlineHours)) && Number(deadlineHours) >= 1 && Number(deadlineHours) <= 720 &&
     draftTasks.length > 0 && draftTasks.length <= 100 && !hasInvalidStep;
@@ -97,7 +98,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
               <label>Название шага<input ref={index === draftTasks.length - 1 ? newStepInput : undefined} required minLength={2} maxLength={160} value={task.title} onChange={(event) => updateTask(task.id, "title", event.target.value)} placeholder="Например, Познакомиться с командой" /></label>
               <label>Описание<textarea required minLength={2} maxLength={5000} rows={3} value={task.description} onChange={(event) => updateTask(task.id, "description", event.target.value)} placeholder="Что нужно сделать и какой ответ отправить" /></label>
               <div className="form-two-columns">
-                <label>Максимум миль<input required type="number" min="0" max="100" step="1" value={task.maxPoints} onChange={(event) => updateTask(task.id, "maxPoints", event.target.value)} /></label>
+                <label>Максимум миль<input required type="number" min="0" max={MAX_MILES} step="1" value={task.maxPoints} onChange={(event) => updateTask(task.id, "maxPoints", event.target.value)} /></label>
                 <label>Ссылка на материал <span className="field-hint">необязательно</span><input type="url" maxLength={2000} value={task.resourceUrl} aria-invalid={!validLink(task.resourceUrl)} onChange={(event) => updateTask(task.id, "resourceUrl", event.target.value)} placeholder="https://youtube.com/..." />{!validLink(task.resourceUrl) && <span className="program-field-error">Укажите ссылку с http:// или https://</span>}</label>
               </div>
               <ResourceCard url={task.resourceUrl} caption="Так участник увидит материал" />

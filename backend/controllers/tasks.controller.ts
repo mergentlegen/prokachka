@@ -6,6 +6,7 @@ import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
 import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from "@/backend/services/tasks.service";
 import { listTaskAttachments } from "@/backend/services/task-attachments.service";
 import { applyTaskFeedOrder } from "@/backend/services/task-feed-order.service";
+import { validMiles } from "@/shared/domain/miles";
 
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
@@ -63,7 +64,7 @@ export async function createTask(request: Request) {
     if ("error" in resourceUrl) return failure(resourceUrl.error, 400);
     const teamId = user.role === "ceo" ? typeof body.teamId === "string" ? body.teamId : undefined : user.teamId;
     if (teamId && !isUuid(teamId)) return failure("Некорректная команда.", 400);
-    if (body.maxPoints !== undefined && (!Number.isFinite(Number(body.maxPoints)) || Number(body.maxPoints) < 0 || Number(body.maxPoints) > 100)) return failure("Некорректное количество миль.", 400);
+    if (body.maxPoints !== undefined && !validMiles(Number(body.maxPoints))) return failure("Некорректное количество миль.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус задания.", 400);
     if (body.publicationType !== undefined && !["evergreen", "fixed", "sequential"].includes(body.publicationType)) return failure("Некорректный тип публикации.", 400);
     const result = await insertTask({
@@ -90,7 +91,7 @@ export async function updateTask(request: Request, id: string) {
     const body = await readLimitedJson(request);
     if (body.title !== undefined && (typeof body.title !== "string" || body.title.trim().length < 2 || body.title.trim().length > 160)) return failure("Название задания должно быть от 2 до 160 символов.", 400);
     if (body.description !== undefined && (typeof body.description !== "string" || body.description.trim().length < 2 || body.description.trim().length > 5000)) return failure("Описание задания должно быть от 2 до 5000 символов.", 400);
-    if (body.maxPoints !== undefined && (!Number.isFinite(Number(body.maxPoints)) || Number(body.maxPoints) < 0 || Number(body.maxPoints) > 100)) return failure("Некорректное количество миль.", 400);
+    if (body.maxPoints !== undefined && !validMiles(Number(body.maxPoints))) return failure("Некорректное количество миль.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус задания.", 400);
     if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
     const deadline = Object.prototype.hasOwnProperty.call(body, "deadlineAt") ? parseDeadline(body.deadlineAt) : { value: undefined as string | null | undefined };

@@ -5,7 +5,6 @@ import { isUuid } from "@/backend/http/security";
 import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
 import { captainCruiseAction, type CaptainAction } from "@/backend/services/captain-cruise.service";
 import { countYourDreamAction } from "@/backend/services/count-your-dream.service";
-import { orgEnvironmentAction, type OrgAction } from "@/backend/services/org-environment.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
@@ -15,41 +14,14 @@ function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttem
   return ok({ attempt: result.data });
 }
 
-function validOrgTranscript(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const data = value as Record<string, unknown>;
-  if (!Array.isArray(data.quiz) || data.quiz.length !== 10 || !Array.isArray(data.sort) || data.sort.length !== 15
-    || !Array.isArray(data.blitz) || data.blitz.length > 100) return false;
-  return data.quiz.every((move: unknown) => validOrgMove(move, 14, 3, 20000, true))
-    && data.sort.every((move: unknown) => validOrgMove(move, 15, 2, 3600000, false))
-    && data.blitz.every((move: unknown) => validOrgMove(move, 20, 1, 44999, false, "atMs"));
-}
-
-function validOrgMove(value: unknown, ids: number, choices: number, maxMs: number, nullable: boolean, timeKey = "ms") {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const move = value as Record<string, unknown>;
-  return Number.isInteger(move.id) && Number(move.id) >= 0 && Number(move.id) < ids
-    && Number.isInteger(move[timeKey]) && Number(move[timeKey]) >= 0 && Number(move[timeKey]) <= maxMs
-    && (nullable && move.answer === null || Number.isInteger(move.answer) && Number(move.answer) >= 0 && Number(move.answer) <= choices);
-}
-
 export async function postReadyProgramAttempt(request: Request, taskId: string) {
   const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "org-environment"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | OrgAction | "save" | "complete"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
     const action = body?.action;
-    if (action === "org-environment") {
-      if ((body.operation !== "start" && body.operation !== "finish")
-        || (body.operation === "finish" && !validOrgTranscript(body.payload))) return failure("Некорректное действие игры.", 400);
-      const result = await orgEnvironmentAction(user.id, taskId, body.operation as OrgAction, body.payload);
-      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
-      if ("validationError" in result) return failure(result.validationError || "Некорректное действие игры.", 409);
-      if ("error" in result) return failure("Не удалось сохранить ход игры. Попробуйте ещё раз.");
-      return ok({ attempt: result.data });
-    }
     if (action === "count-dream") {
       if (!body.operation || !["start", "save", "complete"].includes(body.operation)
         || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 12))

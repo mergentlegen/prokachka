@@ -127,8 +127,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/reviewer-branch-join-requests.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/feedback.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/count-your-dream.sql
-          psql -X -v ON_ERROR_STOP=1 -f tests/org-environment.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/user-deletion.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/unbounded-task-miles.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

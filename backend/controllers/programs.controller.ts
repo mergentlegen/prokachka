@@ -1,4 +1,5 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
+import { validMiles } from "@/shared/domain/miles";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
@@ -54,7 +55,7 @@ export async function postProgram(request: Request) {
         maxPoints: Number(task.maxPoints), resourceUrl: resourceUrl.value,
       });
     }
-    if (tasks.some((task: { title: string; description: string; maxPoints: number }) => !validText(task.title, 160) || !validText(task.description, 5000) || !Number.isInteger(task.maxPoints) || task.maxPoints < 0 || task.maxPoints > 100)) {
+    if (tasks.some((task: { title: string; description: string; maxPoints: number }) => !validText(task.title, 160) || !validText(task.description, 5000) || !validMiles(task.maxPoints))) {
       return failure("Проверьте названия, описания и мили всех шагов.", 400);
     }
     const teamId = user.role === "ceo" ? typeof body.teamId === "string" ? body.teamId : undefined : user.teamId;

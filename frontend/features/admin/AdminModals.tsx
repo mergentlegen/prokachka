@@ -4,6 +4,7 @@ import type { Task, TaskAttachment } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { TaskFilePicker } from "./TaskFilePicker";
 import { formatMiles } from "@/frontend/shared/lib/format";
+import { MAX_MILES } from "@/shared/domain/miles";
 export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 export type ReviewDraft = { points: string; comment: string };
 
@@ -18,7 +19,7 @@ export function TaskEditorModal({ taskId, draft, editing, busy, attachments, fil
     <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
     <TaskFilePicker taskId={taskId} attachments={attachments} files={files} disabled={busy} onFilesChange={onFilesChange} onRemove={onRemoveAttachment} />
     <div className="form-two-columns">
-    <label>Максимум миль<input type="number" min="0" step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
+    <label>Максимум миль<input type="number" min="0" max={MAX_MILES} step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
       <label className="deadline-toggle"><span>Дедлайн</span><span className="switch-line"><input type="checkbox" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /><span>{draft.hasDeadline ? "Установлен" : "Без дедлайна"}</span></span></label>
     </div>
     {draft.hasDeadline && <label>Дата и время дедлайна<input type="datetime-local" value={draft.deadline} onChange={(event) => onChange("deadline", event.target.value)} /></label>}
