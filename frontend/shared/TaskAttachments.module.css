@@ -6,13 +6,14 @@
 .info strong { overflow:hidden; color:#243650; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
 .info span { color:#748198; font-size:11px; }
 .actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; }
-.actions button { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:7px 10px; border:1px solid #d9e2ef; border-radius:8px; background:white; color:#3157a4; font:inherit; font-size:12px; font-weight:650; cursor:pointer; white-space:nowrap; }
-.actions button:first-child { border-color:#3157a4; background:#3157a4; color:white; }
-.actions button:disabled { opacity:.6; cursor:wait; }
-.error { grid-column:1/-1; margin:0; color:#ad4141; font-size:12px; }
+.actions a { display:inline-flex; box-sizing:border-box; align-items:center; justify-content:center; min-height:36px; padding:7px 10px; border:1px solid #d9e2ef; border-radius:8px; background:white; color:#3157a4; font:inherit; font-size:12px; font-weight:650; text-decoration:none; cursor:pointer; white-space:nowrap; }
+.actions a:first-child { border-color:#3157a4; background:#3157a4; color:white; }
+.actions a:hover { border-color:#3157a4; }
+.actions a:first-child:hover { background:#274a8f; }
+.actions a:focus-visible { outline:2px solid #3157a4; outline-offset:2px; }
 @media(max-width:520px) {
   .file { grid-template-columns:38px minmax(0,1fr); gap:9px 10px; padding:10px; }
   .icon { width:36px; height:40px; }
   .actions { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; }
-  .actions button { width:100%; }
+  .actions a { width:100%; }
 }

@@ -196,7 +196,7 @@ test('SSE rejects the sixth connection and releases the slot when a stream is ca
   } finally { await Promise.all(responses.map(response => response.body.cancel())); }
 });
 
-test('PDF responses remain authorized, uncached and sandboxed; ordinary members cannot submit multipart files', async () => {
+test('PDF responses remain authorized, uncached and unframeable; ordinary members cannot submit multipart files', async () => {
   const controller = load('backend/controllers/task-attachments.controller.ts', {
     [currentKey]: { getCurrentUser: async () => ({ id: uuid, role: 'member' }) },
     '@/backend/services/task-attachments.service': { getTaskAttachment: async () => ({ data: {
@@ -204,7 +204,23 @@ test('PDF responses remain authorized, uncached and sandboxed; ordinary members 
     } }) },
   });
   const response = await controller.readTaskAttachment(new Request('http://localhost/api/file'), uuid, uuid);
-  assert.equal(response.headers.get('content-security-policy'), "default-src 'none'; sandbox");
+  assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'none'");
+  assert.equal(response.headers.get('content-type'), 'application/pdf');
+  assert.match(response.headers.get('content-disposition'), /^inline; filename="test\.pdf"/);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   assert.equal((await controller.createTaskAttachment(new Request('http://localhost', { method: 'POST', body: 'unparsed' }), uuid)).status, 403);
+});
+
+test('opening a PDF link without a session shows a readable page, while API calls keep JSON errors', async () => {
+  const controller = load('backend/controllers/task-attachments.controller.ts', {
+    [currentKey]: { getCurrentUser: async () => null },
+    '@/backend/services/task-attachments.service': {},
+  });
+  const page = await controller.readTaskAttachment(new Request('http://localhost/api/file', { headers: { 'sec-fetch-dest': 'document' } }), uuid, uuid);
+  assert.equal(page.status, 401);
+  assert.match(page.headers.get('content-type'), /^text\/html/);
+  assert.match(await page.text(), /Сначала войдите/);
+  const api = await controller.readTaskAttachment(new Request('http://localhost/api/file', { headers: { 'sec-fetch-dest': 'empty' } }), uuid, uuid);
+  assert.equal(api.status, 401);
+  assert.match(api.headers.get('content-type'), /json/);
 });

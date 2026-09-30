@@ -49,6 +49,11 @@ const nextConfig: NextConfig = {
     return [
       { source: "/(.*)", headers: securityHeaders },
       { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      // PDF attachments open in the browser's built-in viewer, which the page CSP (object-src 'none') can block.
+      { source: "/api/tasks/:id/attachments/:attachmentId/:fileName*", headers: [
+        { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        { key: "Cache-Control", value: "private, no-store" },
+      ] },
     ];
   },
 };

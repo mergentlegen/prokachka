@@ -84,13 +84,11 @@ export async function deleteTaskAttachment(taskId: string, attachmentId: string)
   const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>(url, { method: "DELETE" });
   return Boolean(response.storageCleanupWarning);
 }
-export async function fetchTaskAttachmentFile(taskId: string, attachmentId: string): Promise<Blob> {
-  const response = await authFetch(`/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(attachmentId)}`);
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as ApiResponse<Record<string, never>>;
-    throw new ApiError(typeof body.message === "string" ? body.message : "Не удалось открыть PDF.", response.status);
-  }
-  return response.blob();
+/** Direct same-origin PDF link: the session cookie authorizes it, and the last segment gives the tab and "Save as" the real file name. */
+export function taskAttachmentUrl(taskId: string, file: Pick<TaskAttachment, "id" | "fileName">, options: { download?: boolean } = {}) {
+  const base = file.fileName.replace(/\.pdf$/i, "").replace(/[\u0000-\u001f\u007f/\\?#%"<>|*:]+/g, "_").replace(/^[\s._-]+|[\s._-]+$/g, "").slice(0, 120) || "document";
+  const path = `/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(file.id)}/${encodeURIComponent(`${base}.pdf`)}`;
+  return options.download ? `${path}?download=1` : path;
 }
 export function mapTaskAttachment(row: ApiRow): TaskAttachment {
   return { id: String(row.id), fileName: String(row.file_name || "document.pdf"), contentType: "application/pdf", sizeBytes: Number(row.size_bytes || 0), createdAt: String(row.created_at || new Date().toISOString()) };
