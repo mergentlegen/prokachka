@@ -82,8 +82,8 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 }
 
 type NotificationJob = {
-  id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null; kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback";
-  payload: { canReview?: boolean; canPublishTasks?: boolean }; summary_sent: boolean; attempts: number; lock_token: string;
+  id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null; kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder";
+  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
 export function scheduleTelegramDelivery() {
@@ -129,6 +129,20 @@ export async function deliverTelegramNotifications() {
           event.data.kind === "review" ? "По вашей работе есть решение наставника." : "У вас новое сообщение по заданию.",
           link ? "Открыть обратную связь: " + link : "Откройте раздел «Обратная связь» на сайте.",
         ].join("\n"));
+      } else if (job.kind === "task-reminder") {
+        const taskId = String(job.payload.taskId || "");
+        // Re-check at send time: the participant may have sent the work or reopened the link since queueing.
+        const due = await supabase.rpc("app_task_reminder_due", { p_user: user.id, p_task: taskId });
+        if (due.error) throw new Error("Cannot verify task reminder");
+        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const task = await supabase.from("tasks").select("title").eq("id", taskId).maybeSingle();
+        if (task.error || !task.data) throw new Error("Cannot load reminder task");
+        delivery = await sendTelegramMessage(chatId, [
+          "⏰ Напоминание по заданию «" + String(task.data.title || "Задание").slice(0, 200) + "»",
+          "Вы открыли материал задания больше часа назад, но работа ещё не отправлена.",
+          "Если вы уже всё выполнили, нажмите «Отправить ответ» в задании. Без этого наставник не сможет дать обратную связь и начислить мили.",
+          appUrl() ? "Открыть задания: " + appUrl() + "/" : "",
+        ].filter(Boolean).join("\n"));
       } else if (job.kind === "permissions") {
         const review = job.payload.canReview && (user.role === "admin" || user.can_review);
         const publish = job.payload.canPublishTasks && (user.role === "admin" || user.can_publish_tasks);
@@ -276,5 +290,11 @@ export async function deliverTelegramNotifications() {
       console.warn("Telegram notification delayed", { jobId: job.id });
     }
   }
+  // Existing jobs go first; reminders queued here are sent by the next run, at most a minute later.
+  // A reminder problem must never turn a successful delivery run into a failure.
+  try {
+    const reminders = await supabase.rpc("app_queue_task_reminders", {});
+    if (reminders.error) console.warn("Task reminders were not queued", { code: reminders.error.code });
+  } catch { console.warn("Task reminders were not queued"); }
   return { delivered, failed };
 }

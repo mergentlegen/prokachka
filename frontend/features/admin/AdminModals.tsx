@@ -40,6 +40,19 @@ export function ReviewModal({ draft, status, maxPoints, busy, onChange, onClose,
   </form></div>;
 }
 
+/** Mentor accepts work done outside Prokachka (e.g. an external test) for a participant who never pressed "send". */
+export function CompletionModal({ task, memberName, draft, busy, onChange, onClose, onSubmit }: { task: Task; memberName: string; draft: ReviewDraft; busy: boolean; onChange: (key: keyof ReviewDraft, value: string) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return <div className="modal-backdrop" onMouseDown={onClose}><form className="editor-modal admin-form-modal review-modal" onSubmit={onSubmit} onMouseDown={(event) => event.stopPropagation()}>
+    <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+    <p className="eyebrow eyebrow-success">Засчитать за участника</p>
+    <h2>{memberName}</h2>
+    <p className="modal-description">Задание «{task.title}» будет отмечено выполненным, даже если участник не нажал «Отправить ответ». Мили попадут в рейтинг, а обратная связь придёт участнику в Telegram.</p>
+    <label>Мили <span className="field-hint">максимум {formatMiles(task.maxPoints)}</span><input type="number" min="0" max={task.maxPoints} step="1" value={draft.points} onChange={(event) => onChange("points", event.target.value)} required /></label>
+    <label>Обратная связь участнику<textarea value={draft.comment} onChange={(event) => onChange("comment", event.target.value)} placeholder="Например, результат теста и что стоит подтянуть..." rows={5} required maxLength={4000} /></label>
+    <div className="modal-actions"><button type="button" className="button button-muted" onClick={onClose}>Отмена</button><button type="submit" className="button button-success" disabled={busy || !draft.comment.trim()}>{busy ? "Сохраняем..." : "Засчитать выполнение"}</button></div>
+  </form></div>;
+}
+
 export function DeleteModal({ task, busy, onClose, onConfirm }: { task: Task; busy: boolean; onClose: () => void; onConfirm: () => void }) {
   return <div className="modal-backdrop" onMouseDown={onClose}><div className="editor-modal admin-form-modal danger-modal" onMouseDown={(event) => event.stopPropagation()}>
     <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>

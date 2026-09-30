@@ -2,7 +2,7 @@ import type { StarAwardKind } from "./star-awards";
 
 export type UserRole = "ceo" | "admin" | "member";
 export type SubmissionStatus = "pending" | "accepted" | "revision";
-export type SubmissionSource = "telegram" | "interactive";
+export type SubmissionSource = "telegram" | "interactive" | "mentor";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";

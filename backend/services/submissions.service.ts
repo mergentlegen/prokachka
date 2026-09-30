@@ -79,3 +79,16 @@ export async function saveReview(id: string, input: { status: "accepted" | "revi
   if (result.error) return { error: result.error };
   return result.data as { data?: Record<string, unknown>; forbidden?: boolean; validationError?: string };
 }
+
+/** Records and accepts a completion the participant never sent, e.g. a test passed on an external site. */
+export async function recordMentorCompletion(input: { taskId: string; memberId: string; points: number; comment: string }, viewer?: SubmissionViewer) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  if (!viewer) return { forbidden: true as const };
+  const result = await supabase.rpc("app_mentor_record_submission", {
+    p_task: input.taskId, p_member: input.memberId, p_reviewer: viewer.id === "ceo" ? null : viewer.id,
+    p_ceo: viewer.role === "ceo", p_points: Math.round(input.points), p_comment: input.comment.trim(),
+  });
+  if (result.error) return { error: result.error };
+  return result.data as { data?: Record<string, unknown>; forbidden?: boolean; validationError?: string };
+}

@@ -35,3 +35,4 @@
 \ir 20261016-unbounded-task-miles.sql
 \ir 20261017-dream-route.sql
 \ir 20261018-announcement-photos.sql
+\ir 20261019-mentor-completion.sql

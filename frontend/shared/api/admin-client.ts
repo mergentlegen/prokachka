@@ -47,6 +47,9 @@ export async function updateAdminTask(id: string, input: AdminTaskPatch): Promis
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapTask(response.task);
 }
 export async function deleteAdminTask(id: string): Promise<boolean> { const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>("/api/tasks/" + id, { method: "DELETE" }); return Boolean(response.storageCleanupWarning); }
+export async function recordMentorCompletion(input: { taskId: string; memberId: string; points: number; comment: string }): Promise<Submission> {
+  const response = await request<ApiResponse<{ submission: ApiRow }>>("/api/submissions/mentor", { method: "POST", body: JSON.stringify(input) }); return mapSubmission(response.submission);
+}
 export async function reviewAdminSubmission(id: string, input: { status: "accepted" | "revision"; points: number; comment: string; expectedVersion: number }): Promise<Submission> {
   const response = await request<ApiResponse<{ submission: ApiRow }>>("/api/submissions/" + id + "/review", { method: "PATCH", body: JSON.stringify(input) }); return mapSubmission(response.submission);
 }

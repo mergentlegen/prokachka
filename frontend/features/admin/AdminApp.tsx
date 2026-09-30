@@ -7,7 +7,7 @@ import { userScope } from "@/shared/domain/live-updates";
 import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, request, uploadTaskAttachment } from "@/frontend/shared/api/client";
-import { createAdminTask, deleteAdminTask, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
+import { createAdminTask, deleteAdminTask, recordMentorCompletion, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ProfileDialog } from "@/frontend/features/profile/ProfileDialog";
@@ -25,9 +25,9 @@ import { FeedbackPanel } from "@/frontend/features/feedback/FeedbackPanel";
 import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
 import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
 import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
-import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest } from "@/shared/domain/types";
+import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest, User } from "@/shared/domain/types";
 import { validMiles } from "@/shared/domain/miles";
-import { TaskEditorModal, ReviewModal, DeleteModal } from "./AdminModals";
+import { TaskEditorModal, ReviewModal, DeleteModal, CompletionModal } from "./AdminModals";
 import type { TaskDraft, ReviewDraft } from "./AdminModals";
 import { AccessDenied, Dashboard, TasksView, ReviewView, HistoryView, RequestsView } from "./AdminViews";
 
@@ -37,6 +37,7 @@ type AdminModal =
   | { type: "task"; task?: Task }
   | { type: "review"; submission: Submission; status: "accepted" | "revision" }
   | { type: "delete"; task: Task }
+  | { type: "complete"; task: Task; member: User }
   | null;
 
 
@@ -194,6 +195,29 @@ export function AdminApp() {
     setTaskAttachments(task?.attachments || []);
     setTaskFiles([]);
     setModal({ type: "task", task });
+  }
+
+  const openCompletionModal = useCallback((task: Task, member: User) => {
+    setReviewDraft({ points: String(task.maxPoints), comment: "" });
+    setModal({ type: "complete", task, member });
+  }, []);
+
+  async function submitCompletion() {
+    if (!modal || modal.type !== "complete") return;
+    const parsedPoints = Number(reviewDraft.points);
+    const points = Math.min(Math.max(Number.isFinite(parsedPoints) ? Math.round(parsedPoints) : 0, 0), modal.task.maxPoints);
+    setModalBusy(true);
+    try {
+      const saved = await recordMentorCompletion({ taskId: modal.task.id, memberId: modal.member.id, points, comment: reviewDraft.comment.trim() });
+      setStore((current) => ({ ...current, submissions: [saved, ...current.submissions.filter((item) => item.id !== saved.id)] }));
+      await refreshData();
+      setModal(null);
+      setToast(`Выполнение засчитано: ${modal.member.name}. Участник получит обратную связь.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Не удалось засчитать выполнение.");
+    } finally {
+      setModalBusy(false);
+    }
   }
 
   const openReviewModal = useCallback((submission: Submission, status: "accepted" | "revision") => {
@@ -409,7 +433,7 @@ export function AdminApp() {
         </div>}
         {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
 {section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} />}{section === "programs" && <ProgramsPanel taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
         {section === "welcome-video" && canPublishContent && <WelcomeVideoSettingsPanel user={authUser} />}
@@ -431,6 +455,7 @@ export function AdminApp() {
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
+    {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}
   </main><WelcomeVideoGate user={authUser} /></>;
 }

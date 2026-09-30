@@ -3,7 +3,7 @@ import { validMiles } from "@/shared/domain/miles";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { findSubmissionMedia, findSubmissions, findMentorCounts, saveReview } from "@/backend/services/submissions.service";
+import { findSubmissionMedia, findSubmissions, findMentorCounts, recordMentorCompletion, saveReview } from "@/backend/services/submissions.service";
 import { prepareTelegramSubmission } from "@/backend/services/telegram-submission.service";
 import { serverEnv } from "@/backend/config/env";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
@@ -65,6 +65,26 @@ export async function reviewSubmission(request: Request, id: string) {
     if ("error" in result) return failure("Не удалось сохранить проверку.");
     scheduleTelegramDelivery();
     return ok({ submission: result.data });
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
+}
+
+/** A mentor accepts work the participant completed elsewhere but never sent, and gives feedback in one step. */
+export async function recordCompletion(request: Request) {
+  const user = await currentUser(request);
+  if (!user || (user.role !== "ceo" && user.role !== "admin" && !user.canReview)) return failure("Недостаточно прав.", user ? 403 : 401);
+  try {
+    const body = await readLimitedJson(request);
+    if (!isUuid(body.taskId) || !isUuid(body.memberId)) return failure("Выберите задание и участника.", 400);
+    if (typeof body.comment !== "string" || !body.comment.trim()) return failure("Напишите участнику обратную связь.", 400);
+    if (body.comment.length > 4000) return failure("Комментарий слишком длинный.", 400);
+    if (!validMiles(Number(body.points))) return failure("Некорректное количество миль.", 400);
+    const result = await recordMentorCompletion({ taskId: body.taskId, memberId: body.memberId, points: Number(body.points), comment: body.comment }, user);
+    if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if ("forbidden" in result) return failure("Этот участник не относится к вашей ветке.", 403);
+    if ("validationError" in result) return failure(result.validationError || "Не удалось засчитать выполнение.", 409);
+    if ("error" in result || !result.data) return failure("Не удалось засчитать выполнение.");
+    scheduleTelegramDelivery();
+    return ok({ submission: result.data }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 

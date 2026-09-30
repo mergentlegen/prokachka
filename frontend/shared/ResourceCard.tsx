@@ -4,15 +4,16 @@ import { useState } from "react";
 import { resourcePreview, type ResourcePreview } from "@/frontend/shared/lib/resource-preview";
 import styles from "./ResourceCard.module.css";
 
-export function ResourceCard({ url, caption = "Материал задания" }: { url?: string | null; caption?: string }) {
+export function ResourceCard({ url, caption = "Материал задания", onOpen }: { url?: string | null; caption?: string; onOpen?: () => void }) {
   const preview = resourcePreview(url);
-  return preview ? <ResourceLink key={preview.href} preview={preview} caption={caption} /> : null;
+  return preview ? <ResourceLink key={preview.href} preview={preview} caption={caption} onOpen={onOpen} /> : null;
 }
 
-function ResourceLink({ preview, caption }: { preview: ResourcePreview; caption: string }) {
+function ResourceLink({ preview, caption, onOpen }: { preview: ResourcePreview; caption: string; onOpen?: () => void }) {
   const [imageFailed, setImageFailed] = useState(false);
   const hasImage = Boolean(preview.thumbnail && !imageFailed);
-  return <a className={`${styles.card} ${hasImage ? styles.withImage : ""}`} href={preview.href} target="_blank" rel="noopener noreferrer" aria-label={`${preview.action}: ${preview.host} (в новой вкладке)`}>
+  return <a className={`${styles.card} ${hasImage ? styles.withImage : ""}`} href={preview.href} target="_blank" rel="noopener noreferrer" aria-label={`${preview.action}: ${preview.host} (в новой вкладке)`}
+    onClick={onOpen} onAuxClick={(event) => { if (event.button === 1) onOpen?.(); }}>
     {hasImage ? <span className={styles.media}>
       <img src={preview.thumbnail} alt="" width="480" height="360" loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} />
       <span className={styles.play} aria-hidden="true">▶</span>
