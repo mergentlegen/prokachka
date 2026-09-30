@@ -1,12 +1,11 @@
-.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; max-width:760px; margin:16px 0 4px; }
-.tile { position:relative; display:block; width:100%; height:clamp(130px,24vw,230px); overflow:hidden; padding:0; border:0; border-radius:12px; background:#dce5f3; cursor:zoom-in; }
-.tile img { width:100%; height:100%; object-fit:cover; transition:transform .2s ease; }
+/* A row is as wide as its photos need at the target height (never wider than the card), so every photo keeps its real shape. */
+.gallery { --gap:8px; --row-h:300px; --single-h:440px; display:grid; gap:var(--gap); max-width:760px; margin:16px 0 4px; }
+.row { display:flex; align-items:flex-start; gap:var(--gap); width:min(100%, calc(var(--row-h) * var(--ratio-sum) + var(--gap) * var(--gaps))); }
+.row.single { width:min(100%, calc(var(--single-h) * var(--ratio-sum))); }
+.tile { position:relative; display:block; flex-basis:0; min-width:0; overflow:hidden; padding:0; border:0; border-radius:12px; background:#dce5f3; cursor:zoom-in; }
+.tile img { display:block; width:100%; height:100%; object-fit:cover; transition:transform .2s ease; }
 .tile:hover img,.tile:focus-visible img { transform:scale(1.035); }
 .tile:focus-visible { outline:3px solid #3255b3; outline-offset:2px; }
-.grid:not(.single) .tile:nth-child(n+5) { display:none; }
-.single { grid-template-columns:minmax(0,1fr); max-width:680px; }
-.single .tile { height:auto; max-height:420px; aspect-ratio:4/3; }
-.single .tile img { object-fit:contain; }
 .more { position:absolute; inset:0; display:grid; place-items:center; background:#07162e99; color:white; font-size:28px; font-weight:700; }
 .backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:#07101dee; }
 .viewer { position:relative; width:100%; height:100%; outline:none; }
@@ -17,5 +16,5 @@
 .arrow { position:absolute; top:50%; z-index:2; display:grid; place-items:center; width:44px; height:54px; border:1px solid #ffffff55; border-radius:12px; background:#122642cc; color:white; font-size:36px; cursor:pointer; transform:translateY(-50%); }
 .previous { left:12px; }.next { right:12px; }
 .toolbar button:focus-visible,.arrow:focus-visible { outline:3px solid #fff; outline-offset:2px; }
-@media (max-width:600px) { .grid { gap:6px; }.tile { height:clamp(120px,37vw,190px); border-radius:10px; }.single .tile { max-height:330px; }.full { inset:82px 4px 90px; }.arrow { top:auto; bottom:calc(16px + env(safe-area-inset-bottom)); transform:none; }.previous { left:calc(16px + env(safe-area-inset-left)); }.next { right:calc(16px + env(safe-area-inset-right)); } }
+@media (max-width:600px) { .gallery { --gap:6px; --row-h:220px; --single-h:340px; }.tile { border-radius:10px; }.full { inset:82px 4px 90px; }.arrow { top:auto; bottom:calc(16px + env(safe-area-inset-bottom)); transform:none; }.previous { left:calc(16px + env(safe-area-inset-left)); }.next { right:calc(16px + env(safe-area-inset-right)); } }
 @media (prefers-reduced-motion:reduce) { .tile img { transition:none; } }
