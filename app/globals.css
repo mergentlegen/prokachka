@@ -363,9 +363,21 @@ h1,h2,h3 { font-family:'Manrope', sans-serif; letter-spacing:-.04em; }
 .announcement-hidden { background:#f0f2f5; color:#8b95a4; }
 .announcement-admin-copy h3 { margin:0 0 6px; color:var(--navy); font-size:17px; line-height:1.35; overflow-wrap:anywhere; }
 .announcement-admin-copy p { max-width:700px; margin:0; color:#43536a; font-size:14px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.announcement-photo-count { display:inline-flex; align-items:center; gap:5px; margin-top:10px; color:#385899; font-size:13px; font-weight:700; }
 .admin-resource-link { display:inline-flex; max-width:100%; margin-top:9px; overflow:hidden; color:var(--blue); font-size:10px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
 .announcement-admin-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
-.announcement-editor { display:flex; flex-direction:column; border-top:4px solid #9bb3ef; }
+.announcement-editor { display:flex; flex-direction:column; width:min(620px,100%); border-top:4px solid #9bb3ef; }
+.announcement-photo-editor { display:grid; gap:10px; padding:15px; border:1px solid #dfe7f4; border-radius:13px; background:#f7f9fd; }
+.announcement-photo-editor > strong { color:var(--navy); font-size:15px; }
+.announcement-photo-editor > p,.announcement-photo-editor > small { margin:0; color:#56677e; font-size:13px; line-height:1.5; }
+.announcement-photo-picker { position:relative; width:max-content; max-width:100%; overflow:hidden; cursor:pointer; }
+.announcement-photo-picker input { position:absolute; width:1px; height:1px; opacity:0; }
+.announcement-photo-picker:focus-within { outline:3px solid #3255b3; outline-offset:2px; }
+.announcement-photo-previews { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.announcement-photo-preview { position:relative; aspect-ratio:4/3; overflow:hidden; border-radius:10px; background:#dce5f3; }
+.announcement-photo-preview img { width:100%; height:100%; object-fit:cover; }
+.announcement-photo-preview button { position:absolute; top:6px; right:6px; display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:50%; background:#10203add; color:#fff; font-size:22px; cursor:pointer; }
+.announcement-photo-preview button:focus-visible { outline:3px solid #fff; outline-offset:2px; }
 @media (max-width:700px) {
   .announcement-admin-toolbar { align-items:flex-start; flex-direction:column; }
   .announcement-admin-toolbar .button { width:100%; }
@@ -375,6 +387,7 @@ h1,h2,h3 { font-family:'Manrope', sans-serif; letter-spacing:-.04em; }
 }
 @media (max-width:560px) {
   .announcement-card { padding:14px; }
+  .announcement-photo-previews { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .announcement-meta { align-items:flex-start; flex-direction:column; gap:4px; }
   .announcement-meta time { white-space:normal; }
   .member-shell .task-card p { font-size:15px; }

@@ -40,8 +40,9 @@ export type Task = {
   attachments?: TaskAttachment[]; feedOrder?: number;
 };
 export type Announcement = {
-  id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
+  id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
 };
+export type AnnouncementPhoto = { id: string; url: string; thumbnailUrl: string; width: number; height: number };
 export type StarAward = {
   id: string; userId: string; teamId: string; mentorId?: string; mentorName?: string; kind?: StarAwardKind; stars: number; comment: string; createdAt: string;
 };

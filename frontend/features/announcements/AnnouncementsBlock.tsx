@@ -3,6 +3,7 @@ import type { Announcement } from "@/shared/domain/types";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { PinBadge } from "@/frontend/shared/PublicationPin";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
+import { AnnouncementGallery } from "./AnnouncementGallery";
 
 export function AnnouncementsBlock({ announcements }: { announcements: Announcement[] }) {
   return (
@@ -24,6 +25,7 @@ export function AnnouncementsBlock({ announcements }: { announcements: Announcem
                 <div className="announcement-meta"><span>Для команды</span><time>{formatDateTime(announcement.createdAt)}</time></div>
                 {announcement.isPinned && <PinBadge />}<h3>{announcement.title}</h3>
                 <p>{announcement.content}</p>
+                <AnnouncementGallery photos={announcement.photos || []} title={announcement.title} />
                 {href && <ResourceCard url={href} caption="Материал объявления" />}
               </div>
             </article>

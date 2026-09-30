@@ -1,0 +1,1 @@
+export const ANNOUNCEMENT_PHOTO_LIMIT = 6;

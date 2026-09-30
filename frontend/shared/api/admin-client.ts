@@ -2,7 +2,9 @@ import type { Announcement, RankEntry, StarAward, Store, Submission, Task, TaskP
 import type { ReadyProgramDefinition } from "@/shared/domain/ready-programs";
 import type { ReadyProgramKey } from "@/shared/domain/types";
 import type { StarAwardKind } from "@/shared/domain/star-awards";
-import { mapAnnouncement, mapProgram, mapStarAward, mapSubmission, mapTask, mapUser, request } from "@/frontend/shared/api/client";
+import { ApiError, authFetch, mapAnnouncement, mapProgram, mapStarAward, mapSubmission, mapTask, mapUser, request } from "@/frontend/shared/api/client";
+import { announceMutation } from "@/frontend/shared/api/data-cache";
+import { mutationTopics } from "@/shared/domain/live-updates";
 type ApiRow = Record<string, unknown>;
 type ApiResponse<T> = { ok: boolean; message?: string } & T;
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
@@ -53,6 +55,18 @@ type AdminAnnouncementPatch = Partial<Omit<Pick<Announcement, "title" | "content
 export async function createAdminAnnouncement(input: AdminAnnouncementInput): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements", { method: "POST", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function updateAdminAnnouncement(id: string, input: AdminAnnouncementPatch): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function deleteAdminAnnouncement(id: string) { await request<ApiResponse<Record<string, never>>>("/api/announcements/" + id, { method: "DELETE" }); }
+export async function saveAdminAnnouncementWithPhotos(input: AdminAnnouncementInput & { files: File[]; keepPhotoIds?: string[]; id?: string }): Promise<Announcement> {
+  const url = input.id ? `/api/announcements/${encodeURIComponent(input.id)}` : "/api/announcements";
+  const form = new FormData();
+  form.set("title", input.title); form.set("content", input.content); form.set("resourceUrl", input.resourceUrl || "");
+  if (input.keepPhotoIds) form.set("keepPhotoIds", JSON.stringify(input.keepPhotoIds));
+  for (const file of input.files) form.append("photos", file, file.name);
+  const response = await authFetch(url, { method: input.id ? "PATCH" : "POST", body: form }, 90_000);
+  const body = await response.json().catch(() => ({})) as ApiResponse<{ announcement?: ApiRow }>;
+  if (!response.ok || !body.announcement) throw new ApiError(body.message || "Не удалось сохранить объявление с фотографиями.", response.status);
+  announceMutation(mutationTopics(url, input.id ? "PATCH" : "POST"));
+  return mapAnnouncement(body.announcement);
+}
 export async function createAdminStarAward(input: { userId: string; kind: StarAwardKind; comment: string }): Promise<StarAward> { const response = await request<ApiResponse<{ award: ApiRow }>>("/api/stars", { method: "POST", body: JSON.stringify(input) }); return mapStarAward(response.award); }
 export async function deleteAdminStarAward(id: string) { await request<ApiResponse<Record<string, never>>>("/api/stars/" + id, { method: "DELETE" }); }
 export type ProgramCreateInput = { title: string; deadlineHours: number; tasks: Array<{ title: string; description: string; maxPoints: number; resourceUrl?: string | null }> };

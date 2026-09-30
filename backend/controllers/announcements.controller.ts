@@ -1,6 +1,7 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
+import { readLimitedFormData } from "@/backend/http/form-data";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import {
   findAnnouncements,
@@ -12,6 +13,25 @@ import {
 
 function validateText(value: unknown, min: number, max: number) {
   return typeof value === "string" && value.trim().length >= min && value.trim().length <= max;
+}
+
+async function readAnnouncementBody(request: Request) {
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data"))
+    return { body: await readLimitedJson(request), photoFiles: [] as File[], keepPhotoIds: undefined as string[] | undefined };
+  const form = await readLimitedFormData(request, 20 * 1024 * 1024);
+  const photoFiles = form.getAll("photos");
+  if (photoFiles.some((file) => !(file instanceof File))) throw new Error("invalid_photos");
+  const rawKeep = form.get("keepPhotoIds");
+  let keepPhotoIds: string[] | undefined;
+  if (rawKeep !== null) {
+    const parsed: unknown = JSON.parse(String(rawKeep));
+    if (!Array.isArray(parsed) || parsed.length > 6 || parsed.some((id) => !isUuid(id))) throw new Error("invalid_photos");
+    keepPhotoIds = parsed;
+  }
+  return {
+    body: { title: form.get("title"), content: form.get("content"), resourceUrl: form.get("resourceUrl") },
+    photoFiles: photoFiles as File[], keepPhotoIds,
+  };
 }
 
 export async function listAnnouncements(request: Request) {
@@ -42,7 +62,7 @@ export async function createAnnouncement(request: Request) {
   if (!user.teamId) return failure("Сначала назначьте команду.", 400);
 
   try {
-    const body = await readLimitedJson(request);
+    const { body, photoFiles } = await readAnnouncementBody(request);
     if (!validateText(body.title, 2, 160)) {
       return failure("Заголовок должен содержать от 2 до 160 символов.", 400);
     }
@@ -59,9 +79,12 @@ export async function createAnnouncement(request: Request) {
       content: body.content.trim(),
       resourceUrl: resourceUrl.value,
       audienceRootId: user.role === "member" ? user.id : null,
+      photoFiles,
     });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
-    if (result.error) return failure("Не удалось создать объявление.");
+    if ("validationError" in result) return failure(result.validationError || "Некорректная фотография.", 400);
+    if ("storageError" in result) return failure("Не удалось загрузить фотографию в Storage.", 502);
+    if ("error" in result && result.error) return failure("Не удалось создать объявление.");
     return ok({ announcement: result.data }, 201);
   } catch (error) {
     return requestBodyFailure(error) || failure("Некорректные данные.", 400);
@@ -75,7 +98,7 @@ export async function updateAnnouncement(request: Request, id: string) {
   if (user.role !== "ceo" && !user.teamId) return failure("Сначала назначьте команду.", 400);
 
   try {
-    const body = await readLimitedJson(request);
+    const { body, photoFiles, keepPhotoIds } = await readAnnouncementBody(request);
     if (body.title !== undefined && !validateText(body.title, 2, 160)) {
       return failure("Заголовок должен содержать от 2 до 160 символов.", 400);
     }
@@ -97,12 +120,16 @@ export async function updateAnnouncement(request: Request, id: string) {
         resourceUrl: Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? resourceUrl.value : undefined,
         isActive: body.isActive,
         isPinned: body.isPinned,
+        photoFiles,
+        keepPhotoIds,
       },
       user,
     );
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этому объявлению.", 403);
-    if (result.error) return failure("Не удалось изменить объявление.");
+    if ("validationError" in result) return failure(result.validationError || "Некорректная фотография.", 400);
+    if ("storageError" in result) return failure("Не удалось загрузить фотографию в Storage.", 502);
+    if ("error" in result && result.error) return failure("Не удалось изменить объявление.");
     return ok({ announcement: result.data });
   } catch (error) {
     return requestBodyFailure(error) || failure("Некорректные данные.", 400);

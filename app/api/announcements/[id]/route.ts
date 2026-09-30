@@ -7,7 +7,7 @@ export async function PATCH(request: Request, context: Context) {
   const blocked = enforceRequestSecurity(request, "announcements-update", {
     max: 60,
     windowMs: 60_000,
-    maxBodyBytes: 16 * 1024,
+    maxBodyBytes: 20 * 1024 * 1024,
   });
   if (blocked) return blocked;
   return updateAnnouncement(request, (await context.params).id);

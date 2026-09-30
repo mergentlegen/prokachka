@@ -130,6 +130,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/user-deletion.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/unbounded-task-miles.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/dream-route.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/announcement-photos.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const blocked = enforceRequestSecurity(request, "announcements-create", {
     max: 60,
     windowMs: 60_000,
-    maxBodyBytes: 16 * 1024,
+    maxBodyBytes: 20 * 1024 * 1024,
   });
   if (blocked) return blocked;
   return createAnnouncement(request);

@@ -1,4 +1,4 @@
-import type { Announcement, AuthUser, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
+import type { Announcement, AnnouncementPhoto, AuthUser, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
 import { isReadyProgramKey } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
 import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
@@ -10,14 +10,14 @@ type ApiResponse<T> = { ok: boolean; message?: string } & T;
 const devSessionStorageKey = "incruises_dev_session";
 function devSessionToken() { if (typeof window === "undefined") return ""; return window.sessionStorage.getItem(devSessionStorageKey) || ""; }
 const apiTimeoutMs = 15000;
-function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit) {
+function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = apiTimeoutMs) {
   if (typeof window === "undefined") return fetch(input, init);
-  const controller = new AbortController(); const timeoutId = window.setTimeout(() => controller.abort(), apiTimeoutMs);
+  const controller = new AbortController(); const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   return fetch(input, { ...init, signal: controller.signal }).finally(() => window.clearTimeout(timeoutId));
 }
-export function authFetch(input: RequestInfo | URL, init?: RequestInit) {
+export function authFetch(input: RequestInfo | URL, init?: RequestInit, timeoutMs?: number) {
   const token = devSessionToken();
-  return fetchWithTimeout(input, { ...init, cache: init?.cache || "no-store", headers: { ...(token ? { "x-incruises-dev-session": token } : {}), ...(init?.headers || {}) } });
+  return fetchWithTimeout(input, { ...init, cache: init?.cache || "no-store", headers: { ...(token ? { "x-incruises-dev-session": token } : {}), ...(init?.headers || {}) } }, timeoutMs);
 }
 export function clearDevSession() { dataCache.activate(""); if (typeof window !== "undefined") { window.sessionStorage.removeItem(devSessionStorageKey); window.localStorage.removeItem(devSessionStorageKey); } }export function saveDevSession(value: unknown) {
   if (typeof window !== "undefined" && typeof value === "string" && value.length > 0) {
@@ -112,7 +112,12 @@ export function mapTask(row: ApiRow): Task {
 export function mapProgram(row: ApiRow): TaskProgram {
   return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, publisherId: row.publisher_id ? String(row.publisher_id) : undefined, audienceRootId: row.audience_root_id ? String(row.audience_root_id) : undefined, templateKey: isReadyProgramKey(row.template_key) ? row.template_key : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
 }
-export function mapAnnouncement(row: ApiRow): Announcement { return { id: String(row.id), teamId: String(row.team_id), authorId: row.author_id ? String(row.author_id) : undefined, title: String(row.title || ""), content: String(row.content || ""), resourceUrl: row.resource_url ? String(row.resource_url) : undefined, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) }; }
+export function mapAnnouncement(row: ApiRow): Announcement {
+  const photos: AnnouncementPhoto[] = Array.isArray(row.photos) ? row.photos.filter((photo): photo is ApiRow => Boolean(photo && typeof photo === "object" && !Array.isArray(photo)))
+    .filter((photo) => typeof photo.id === "string" && typeof photo.url === "string" && typeof photo.thumbnailUrl === "string")
+    .map((photo) => ({ id: String(photo.id), url: String(photo.url), thumbnailUrl: String(photo.thumbnailUrl), width: Number(photo.width) || 1, height: Number(photo.height) || 1 })) : [];
+  return { id: String(row.id), teamId: String(row.team_id), authorId: row.author_id ? String(row.author_id) : undefined, title: String(row.title || ""), content: String(row.content || ""), resourceUrl: row.resource_url ? String(row.resource_url) : undefined, photos, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()) };
+}
 export function mapStarAward(row: ApiRow): StarAward {
   const mentor = Array.isArray(row.mentor) ? row.mentor[0] : row.mentor;
   return {

@@ -16,7 +16,7 @@ copyReleaseTree(source, destination, root);
 copyReleaseTree(path.join(root, 'public'), path.join(destination, 'public'), root);
 copyReleaseTree(path.join(root, '.next/static'), path.join(destination, '.next/static'), root);
 fs.mkdirSync(path.join(destination, 'scripts'));
-for (const file of ['start-release.cjs', 'smoke-test.cjs', 'deliver-telegram.cjs', 'cleanup-welcome-videos.cjs', 'cleanup-profile-avatars.cjs', 'cleanup-deleted-users.cjs']) {
+for (const file of ['start-release.cjs', 'smoke-test.cjs', 'deliver-telegram.cjs', 'cleanup-welcome-videos.cjs', 'cleanup-profile-avatars.cjs', 'cleanup-deleted-users.cjs', 'cleanup-announcement-photos.cjs']) {
   fs.copyFileSync(path.join(root, 'scripts', file), path.join(destination, 'scripts', file));
 }
 const metadata = {
