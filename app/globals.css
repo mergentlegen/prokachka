@@ -1027,15 +1027,6 @@ html, body { width:100%; max-width:100%; overflow-x:clip; }
 .admin-heading h1 { overflow-wrap:anywhere; }
 .admin-heading-actions:empty { display:none; }
 .admin-mobile-menu-button { display:none; }
-.admin-mobile-drawer-nav { display:grid; gap:4px; padding-top:18px; }
-.admin-mobile-drawer-nav button,.admin-mobile-drawer-home { display:flex; align-items:center; gap:12px; width:100%; min-height:44px; padding:11px 12px; border:0; border-radius:8px; background:transparent; color:#697589; text-align:left; text-decoration:none; font:inherit; font-size:13px; cursor:pointer; }
-.admin-mobile-drawer-home { margin-bottom:9px; border-bottom:1px solid var(--line); border-radius:0; color:var(--blue); font-weight:700; }
-.admin-mobile-drawer-nav button span { width:17px; color:#9aa5b6; text-align:center; }
-.admin-mobile-drawer-nav button.active { background:#edf2fd; color:var(--blue); font-weight:700; }
-.admin-mobile-drawer-nav button.active span { color:var(--blue); }
-.admin-mobile-drawer-nav button b { display:grid; place-items:center; min-width:19px; height:19px; margin-left:auto; border-radius:50%; background:var(--orange); color:#fff; font-size:9px; }
-.admin-mobile-telegram { margin-top:18px; padding-top:12px; border-top:1px solid var(--line); }
-.admin-mobile-telegram .telegram-connect { margin:0; }
 
 .modal-backdrop { padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
 .simple-modal,.profile-modal,.editor-modal { max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior:contain; }
@@ -1420,3 +1411,51 @@ button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 
 .member-sidebar-nav button span svg { width:20px; height:20px; }
 @media (max-width:760px) { .member-shell .logout-link { display:none; } }
 @media (prefers-reduced-motion:reduce) { .member-shell .member-section,.member-shell .welcome-section { animation:none; } }
+
+/* Mentor: simple header, icon sidebar with account footer, tile menu on phones, gentle section transitions. */
+@media (min-width:851px) { .admin-shell .admin-topbar { position:sticky; top:0; z-index:6; } .admin-shell .admin-sidebar { position:sticky; top:72px; align-self:start; display:flex; flex-direction:column; height:calc(100dvh - 72px); overflow-y:auto; overscroll-behavior:contain; } }
+.admin-sidebar nav button span { display:grid; place-items:center; width:20px; }
+.admin-sidebar nav button span svg { width:19px; height:19px; }
+.admin-sidebar nav button b { width:auto; min-width:19px; padding:0 5px; border-radius:99px; }
+.admin-sidebar-footer { display:grid; gap:8px; margin-top:auto; padding-top:18px; border-top:1px solid var(--line); }
+.admin-sidebar-footer .telegram-connect { width:100%; min-width:0; margin:0; }
+.admin-sidebar-footer .logout-button { display:flex; align-items:center; gap:10px; min-height:40px; padding:8px 13px; border:0; border-radius:8px; background:none; font:inherit; font-size:12px; font-weight:600; text-align:left; }
+.admin-sidebar-footer .logout-button:hover { background:#fdf1f2; }
+.admin-sidebar-footer .logout-button span { display:grid; width:20px; }
+.admin-sidebar-footer .logout-button svg { width:18px; height:18px; }
+.admin-menu-badge { position:absolute; top:-6px; right:-6px; display:grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border:2px solid #fff; border-radius:99px; background:#d68d15; color:#fff; font-size:10px; font-weight:800; line-height:1; }
+.admin-shell .admin-mobile-menu-button { position:relative; }
+.admin-shell .admin-content > * { animation:admin-enter .3s ease backwards; } /* backwards: a finished animation must not trap fixed sheets. */
+@keyframes admin-enter { from { opacity:0; transform:translateY(6px); } }
+
+.admin-drawer-profile { display:flex; align-items:center; gap:12px; width:100%; margin-top:14px; padding:12px; border:1px solid var(--line); border-radius:16px; background:#f9fbfe; color:inherit; font:inherit; text-align:left; }
+.admin-drawer-profile .admin-drawer-avatar { flex:0 0 44px; width:44px; height:44px; }
+.admin-drawer-profile > span { display:grid; flex:1; min-width:0; }
+.admin-drawer-profile strong { color:var(--navy); font-size:15px; overflow-wrap:anywhere; }
+.admin-drawer-profile small { color:var(--blue); font-size:12px; font-weight:600; }
+.admin-drawer-profile i { display:grid; color:#9aa5b6; }
+.admin-drawer-profile i svg { width:20px; height:20px; }
+.admin-drawer-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.admin-drawer-grid button { position:relative; display:flex; align-items:center; gap:8px; min-width:0; min-height:60px; padding:8px 10px 8px 8px; border:1px solid var(--line); border-radius:16px; background:#fff; color:#44536b; font:inherit; text-align:left; transition:transform .12s, border-color .2s; }
+.admin-drawer-grid button:active { transform:scale(.97); }
+.admin-drawer-grid button.active { border-color:var(--blue); background:#f2f6ff; color:var(--blue); }
+.admin-drawer-icon { display:grid; flex:0 0 30px; place-items:center; width:30px; height:30px; border-radius:11px; background:#eef2fb; color:var(--blue); }
+.admin-drawer-icon svg { width:19px; height:19px; }
+.admin-drawer-grid button.active .admin-drawer-icon { background:var(--blue); color:#fff; }
+.admin-drawer-label { min-width:0; font-size:13px; font-weight:650; line-height:1.25; overflow-wrap:normal; word-break:normal; }
+.admin-drawer-grid button b { position:absolute; top:-6px; right:-4px; display:grid; place-items:center; min-width:22px; height:22px; padding:0 6px; border-radius:99px; background:#d68d15; color:#fff; font-size:11px; font-weight:800; }
+.admin-drawer-footer { display:grid; gap:6px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.admin-drawer-footer .telegram-connect { margin:0 0 4px; }
+.admin-drawer-link { display:flex; align-items:center; gap:12px; width:100%; min-height:48px; padding:10px 12px; border:0; border-radius:12px; background:none; color:var(--blue); font:inherit; font-size:14px; font-weight:650; text-align:left; text-decoration:none; }
+.admin-drawer-link span { display:grid; }
+.admin-drawer-link svg { width:20px; height:20px; }
+.admin-drawer-logout { color:#b23e4d; }
+@media (max-width:360px) { .admin-drawer-grid { gap:6px; } .admin-drawer-grid button { gap:6px; padding:8px 6px; } .admin-drawer-label { font-size:12px; } }
+@media (prefers-reduced-motion:reduce) { .admin-shell .admin-content > * { animation:none; } .admin-drawer-grid button { transition:none; } }
+.review-queue-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; padding:14px 16px; border:1px solid var(--line); border-radius:16px; background:#fff; }
+.review-queue-bar > div:first-child { display:grid; gap:3px; min-width:0; }
+.review-queue-bar strong { color:var(--navy); font-size:15px; }
+.review-queue-bar small { color:var(--muted); font-size:12px; }
+.review-queue-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.review-queue-actions .button { min-height:44px; }
+@media (max-width:560px) { .review-queue-actions { width:100%; } .review-queue-actions .button { flex:1 1 140px; } }

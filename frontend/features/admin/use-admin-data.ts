@@ -2,20 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { SetStateAction } from "react";
-import type { AuthUser, RankEntry, Store, TeamJoinRequest, NetworkMember } from "@/shared/domain/types";
+import type { AuthUser, Store, TeamJoinRequest, NetworkMember } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 import { userScope } from "@/shared/domain/live-updates";
 import { dataCache } from "@/frontend/shared/api/data-cache";
 import { ScopeChangedError } from "@/frontend/shared/lib/query-cache";
 import { loadNetwork } from "@/frontend/shared/api/network-client";
-import { loadAdminData, loadAdminProgramHistory, loadAdminPublicationHistory, loadAdminRanking, loadMentorCounts } from "@/frontend/shared/api/admin-client";
+import { loadAdminData, loadAdminProgramHistory, loadAdminPublicationHistory, loadMentorCounts } from "@/frontend/shared/api/admin-client";
 import { loadTeamRequests } from "@/frontend/shared/api/team-client";
 import { sectionDatasets, type AdminSection } from "./admin-sections";
 
 const emptyStore = (): Store => ({ users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] });
 const emptySnapshot = () => ({ scope: "", loaded: {} as Partial<Record<AdminSection, boolean>>, errors: {} as Partial<Record<AdminSection, string>>,
   store: emptyStore(), requests: [] as TeamJoinRequest[], networkUsers: [] as NetworkMember[],
-  programHistory: [] as ProgramHistory[], publicationHistory: [] as PublicationHistoryItem[], ranking: [] as RankEntry[],
+  programHistory: [] as ProgramHistory[], publicationHistory: [] as PublicationHistoryItem[],
   counts: { pending: 0, accepted: 0, requests: 0 } });
 
 export function useAdminData(user: AuthUser | null, section: AdminSection) {
@@ -29,12 +29,11 @@ export function useAdminData(user: AuthUser | null, section: AdminSection) {
     const requestVersion = ++version.current;
     const startedEpoch = dataCache.epoch;
     try {
-      const [patch, counts, requests, programHistory, publicationHistory, ranking, networkUsers] = await Promise.all([
+      const [patch, counts, requests, programHistory, publicationHistory, networkUsers] = await Promise.all([
         loadAdminData(sectionDatasets[section]), loadMentorCounts(),
         section === "requests" ? loadTeamRequests() : null,
         section === "history" ? loadAdminProgramHistory() : null,
         section === "history" ? loadAdminPublicationHistory() : null,
-        section === "dashboard" ? loadAdminRanking() : null,
         section === "network" ? loadNetwork() : null,
       ]);
       if (requestVersion !== version.current || startedEpoch !== dataCache.epoch) return;
@@ -43,7 +42,7 @@ export function useAdminData(user: AuthUser | null, section: AdminSection) {
         return { ...current, scope, loaded: { ...current.loaded, [section]: true }, errors: { ...current.errors, [section]: "" },
           store: { ...current.store, ...patch }, counts, networkUsers: networkUsers ?? current.networkUsers,
           requests: requests ?? current.requests, programHistory: programHistory ?? current.programHistory,
-          publicationHistory: publicationHistory ?? current.publicationHistory, ranking: ranking ?? current.ranking };
+          publicationHistory: publicationHistory ?? current.publicationHistory };
       });
     } catch (error) {
       if (requestVersion !== version.current || startedEpoch !== dataCache.epoch || error instanceof ScopeChangedError) return;

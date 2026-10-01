@@ -1,4 +1,4 @@
-import type { Announcement, RankEntry, StarAward, Store, Submission, Task, TaskProgram } from "@/shared/domain/types";
+import type { Announcement, StarAward, Store, Submission, Task, TaskProgram } from "@/shared/domain/types";
 import type { ReadyProgramDefinition } from "@/shared/domain/ready-programs";
 import type { ReadyProgramKey } from "@/shared/domain/types";
 import type { StarAwardKind } from "@/shared/domain/star-awards";
@@ -22,9 +22,6 @@ const datasetLoaders: { [K in AdminDataset]: () => Promise<Store[K]> } = {
 export async function loadAdminData(keys: readonly AdminDataset[]): Promise<Partial<Store>> {
   const entries = await Promise.all([...new Set(keys)].map(async (key) => [key, await datasetLoaders[key]()]));
   return Object.fromEntries(entries);
-}
-export async function loadAdminRanking(): Promise<RankEntry[]> {
-  return (await request<ApiResponse<{ ranking: RankEntry[] }>>("/api/ranking")).ranking;
 }
 export type MentorCounts = { pending: number; accepted: number; requests: number };
 export async function loadMentorCounts(): Promise<MentorCounts> {

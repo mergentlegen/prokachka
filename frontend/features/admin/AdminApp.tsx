@@ -29,7 +29,14 @@ import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest, User 
 import { validMiles } from "@/shared/domain/miles";
 import { TaskEditorModal, ReviewModal, DeleteModal, CompletionModal } from "./AdminModals";
 import type { TaskDraft, ReviewDraft } from "./AdminModals";
-import { AccessDenied, Dashboard, TasksView, ReviewView, HistoryView, RequestsView } from "./AdminViews";
+import { AccessDenied, TasksView, ReviewView, HistoryView, RequestsView } from "./AdminViews";
+import { AdminDashboard } from "./AdminDashboard";
+import { ReviewFlow, type ReviewDecision } from "./ReviewFlow";
+import { ReviewTemplatesEditor } from "./ReviewTemplatesEditor";
+import { adminIcons, homeIcon, logoutIcon, profileIcon } from "./AdminIcons";
+import { reviewQueue } from "./review-queue";
+import { loadReviewTemplates, saveReviewTemplates } from "@/frontend/shared/api/review-templates-client";
+import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
 
 import type { AdminSection } from "./admin-sections";
 import { useAdminData } from "./use-admin-data";
@@ -60,7 +67,7 @@ export function AdminApp() {
   const [feedbackVersion, setFeedbackVersion] = useState(0);
   const [feedbackNeedsReply, setFeedbackNeedsReply] = useState(0);
   const [toast, setToast] = useState("");
-  const { store, setStore, requests, setRequests, programHistory, publicationHistory, ranking, counts, networkUsers, setNetworkUsers, dataError, dataLoading, refreshData } = useAdminData(authUser, section);
+  const { store, setStore, requests, setRequests, programHistory, publicationHistory, counts, networkUsers, setNetworkUsers, dataError, dataLoading, refreshData } = useAdminData(authUser, section);
   const [modal, setModal] = useState<AdminModal>(null);
   const [modalBusy, setModalBusy] = useState(false);
   const [programEditorOpen, setProgramEditorOpen] = useState(false);
@@ -74,6 +81,10 @@ export function AdminApp() {
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [reviewFlow, setReviewFlow] = useState<{ startId: string; intent?: "accepted" | "revision" } | null>(null);
+  const [templates, setTemplates] = useState<{ list: string[]; canEdit: boolean }>({ list: [], canEdit: false });
+  const [templatesEditorOpen, setTemplatesEditorOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const shellRef = useRef<HTMLElement>(null);
   const openMobileMenu = useCallback(() => setMobileMenuOpen(true), []);
   useMenuSwipe(shellRef, !authLoading && hasMentorAccess(authUser) && !mobileMenuOpen && !modal && !taskOrderOpen, openMobileMenu);
@@ -95,6 +106,20 @@ export function AdminApp() {
       .catch(() => undefined);
     return () => { active = false; };
   }, [authUser?.id, authUser?.role, authUser?.canReview, feedbackVersion]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Reloads the shared comments when the reviewer, their rights or their team change.
+  const templatesViewer = authUser && authUser.teamId && (authUser.role === "admin" || authUser.canReview) ? `${authUser.id}:${authUser.role}:${authUser.teamId}` : "";
+  useEffect(() => {
+    if (!templatesViewer) return;
+    let active = true;
+    void loadReviewTemplates().then((result) => { if (active) setTemplates({ list: result.templates, canEdit: result.canEdit }); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [templatesViewer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +167,6 @@ export function AdminApp() {
     }
   });
 
-  const pending = store.submissions.filter((submission) => submission.status === "pending");
   const pendingRequests = requests.filter((request) => request.status === "pending");
 
   async function logout() {
@@ -239,7 +263,8 @@ export function AdminApp() {
     const submission = store.submissions.find((item) => item.id === submissionId);
     if (!submission) return;
     setSection("review");
-    openReviewModal(submission, "accepted");
+    if (submission.status === "pending") setReviewFlow({ startId: submission.id });
+    else openReviewModal(submission, "accepted");
     setDeepLinkHandled(true);
   }, [authUser, dataLoading, deepLinkHandled, store.submissions, openReviewModal]);
    function openDeleteModal(task: Task) {
@@ -248,6 +273,30 @@ export function AdminApp() {
 
   function closeModal() {
     if (!modalBusy) setModal(null);
+  }
+
+  async function saveDecision(submission: Submission, decision: ReviewDecision) {
+    try {
+      const updated = await reviewAdminSubmission(submission.id, { ...decision, expectedVersion: submission.reviewVersion ?? 0 });
+      setStore((current) => ({ ...current, submissions: current.submissions.map((item) => item.id === updated.id ? updated : item) }));
+      void refreshData();
+      return true;
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Произошла ошибка при проверке.");
+      return false;
+    }
+  }
+
+  async function storeTemplates(list: string[]) {
+    try {
+      const result = await saveReviewTemplates(list);
+      setTemplates({ list: result.templates, canEdit: true });
+      setToast("Готовые комментарии сохранены.");
+      return true;
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Не удалось сохранить готовые комментарии.");
+      return false;
+    }
   }
 
   async function submitReview() {
@@ -411,27 +460,32 @@ export function AdminApp() {
 
   const canPublishContent = authUser.role === "admin" || Boolean(authUser.canPublishTasks);
   const canReview = authUser.role === "admin" || Boolean(authUser.canReview);
-  const sections: Array<[AdminSection, string, string]> = [
-    ["dashboard", "Обзор", "⌂"], ["tasks", "Задания", "☷"], ["programs", "Программы", "▤"], ["review", "Проверка работ", "✓"], ["feedback", "Обратная связь", "✉"], ["history", "История", "◷"],
-    ["announcements", "Объявления", "✦"], ["welcome-video", "Приветственное видео", "▶"], ["stars", "Звёзды", "★"], ["network", "Структура сети", "⌘"],
+  const sections: Array<[AdminSection, string]> = [
+    ["dashboard", "Обзор"], ["review", "Проверка работ"], ["feedback", "Обратная связь"], ["tasks", "Задания"], ["programs", "Программы"],
+    ["announcements", "Объявления"], ["stars", "Звёзды"], ["network", "Структура сети"], ["history", "История проверок"], ["welcome-video", "Приветственное видео"],
   ];
+  const queue = reviewQueue(store.submissions);
+  const sectionCount = (id: AdminSection) => id === "review" ? counts.pending : id === "feedback" ? feedbackNeedsReply : id === "requests" ? counts.requests : 0;
+  const menuBadge = canReview ? counts.pending + feedbackNeedsReply + counts.requests : 0;
   const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements" || id === "welcome-video") ? canPublishContent : id === "review" || id === "feedback" || id === "history" || id === "stars" ? canReview : true);
 
   return <><main className="admin-shell" ref={shellRef}>
-    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label="Открыть меню" aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span /></button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><span className="admin-role">Наставник</span><button type="button" className="avatar-button" aria-label="Открыть профиль" onClick={() => setProfileOpen(true)}><Avatar name={authUser.name} src={authUser.avatarUrl} className="header-avatar" eager /></button><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button className="logout-button" onClick={logout}>Выйти</button></div></header>
+    <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label={menuBadge ? `Открыть меню, ждут внимания: ${menuBadge}` : "Открыть меню"} aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span />{menuBadge > 0 && <b className="admin-menu-badge">{menuBadge > 99 ? "99+" : menuBadge}</b>}</button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><button type="button" className="avatar-button" aria-label="Открыть профиль" onClick={() => setProfileOpen(true)}><Avatar name={authUser.name} src={authUser.avatarUrl} className="header-avatar" eager /></button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
-{visibleSections.map(([id, label, icon]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}{id === "feedback" && feedbackNeedsReply > 0 && <b>{feedbackNeedsReply}</b>}</button>)}
-        {canReview && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
-      </nav></aside>
+{visibleSections.map(([id, label]) => <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}><span>{adminIcons[id]}</span>{label}{sectionCount(id) > 0 && <b>{sectionCount(id)}</b>}</button>)}
+        {canReview && <button className={section === "requests" ? "active" : ""} onClick={() => setSection("requests")}><span>{adminIcons.requests}</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
+      </nav>
+        <div className="admin-sidebar-footer"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button type="button" className="logout-button" onClick={logout}><span>{logoutIcon}</span>Выйти</button></div>
+      </aside>
       <section className={`admin-content${section === "feedback" ? " admin-content-feedback" : ""}`}><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "feedback" ? "Обратная связь" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit" onClick={() => setTaskOrderOpen(true)}>↕ Изменить порядок</button><button className="primary-button" onClick={() => openTaskModal()}>+ Создать задание</button></>}{section === "programs" && canPublishContent && <button className="primary-button" onClick={() => setProgramEditorOpen(true)}>+ Создать программу</button>}</div></div>
-        <SectionBoundary loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
-        {section === "dashboard" && <Dashboard store={store} pending={pending} ranking={ranking} onNavigate={setSection} />}
+        <SectionBoundary key={section} loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
+        {section === "dashboard" && <AdminDashboard store={store} queue={queue} feedbackNeedsReply={feedbackNeedsReply} requests={counts.requests} canReview={canReview} now={now} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
           <ReadyProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />
           <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
         </div>}
-        {section === "review" && <ReviewView store={store} submissions={pending} onReview={openReviewModal} />}
+        {section === "review" && <ReviewView store={store} submissions={queue} onReview={(submission, intent) => setReviewFlow({ startId: submission.id, intent })} onStart={() => { if (queue[0]) setReviewFlow({ startId: queue[0].id }); }} onEditTemplates={templates.canEdit ? () => setTemplatesEditorOpen(true) : undefined} />}
 {section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
         {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
@@ -441,18 +495,26 @@ export function AdminApp() {
       </section>
     </div>
     <MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu}>
-      <nav className="admin-mobile-drawer-nav">
-        <button type="button" onClick={() => { setProfileOpen(true); setMobileMenuOpen(false); }}><span>◌</span>Мой профиль</button>
-        <a className="admin-mobile-drawer-home" href="/" onClick={() => setMobileMenuOpen(false)}>← Обычный интерфейс</a>
-        {visibleSections.map(([id, label, icon]) => <button type="button" key={id} className={section === id ? "active" : ""} onClick={() => { setSection(id); setMobileMenuOpen(false); }}><span>{icon}</span>{label}{id === "review" && counts.pending > 0 && <b>{counts.pending}</b>}{id === "feedback" && feedbackNeedsReply > 0 && <b>{feedbackNeedsReply}</b>}</button>)}
-        {canReview && <button type="button" className={section === "requests" ? "active" : ""} onClick={() => { setSection("requests"); setMobileMenuOpen(false); }}><span>◈</span>Заявки{counts.requests > 0 && <b>{counts.requests}</b>}</button>}
+      <button type="button" className="admin-drawer-profile" onClick={() => { setProfileOpen(true); setMobileMenuOpen(false); }}><Avatar name={authUser.name} src={authUser.avatarUrl} className="admin-drawer-avatar" /><span><strong>{authUser.name}</strong><small>Мой профиль</small></span><i aria-hidden="true">{profileIcon}</i></button>
+      <nav className="admin-drawer-grid" aria-label="Разделы">
+        {[...visibleSections, ...(canReview ? [["requests", "Заявки"] as [AdminSection, string]] : [])].map(([id, label]) => <button type="button" key={id} className={section === id ? "active" : ""} aria-current={section === id ? "page" : undefined} onClick={() => { setSection(id); setMobileMenuOpen(false); }}>
+          <span className="admin-drawer-icon">{adminIcons[id]}</span><span className="admin-drawer-label">{id === "welcome-video" ? "Видео" : label}</span>{sectionCount(id) > 0 && <b>{sectionCount(id)}</b>}
+        </button>)}
       </nav>
-      <div className="admin-mobile-telegram"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div>
+      <div className="admin-drawer-footer">
+        <TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} />
+        <a className="admin-drawer-link" href="/" onClick={() => setMobileMenuOpen(false)}><span>{homeIcon}</span>Обычный интерфейс</a>
+        <button type="button" className="admin-drawer-link admin-drawer-logout" onClick={logout}><span>{logoutIcon}</span>Выйти</button>
+      </div>
     </MobileDrawer>
     {profileOpen && <ProfileDialog user={authUser} onClose={() => setProfileOpen(false)} onSaved={(updated) => { setAuthUser(updated); setToast("Профиль обновлён."); void refreshData(); }} />}
     {taskOrderOpen && <TaskOrderDialog onClose={() => setTaskOrderOpen(false)} onSaved={() => { setTaskOrderOpen(false); setToast("Порядок заданий сохранён."); void refreshData(); }} />}
     {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
+    <PullToRefresh onRefresh={async () => { setFeedbackVersion((value) => value + 1); await refreshData(); }} />
+    {reviewFlow && <ReviewFlow queue={queue} startId={reviewFlow.startId} intent={reviewFlow.intent} store={store} templates={templates.list} canEditTemplates={templates.canEdit}
+      onSave={saveDecision} onEditTemplates={() => setTemplatesEditorOpen(true)} onClose={() => setReviewFlow(null)} />}
+    {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
     {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}

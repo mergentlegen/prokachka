@@ -1,0 +1,11 @@
+.editor { display: grid; gap: 14px; }
+.intro { margin: 0; color: #5b6b85; font-size: 14px; line-height: 1.5; }
+.rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rows li { display: flex; align-items: flex-start; gap: 8px; }
+.rows textarea { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 12px; outline: none; background: #fff; color: var(--navy); font: inherit; font-size: 16px; line-height: 1.45; resize: vertical; }
+.rows textarea:focus { border-color: #92a6dd; box-shadow: 0 0 0 3px #dfe7ff; }
+.rows button { flex: 0 0 44px; height: 44px; border: 0; border-radius: 10px; background: #f6f1f2; color: #a13d4c; font-size: 22px; line-height: 1; }
+.add { justify-self: start; min-height: 44px; padding: 8px 14px; border: 1px dashed #c9d6f2; border-radius: 12px; background: #f7f9fe; color: var(--blue); font: inherit; font-size: 13px; font-weight: 700; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.actions :global(.button) { min-height: 44px; }
+@media (max-width: 560px) { .actions :global(.button) { flex: 1; } }

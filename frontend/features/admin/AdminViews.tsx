@@ -5,14 +5,12 @@ import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import type { Store, Submission, Task, TeamJoinRequest, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
-import type { AdminSection } from "./admin-sections";
 import { formatDate, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
-import { SubmissionCard, SubmissionSummary } from "./SubmissionCard";
+import { SubmissionCard } from "./SubmissionCard";
+import { plural, waitingInfo } from "./review-queue";
 function isTaskExpired(task: Task) { return Boolean(task.deadlineAt && new Date(task.deadlineAt).getTime() <= Date.now()); }
 
 export function AccessDenied({ onLogout }: { onLogout: () => void }) { return <main className="admin-login"><div className="admin-login-card"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><p className="eyebrow">Доступ ограничен</p><h1>Это раздел наставника</h1><p>Твой аккаунт участника не может открыть админ-панель.</p><button className="primary-button full" onClick={() => { void onLogout(); }}>Выйти</button><a className="back-link" href="/">Вернуться к заданиям</a></div></main>; }
-export function Dashboard({ store, pending, ranking, onNavigate }: { store: Store; pending: Submission[]; ranking: { id: string; name: string; avatarUrl?: string; points: number }[]; onNavigate: (section: AdminSection) => void }) { return <><div className="metric-grid"><Metric label="Участники" value={store.users.length} note="в команде" icon="♙" /><Metric label="Активные задания" value={store.tasks.filter((task) => task.isActive && !isTaskExpired(task)).length} note={"из " + store.tasks.length + " всего"} icon="☷" /><Metric label="На проверке" value={pending.length} note="ждут внимания" icon="◷" /><Metric label="Принято работ" value={store.submissions.filter((submission) => submission.status === "accepted").length} note="за всё время" icon="✓" /></div><div className="dashboard-grid"><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Сейчас</p><h2>Нужна проверка</h2></div><button className="text-button" onClick={() => onNavigate("review")}>Все работы →</button></div>{pending.length === 0 ? <EmptyAdmin text="Все работы проверены." /> : pending.slice(0, 3).map((submission) => <SubmissionRow key={submission.id} submission={submission} store={store} />)}</div><div className="admin-panel"><div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Лидеры рейтинга</h2></div><button className="text-button" onClick={() => onNavigate("history")}>История →</button></div>{ranking.slice(0, 4).map((member, index) => <div className="leader-row" key={member.id}><span>{index + 1}</span><Avatar className="rank-avatar" name={member.name} src={member.avatarUrl} /><strong>{member.name}</strong><b>{member.points}</b></div>)}</div></div></>; }
-function Metric({ label, value, note, icon }: { label: string; value: number; note: string; icon: string }) { return <div className="metric-card"><span className="metric-icon">{icon}</span><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></div>; }
 function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" | "publications"; onChange: (value: "regular" | "programs" | "publications") => void }) {
   return <div className="task-kind-switch history-kind-switch"><button type="button" className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button type="button" className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button><button type="button" className={value === "publications" ? "active" : ""} onClick={() => onChange("publications")}>Публикации</button></div>;
 }
@@ -47,10 +45,14 @@ export function TaskRows({ tasks, submissions = [], actorId, canManageAll, onTog
     </div>;
   })}</>;
 }
-export function ReviewView({ store, submissions, onReview }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void }) {
-  return <div className="submission-review-list">{submissions.length === 0 ? <div className="admin-panel"><EmptyAdmin text="Нет работ, ожидающих проверки." /></div> : submissions.map((submission) =>
-    <SubmissionCard key={submission.id} submission={submission} name={store.users.find((user) => user.id === submission.userId)?.name || "Неизвестный участник"} avatarUrl={store.users.find((user) => user.id === submission.userId)?.avatarUrl} taskTitle={submission.taskTitle || store.tasks.find((task) => task.id === submission.taskId)?.title || "Удалённое задание"} onReview={onReview} />
-  )}</div>;
+export function ReviewView({ store, submissions, onReview, onStart, onEditTemplates }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void; onStart: () => void; onEditTemplates?: () => void }) {
+  const oldest = submissions[0] ? waitingInfo(submissions[0].submittedAt) : null;
+  return <div className="submission-review-list">
+    {submissions.length > 0 && <div className="review-queue-bar"><div><strong>{submissions.length} {plural(submissions.length, "работа ждёт", "работы ждут", "работ ждут")} проверки</strong>{oldest && <small>Сверху самые старые · первая {oldest.text}</small>}</div>
+      <div className="review-queue-actions">{onEditTemplates && <button type="button" className="button button-edit" onClick={onEditTemplates}>Готовые комментарии</button>}<button type="button" className="button button-primary" onClick={onStart}>Проверять по очереди</button></div></div>}
+    {submissions.length === 0 ? <div className="admin-panel"><EmptyAdmin text="Нет работ, ожидающих проверки." /></div> : submissions.map((submission) =>
+      <SubmissionCard key={submission.id} submission={submission} name={store.users.find((user) => user.id === submission.userId)?.name || "Неизвестный участник"} avatarUrl={store.users.find((user) => user.id === submission.userId)?.avatarUrl} taskTitle={submission.taskTitle || store.tasks.find((task) => task.id === submission.taskId)?.title || "Удалённое задание"} onReview={onReview} />
+    )}</div>;
 }
 export function RequestsView({ requests, onReview }: { requests: TeamJoinRequest[]; onReview: (teamRequest: TeamJoinRequest, status: "approved" | "rejected") => void }) {
   return <div className="admin-panel table-panel">{requests.length === 0 ? <EmptyAdmin text="Новых заявок в команду нет." /> : requests.map((teamRequest) => <div className="review-row" key={teamRequest.id}><div className="submission-row"><Avatar className="rank-avatar" name={teamRequest.userName || "У"} src={teamRequest.userAvatarUrl} /><div><strong>{teamRequest.userName || "Новый участник"}</strong><span>Заявка на вступление в команду</span></div><time>{formatDateTime(teamRequest.createdAt)}</time></div><div className="review-actions"><span className="request-team-name">{teamRequest.teamName || "Твоя команда"}</span><div><button className="button button-success" onClick={() => onReview(teamRequest, "approved")}>Принять</button><button className="button button-danger" onClick={() => onReview(teamRequest, "rejected")}>Отклонить</button></div></div></div>)}</div>;
@@ -165,10 +167,5 @@ export function HistoryView({ store, programs, publications, onReview, actorId, 
         </div>
       </div>;
     })()}  </>;
-}
-function SubmissionRow({ submission, store }: { submission: Submission; store: Store }) {
-  const user = store.users.find((item) => item.id === submission.userId);
-  const task = store.tasks.find((item) => item.id === submission.taskId);
-  return <SubmissionSummary submission={submission} name={user?.name || "Неизвестный участник"} avatarUrl={user?.avatarUrl} taskTitle={submission.taskTitle || task?.title || "Удалённое задание"} />;
 }
 function EmptyAdmin({ text }: { text: string }) { return <div className="empty-admin"><span>✓</span><p>{text}</p></div>; }

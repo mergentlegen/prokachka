@@ -4,7 +4,13 @@
 .identity { min-width:0; }
 .identity strong { display:block; color:var(--navy); font-size:15px; line-height:1.5; overflow-wrap:anywhere; }
 .identity span { display:block; margin-top:3px; color:#62718a; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
-.header time { padding-top:4px; color:#758098; font-size:11px; line-height:1.5; }
+.when { display:grid; justify-items:end; gap:4px; padding-top:4px; }
+.header time { color:#758098; font-size:11px; line-height:1.5; }
+.wait { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:700; white-space:nowrap; }
+.wait::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.fresh { background:#eaf0fb; color:#3f5f9e; }
+.waiting { background:#fdf2dc; color:#a26a20; }
+.late { background:#fde7e7; color:#b23e4d; }
 .answer { margin-top:20px; }
 .text { padding:18px; border:1px solid #e9edf4; border-radius:12px; background:#f8f9fc; color:#253853; font-size:16px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
 .muted { color:#6b7890; font-size:14px; }
@@ -17,17 +23,11 @@
 .actions button { min-height:44px; padding:10px 20px; border:1px solid; border-radius:10px; font:inherit; font-size:13px; font-weight:700; }
 .accept { background:#eaf8f2; color:#14745e; border-color:#bfe3d3 !important; }
 .revise { background:#fff8ea; color:#8c601e; border-color:#ead9b6 !important; }
-.summary { min-width:0; padding:18px 20px; border-top:1px solid var(--line); }
-.summary .header { grid-template-columns:36px minmax(0,1fr); gap:8px 10px; }
-.summary .avatar { width:36px; height:36px; }
-.summary .header time { grid-column:2; padding:0; }
-.preview { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin:12px 0 0; color:#596b86; font-size:14px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
 @media(max-width:560px) {
   .card { padding:18px 16px; }
   .header { grid-template-columns:36px minmax(0,1fr); gap:6px 10px; }
   .avatar { width:36px; height:36px; }
-  .header time { grid-column:2; padding:0; }
+  .when { grid-column:2; justify-items:start; grid-auto-flow:column; justify-content:start; align-items:center; gap:8px; padding:0; }
   .text { padding:14px; }
   .actions button { flex:1; padding:10px 12px; }
-  .summary { padding:16px; }
-}
+  }

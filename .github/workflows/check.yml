@@ -134,6 +134,8 @@ jobs:
           # The captain replay above resets notification kinds; replaying this one also proves it is re-runnable.
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261019-mentor-completion.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/mentor-completion.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261020-review-comment-templates.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/review-comment-templates.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

@@ -4,16 +4,17 @@ import { useState } from "react";
 import { Avatar } from "@/frontend/shared/Avatar";
 import type { Submission } from "@/shared/domain/types";
 import { formatDateTime } from "@/frontend/shared/lib/format";
-import { ModalSheet } from "@/frontend/shared/ModalSheet";
+import { waitingInfo } from "./review-queue";
 import styles from "./SubmissionCard.module.css";
 
 type Props = { submission: Submission; name: string; avatarUrl?: string; taskTitle: string };
 
-function SubmissionHeader({ submission, name, avatarUrl, taskTitle }: Props) {
+export function SubmissionHeader({ submission, name, avatarUrl, taskTitle }: Props) {
+  const waiting = submission.status === "pending" ? waitingInfo(submission.submittedAt) : null;
   return <header className={styles.header}>
     <Avatar className={styles.avatar} name={name} src={avatarUrl} />
     <div className={styles.identity}><strong>{name}</strong><span>{taskTitle}</span></div>
-    <time dateTime={submission.submittedAt}>{formatDateTime(submission.submittedAt)}</time>
+    <div className={styles.when}><time dateTime={submission.submittedAt}>{formatDateTime(submission.submittedAt)}</time>{waiting && <span className={`${styles.wait} ${styles[waiting.tone]}`}>{waiting.text}</span>}</div>
   </header>;
 }
 
@@ -48,14 +49,4 @@ export function SubmissionCard({ onReview, ...props }: Props & { onReview: (subm
       <button type="button" className={styles.revise} onClick={() => onReview(props.submission, "revision")}>На доработку</button>
     </footer>
   </article>;
-}
-
-export function SubmissionSummary(props: Props) {
-  const [open, setOpen] = useState(false);
-  return <div className={styles.summary}>
-    <SubmissionHeader {...props} />
-    {props.submission.answerText && <p className={styles.preview}>{props.submission.answerText}</p>}
-    <button type="button" className={styles.open} aria-haspopup="dialog" onClick={() => setOpen(true)}>Открыть ответ ↗</button>
-    {open && <ModalSheet title="Ответ участника" onClose={() => setOpen(false)}><SubmissionHeader {...props} /><SubmissionAnswer submission={props.submission} /></ModalSheet>}
-  </div>;
 }
