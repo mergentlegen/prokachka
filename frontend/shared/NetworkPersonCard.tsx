@@ -6,12 +6,8 @@ import { Avatar } from "./Avatar";
 import { ModalSheet } from "./ModalSheet";
 import { isNewMember, networkActivity, networkAncestors, type NetworkEntry } from "./lib/network-tree";
 import { milesUnit } from "./lib/format";
+import { plural } from "./lib/plural";
 import styles from "./NetworkPersonCard.module.css";
-
-const plural = (value: number, one: string, few: string, many: string) => {
-  const lastTwo = value % 100, last = value % 10;
-  return lastTwo >= 11 && lastTwo <= 14 ? many : last === 1 ? one : last >= 2 && last <= 4 ? few : many;
-};
 
 export function daysAgo(value: string, now = Date.now()) {
   const days = Math.max(0, Math.floor((now - Date.parse(value)) / 86_400_000));

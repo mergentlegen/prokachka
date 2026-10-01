@@ -8,6 +8,7 @@ import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/his
 import { formatDate, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
 import { SubmissionCard } from "./SubmissionCard";
 import { plural, waitingInfo } from "./review-queue";
+import { actionIcons } from "./AdminIcons";
 function isTaskExpired(task: Task) { return Boolean(task.deadlineAt && new Date(task.deadlineAt).getTime() <= Date.now()); }
 
 export function AccessDenied({ onLogout }: { onLogout: () => void }) { return <main className="admin-login"><div className="admin-login-card"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><p className="eyebrow">Доступ ограничен</p><h1>Это раздел наставника</h1><p>Твой аккаунт участника не может открыть админ-панель.</p><button className="primary-button full" onClick={() => { void onLogout(); }}>Выйти</button><a className="back-link" href="/">Вернуться к заданиям</a></div></main>; }
@@ -38,9 +39,9 @@ export function TaskRows({ tasks, submissions = [], actorId, canManageAll, onTog
       <span className="task-max">до {formatMiles(task.maxPoints)}</span>
       {canManage && <div className="row-actions">
         {onPin && <PinButton pinned={task.isPinned} title={task.title} disabled={Boolean(busyId)} onClick={() => onPin(task)} />}
-        <button type="button" className="button button-edit" disabled={Boolean(busyId)} onClick={() => onEdit(task)}>Изменить</button>
-        <button type="button" className={"button " + (task.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => onToggle(task.id)}>{task.isActive ? "Скрыть" : "Активировать"}</button>
-        <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => onRemove(task)}>Удалить</button>
+        <button type="button" className="button button-edit" disabled={Boolean(busyId)} onClick={() => onEdit(task)}>{actionIcons.edit}Изменить</button>
+        <button type="button" className={"button " + (task.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => onToggle(task.id)}>{task.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
+        <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => onRemove(task)}>{actionIcons.remove}Удалить</button>
       </div>}
     </div>;
   })}</>;

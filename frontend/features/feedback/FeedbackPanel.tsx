@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/frontend/shared/lib/plural";
 import { useEffect, useRef, useState } from "react";
 import { request } from "@/frontend/shared/api/client";
 import styles from "./FeedbackPanel.module.css";
@@ -187,7 +188,7 @@ export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, select
         {taskGroups.length === 0 && <p className={styles.empty}>{filter === "reply" ? "Сейчас никто не ждёт ответа." : "Переписки появятся после отправки работ."}</p>}
         {taskGroups.map((group) => <button type="button" key={group.key} className={styles.taskCard} onClick={() => { setParticipantsLoading(true); setSelectedTaskKey(group.key); setSelectedId(null); setDetail(null); setThreads([]); }}>
           <span className={styles.taskCardTop}><span className={styles.taskIcon}>☷</span><span>{date(group.lastAt)}</span></span>
-          <strong>{group.title}</strong><span className={styles.taskCardBottom}>{participantsLabel(group.participants)}{group.needsReply > 0 && <b>{group.needsReply} ждут ответа</b>}{group.unread > 0 && <i aria-label={`${group.unread} непрочитанных`}>{group.unread}</i>}</span>
+          <strong>{group.title}</strong><span className={styles.taskCardBottom}>{participantsLabel(group.participants)}{group.needsReply > 0 && <b>{group.needsReply} {plural(group.needsReply, "ждёт", "ждут", "ждут")} ответа</b>}{group.unread > 0 && <i aria-label={`${group.unread} непрочитанных`}>{group.unread} {plural(group.unread, "новое", "новых", "новых")}</i>}</span>
         </button>)}
         {moreGroups && <button type="button" className={styles.more} disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "Загружаем…" : "Показать ещё задания"}</button>}
       </div>}

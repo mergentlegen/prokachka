@@ -1,12 +1,8 @@
+import { plural } from "@/frontend/shared/lib/plural";
 import type { Submission, User } from "@/shared/domain/types";
 
 export type WaitTone = "fresh" | "waiting" | "late";
 const HOUR = 3_600_000, DAY = 24 * HOUR;
-
-export function plural(value: number, one: string, few: string, many: string) {
-  const lastTwo = Math.abs(value) % 100, last = Math.abs(value) % 10;
-  return lastTwo >= 11 && lastTwo <= 14 ? many : last === 1 ? one : last >= 2 && last <= 4 ? few : many;
-}
 
 // The oldest work first: whoever has waited longest is reviewed first.
 export function reviewQueue(submissions: Submission[]) {
@@ -62,3 +58,5 @@ export function weeklyLeaders(submissions: Submission[], users: User[], now = Da
     .map(([id, miles]) => ({ user: byId.get(id)!, miles }))
     .sort((a, b) => b.miles - a.miles || a.user.name.localeCompare(b.user.name, "ru")).slice(0, limit);
 }
+
+export { plural };

@@ -1,10 +1,14 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { ModalSheet } from "./ModalSheet";
 
 type ConfirmModalProps = {
   title: string;
   description: ReactNode;
   eyebrow?: string;
   confirmLabel?: string;
+  busyLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
   confirmDisabled?: boolean;
@@ -12,34 +16,27 @@ type ConfirmModalProps = {
   onClose: () => void;
 };
 
+// One confirmation look for every dangerous action: what happens, and a clearly red button.
 export function ConfirmModal({
   title,
   description,
   eyebrow = "Подтверждение действия",
   confirmLabel = "Удалить",
+  busyLabel = "Удаляем…",
   cancelLabel = "Отмена",
   busy = false,
   confirmDisabled = false,
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
-  function close() {
-    if (!busy) onClose();
-  }
-
-  return (
-    <div className="modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) close(); }}>
-      <div className="editor-modal admin-form-modal danger-modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button type="button" className="modal-close" onClick={close} aria-label="Закрыть">×</button>
-        <span className="confirm-modal-icon" aria-hidden="true">!</span>
-        <p className="eyebrow eyebrow-danger">{eyebrow}</p>
-        <h2 id="confirm-modal-title">{title}</h2>
-        <p className="modal-description">{description}</p>
-        <div className="modal-actions">
-          <button type="button" className="button button-muted" onClick={close} disabled={busy}>{cancelLabel}</button>
-          <button type="button" className="button button-danger" onClick={onConfirm} disabled={busy || confirmDisabled}>{busy ? "Удаляем..." : confirmLabel}</button>
-        </div>
-      </div>
+  const close = () => { if (!busy) onClose(); };
+  return <ModalSheet title={title} onClose={close} footer={<>
+    <button type="button" className="button button-muted" onClick={close} disabled={busy}>{cancelLabel}</button>
+    <button type="button" className="button button-danger" onClick={onConfirm} disabled={busy || confirmDisabled}>{busy ? busyLabel : confirmLabel}</button>
+  </>}>
+    <div className="confirm-sheet">
+      <span className="confirm-sheet-icon" aria-hidden="true">!</span>
+      <div><p className="eyebrow eyebrow-danger">{eyebrow}</p><p className="confirm-sheet-text">{description}</p></div>
     </div>
-  );
+  </ModalSheet>;
 }

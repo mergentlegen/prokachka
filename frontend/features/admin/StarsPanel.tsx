@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { formatDateTime } from "@/frontend/shared/lib/format";
+import { plural } from "@/frontend/shared/lib/plural";
 import { createAdminStarAward, deleteAdminStarAward } from "@/frontend/shared/api/admin-client";
 import type { StarAward, User } from "@/shared/domain/types";
 import { starAwardOption, type StarAwardKind } from "@/shared/domain/star-awards";
@@ -97,7 +98,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
           visibleMembers.map((user) => (
             <div className="stars-member-row" key={user.id}>
               <Avatar className="rank-avatar" name={user.name} src={user.avatarUrl} />
-              <div className="stars-member-copy"><strong>{user.name}</strong><span className="stars-member-total">★ {totals.get(user.id) || 0} звёзд</span></div>
+              <div className="stars-member-copy"><strong>{user.name}</strong><span className="stars-member-total">★ {totals.get(user.id) || 0} {plural(totals.get(user.id) || 0, "звезда", "звезды", "звёзд")}</span></div>
               <button type="button" className="button star-award-button" aria-label={"Выдать звёзды: " + user.name} onClick={() => openAward(user)}>+ Выдать</button>
             </div>
           ))
@@ -105,7 +106,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
       </div>
 
       <div className="admin-panel stars-history-panel">
-        <div className="panel-title"><div><p className="eyebrow">Контроль</p><h2>История выдачи</h2></div><span className="ceo-count-label">{awards.length} записей</span></div>
+        <div className="panel-title"><div><p className="eyebrow">Контроль</p><h2>История выдачи</h2></div><span className="ceo-count-label">{awards.length} {plural(awards.length, "запись", "записи", "записей")}</span></div>
         {awards.length === 0 ? (
           <div className="empty-admin"><span>◷</span><p>История награждений пока пуста.</p></div>
         ) : (

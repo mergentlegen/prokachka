@@ -1,3 +1,4 @@
+import { plural } from "@/frontend/shared/lib/plural";
 import type { RankEntry, Submission, Task } from "@/shared/domain/types";
 import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 
@@ -67,7 +68,4 @@ export function rankGap(ranking: RankEntry[], userId: string) {
   return { place: index + 1, points: mine, ahead, gap: ahead ? Math.max(1, ahead.points - mine + 1) : 0 };
 }
 
-export function plural(value: number, one: string, few: string, many: string) {
-  const lastTwo = Math.abs(value) % 100, last = Math.abs(value) % 10;
-  return lastTwo >= 11 && lastTwo <= 14 ? many : last === 1 ? one : last >= 2 && last <= 4 ? few : many;
-}
+export { plural };

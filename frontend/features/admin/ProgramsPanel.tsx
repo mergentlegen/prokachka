@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { deleteAdminProgram, updateAdminProgram } from "@/frontend/shared/api/admin-client";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
+import { actionIcons } from "./AdminIcons";
 import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { formatDate, formatMiles } from "@/frontend/shared/lib/format";
@@ -66,8 +67,8 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, taskBusy
             <span className="task-max">до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>
             {canManage && <div className="row-actions">
               <PinButton pinned={program.isPinned} title={program.title} disabled={Boolean(busyId)} onClick={() => void update(program, { isPinned: !program.isPinned })} />
-              <button type="button" className={"button " + (program.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => void update(program, { isActive: !program.isActive })}>{program.isActive ? "Скрыть" : "Активировать"}</button>
-              <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => setDeleteTarget(program)}>Удалить</button>
+              <button type="button" className={"button " + (program.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => void update(program, { isActive: !program.isActive })}>{program.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
+              <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => setDeleteTarget(program)}>{actionIcons.remove}Удалить</button>
             </div>}
           </div>
           {isExpanded && <div id={"program-steps-" + program.id} className={styles.steps}>

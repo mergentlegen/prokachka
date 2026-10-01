@@ -153,6 +153,6 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
         </article>;
       })}
     </div>
-    {!visibleItems.length && <p className={styles.empty}>Ничего не найдено. Измените поиск или фильтр.</p>}
+    {!visibleItems.length && <p className={styles.empty}>{catalog.length === 0 ? "Готовых заданий пока нет." : normalizedQuery || filter !== "all" ? "Ничего не найдено. Измените поиск или фильтр." : "Готовых заданий пока нет."}</p>}
   </section>;
 }
