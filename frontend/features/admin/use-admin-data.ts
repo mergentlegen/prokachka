@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { SetStateAction } from "react";
-import type { AuthUser, RankEntry, Store, TeamJoinRequest, User } from "@/shared/domain/types";
+import type { AuthUser, RankEntry, Store, TeamJoinRequest, NetworkMember } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 import { userScope } from "@/shared/domain/live-updates";
 import { dataCache } from "@/frontend/shared/api/data-cache";
@@ -14,7 +14,7 @@ import { sectionDatasets, type AdminSection } from "./admin-sections";
 
 const emptyStore = (): Store => ({ users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] });
 const emptySnapshot = () => ({ scope: "", loaded: {} as Partial<Record<AdminSection, boolean>>, errors: {} as Partial<Record<AdminSection, string>>,
-  store: emptyStore(), requests: [] as TeamJoinRequest[], networkUsers: [] as User[],
+  store: emptyStore(), requests: [] as TeamJoinRequest[], networkUsers: [] as NetworkMember[],
   programHistory: [] as ProgramHistory[], publicationHistory: [] as PublicationHistoryItem[], ranking: [] as RankEntry[],
   counts: { pending: 0, accepted: 0, requests: 0 } });
 
@@ -66,7 +66,7 @@ export function useAdminData(user: AuthUser | null, section: AdminSection) {
   const setRequests = useCallback((value: SetStateAction<TeamJoinRequest[]>) => {
     setSnapshot((current) => current.scope === scope ? { ...current, requests: typeof value === "function" ? value(current.requests) : value } : current);
   }, [scope]);
-  const setNetworkUsers = useCallback((value: SetStateAction<User[]>) => {
+  const setNetworkUsers = useCallback((value: SetStateAction<NetworkMember[]>) => {
     setSnapshot((current) => current.scope === scope ? { ...current, networkUsers: typeof value === "function" ? value(current.networkUsers) : value } : current);
   }, [scope]);
   const visible = snapshot.scope === scope ? snapshot : emptySnapshot();

@@ -1,4 +1,4 @@
-import type { Announcement, AnnouncementPhoto, AuthUser, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
+import type { Announcement, AnnouncementPhoto, AuthUser, NetworkMember, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
 import { isReadyProgramKey } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
 import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
@@ -131,9 +131,14 @@ export function mapStarAward(row: ApiRow): StarAward {
   };
 }
 export function mapUser(row: ApiRow): User { return { id: String(row.id), name: String(row.name || ""), firstName: row.first_name ? String(row.first_name) : row.firstName ? String(row.firstName) : undefined, lastName: row.last_name ? String(row.last_name) : row.lastName ? String(row.lastName) : undefined, avatarUrl: row.avatar_url ? String(row.avatar_url) : row.avatarUrl ? String(row.avatarUrl) : undefined, profileVersion: row.profile_updated_at ? String(row.profile_updated_at) : row.profileVersion ? String(row.profileVersion) : undefined, login: row.login ? String(row.login) : undefined, telegramId: row.telegram_id ? String(row.telegram_id) : undefined, role: row.role === "ceo" ? "ceo" : row.role === "admin" ? "admin" : "member", teamId: row.team_id ? String(row.team_id) : row.teamId ? String(row.teamId) : undefined, teamJoinedAt: row.team_joined_at ? String(row.team_joined_at) : row.teamJoinedAt ? String(row.teamJoinedAt) : undefined, parentUserId: row.parent_user_id ? String(row.parent_user_id) : row.parentUserId ? String(row.parentUserId) : undefined, canReview: Boolean(row.can_review ?? row.canReview), canPublishTasks: Boolean(row.can_publish_tasks ?? row.canPublishTasks), canInviteMembers: Boolean(row.can_invite_members ?? row.canInviteMembers), createdAt: String(row.created_at || row.createdAt || new Date().toISOString()) }; }
+export function mapNetworkMember(row: ApiRow): NetworkMember {
+  const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return { ...mapUser(row), points: number(row.points), stars: number(row.stars), recentSubmissions: number(row.recentSubmissions),
+    lastSubmittedAt: typeof row.lastSubmittedAt === "string" ? row.lastSubmittedAt : undefined, hasTelegram: typeof row.hasTelegram === "boolean" ? row.hasTelegram : undefined };
+}
 export function mapSubmission(row: ApiRow): Submission { return { id: String(row.id), userId: String(row.user_id), taskId: String(row.task_id), taskTitle: String((Array.isArray(row.tasks) ? row.tasks[0] : row.tasks)?.title || ""), taskMaxPoints: (Array.isArray(row.tasks) ? row.tasks[0] : row.tasks)?.max_points, reviewVersion: Number(row.review_version || 0), status: row.status === "accepted" || row.status === "revision" ? row.status : "pending", interactiveCompleted: row.interactive_completed !== false, source: row.submission_source === "interactive" || row.submission_source === "mentor" ? row.submission_source : "telegram", mediaType: row.media_type === "text" || row.media_type === "photo" || row.media_type === "video" || row.media_type === "document" ? row.media_type : undefined, answerText: row.answer_text ? String(row.answer_text) : undefined, points: Number(row.points || 0), comment: String(row.comment || ""), submittedAt: String(row.submitted_at || new Date().toISOString()), reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined }; }
 
-export type MemberData = { store: Store; ranking: RankEntry[]; starRanking: RankEntry[]; network: User[] };
+export type MemberData = { store: Store; ranking: RankEntry[]; starRanking: RankEntry[]; network: NetworkMember[] };
 export type MemberDataset = "tasks" | "submissions" | "ranking" | "announcements" | "stars" | "network";
 export async function loadMemberData(userId: string, keys: readonly MemberDataset[] = ["tasks", "submissions", "ranking", "announcements", "stars", "network"]): Promise<MemberData> {
   const read = <T,>(key: MemberDataset, url: string, empty: T): Promise<T> => keys.includes(key)
@@ -142,7 +147,7 @@ export async function loadMemberData(userId: string, keys: readonly MemberDatase
     read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
     read("ranking", "/api/ranking", { ranking: [] as RankEntry[], starRanking: [] as RankEntry[] }), read("announcements", "/api/announcements", { announcements: [] as ApiRow[] }), read("stars", "/api/stars", { awards: [] as ApiRow[] }), read("network", "/api/network", { users: [] as ApiRow[] }),
   ]);
-  return { store: { tasks: tasksResponse.tasks.map(mapTask), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapUser) };
+  return { store: { tasks: tasksResponse.tasks.map(mapTask), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapNetworkMember) };
 }
 export async function createMemberSubmission(taskId: string): Promise<string> {
   const response = await request<ApiResponse<{ url: string }>>("/api/submissions", { method: "POST", body: JSON.stringify({ taskId }) });

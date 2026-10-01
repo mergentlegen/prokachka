@@ -1,12 +1,12 @@
-import type { User } from "@/shared/domain/types";
-import { mapUser, request } from "@/frontend/shared/api/client";
+import type { NetworkMember, User } from "@/shared/domain/types";
+import { mapNetworkMember, mapUser, request } from "@/frontend/shared/api/client";
 
 type ApiRow = Record<string, unknown>;
 type ApiResponse<T> = { ok: boolean; message?: string } & T;
 
-export async function loadNetwork(): Promise<User[]> {
+export async function loadNetwork(): Promise<NetworkMember[]> {
   const response = await request<ApiResponse<{ users: ApiRow[] }>>("/api/network");
-  return response.users.map(mapUser);
+  return response.users.map(mapNetworkMember);
 }
 
 export async function createNetworkInvitation(): Promise<{ url: string; expiresAt: string | null }> {

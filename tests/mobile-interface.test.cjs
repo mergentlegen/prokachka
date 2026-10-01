@@ -208,7 +208,6 @@ test("empty program presents add-step before a disabled next button; no immediat
 test("network search finds a deep participant and settings stay lazy until expanded", () => {
   const css = new Proxy({}, { get: (_, name) => String(name) });
   const { NetworkTree } = loadTs("frontend/shared/NetworkTree.tsx", {
-    "./lib/network-tree": { buildNetworkTree, visibleNetworkEntries },
     "./NetworkTree.module.css": { default: css },
   });
   let controlRenders = 0;
@@ -218,7 +217,7 @@ test("network search finds a deep participant and settings stay lazy until expan
     renderControls() { controlRenders++; return React.createElement("select"); },
   }));
   assert.match(markup, /Участник &lt;script&gt;/);
-  assert.match(markup, /В ветке: Наставник/);
+  assert.match(markup, /Руководитель → Наставник/, "search results show where the person sits in the tree");
   assert.ok(!markup.includes("<script>"));
   assert.equal(controlRenders, 0, "closed settings must not create an N×N dropdown DOM");
 });

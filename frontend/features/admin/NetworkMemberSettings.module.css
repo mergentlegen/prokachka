@@ -1,0 +1,40 @@
+.settings { display: grid; gap: 16px; }
+.field { display: grid; gap: 8px; }
+.label { color: var(--muted); font-size: 12px; font-weight: 700; }
+.current { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.current > span { min-width: 0; color: var(--navy); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.current :global(.button) { flex-shrink: 0; min-height: 44px; }
+
+.picker { display: grid; gap: 8px; }
+.picker input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 10px; outline: none; background: #fff; color: var(--navy); font: inherit; font-size: 16px; }
+.picker input:focus { border-color: #92a6dd; box-shadow: 0 0 0 3px #dfe7ff; }
+.picker ul { display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; list-style: none; }
+.picker li + li { border-top: 1px solid #eef1f6; }
+.picker li button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 12px; border: 0; background: transparent; color: var(--navy); font: inherit; font-size: 14px; text-align: left; }
+.picker li button:hover, .picker li button:focus-visible { background: #f3f6fd; outline: none; }
+.picker li button > span:last-child { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.picker li small { color: var(--muted); font-size: 12px; }
+.noLeader { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border-radius: 50%; background: #f1f4f9; color: var(--muted); }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+.switches { display: grid; border-top: 1px solid var(--line); }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 60px; padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.switch:last-child { border-bottom: 0; }
+.switch > span { display: grid; gap: 2px; min-width: 0; }
+.switch strong { color: var(--navy); font-size: 14px; }
+.switch small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.switch input { appearance: none; position: relative; flex: 0 0 46px; width: 46px; height: 28px; margin: 0; border-radius: 14px; background: #d4dbe6; cursor: pointer; transition: background-color .2s; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #10203a33; transition: transform .2s; }
+.switch input:checked { background: var(--blue); }
+.switch input:checked::after { transform: translateX(18px); }
+.switch input:focus-visible { outline: 3px solid #cddaff; outline-offset: 2px; }
+.switch input:disabled { cursor: wait; opacity: .6; }
+
+.confirm { display: grid; gap: 6px; padding: 4px 0; }
+.who { margin: 0; color: var(--muted); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.question { margin: 0; color: var(--navy); font-size: 16px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.note { margin: 0 0 8px; color: #5b6b85; font-size: 13px; line-height: 1.5; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions :global(.button) { flex: 1 1 140px; min-height: 44px; }
+
+@media (prefers-reduced-motion: reduce) { .switch input, .switch input::after { transition: none; } }

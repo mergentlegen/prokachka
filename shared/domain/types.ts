@@ -25,6 +25,9 @@ export type User = {
   id: string; name: string; firstName?: string; lastName?: string; avatarUrl?: string; profileVersion?: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string;
   parentUserId?: string; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean; createdAt: string;
 };
+// Stats are omitted when they could not be loaded or the viewer may not see them.
+export type NetworkStats = { points?: number; stars?: number; lastSubmittedAt?: string; recentSubmissions?: number; hasTelegram?: boolean };
+export type NetworkMember = User & NetworkStats;
 export type AuthUser = Pick<User, "id" | "name" | "firstName" | "lastName" | "avatarUrl" | "profileVersion" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers"> & { sessionVersion?: number };
 
 export type TaskProgram = {

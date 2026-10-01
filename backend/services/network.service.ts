@@ -1,7 +1,8 @@
 import { createHash, createHmac } from "node:crypto";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import type { AuthUser } from "@/shared/domain/types";
+import type { AuthUser, NetworkStats } from "@/shared/domain/types";
 import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
+import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 
 export type NetworkUserRow = {
   id: string;
@@ -15,10 +16,11 @@ export type NetworkUserRow = {
   can_review?: boolean;
   can_publish_tasks?: boolean;
   can_invite_members?: boolean;
+  team_joined_at?: string | null;
   created_at?: string;
 };
 
-const networkSelect = "id,name,avatar_path,login,role,team_id,parent_user_id,can_review,can_publish_tasks,can_invite_members,created_at";
+const networkSelect = "id,name,avatar_path,login,role,team_id,parent_user_id,can_review,can_publish_tasks,can_invite_members,team_joined_at,created_at";
 
 export async function findTeamNetwork(teamId: string) {
   const supabase = getSupabaseAdmin();
@@ -82,13 +84,52 @@ export async function createTeamInvitation(teamId: string, inviterId: string) {
 
 
 export async function getNetworkForViewer(user: AuthUser) {
-  if (!user.teamId) return { data: [] as ReturnType<typeof mapNetworkUser>[] };
-  const result = await findTeamNetwork(user.teamId);
+  if (!user.teamId) return { data: [] as Array<ReturnType<typeof mapNetworkUser> & NetworkStats> };
+  const mentorView = user.role === "admin" || Boolean(user.canReview);
+  const [result, stats] = await Promise.all([findTeamNetwork(user.teamId), findNetworkStats(user.teamId, mentorView)]);
   if ("unavailable" in result || "error" in result) return result;
   const allowed = user.role === "ceo" || user.role === "admin"
     ? new Set(result.data.map((row) => String(row.id)))
     : descendants(result.data, user.id, true);
-  return { data: (await withAvatarUrls(result.data.filter((row) => allowed.has(String(row.id))))).map(mapNetworkUser) };
+  const users = (await withAvatarUrls(result.data.filter((row) => allowed.has(String(row.id))))).map(mapNetworkUser);
+  return { data: users.map((row) => ({ ...row, ...stats?.get(row.id) })) };
+}
+
+export const NETWORK_ACTIVITY_DAYS = 30;
+
+// Miles and stars are visible to everyone in the branch; activity and Telegram status only to mentors.
+// A failed stats query leaves the numbers out instead of showing a misleading zero.
+async function findNetworkStats(teamId: string, mentorView: boolean) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+  const since = new Date(Date.now() - NETWORK_ACTIVITY_DAYS * 86_400_000).toISOString();
+  const none = Promise.resolve({ data: [], error: null });
+  const [points, stars, activity, telegram] = await Promise.all([
+    readPages<{ id: string; points: number | string }>(supabase.rpc("app_ranking", { p_team_id: teamId, p_metric: "points" }).order("id")),
+    readPages<{ id: string; points: number | string }>(supabase.rpc("app_ranking", { p_team_id: teamId, p_metric: "stars" }).order("id")),
+    mentorView ? readPages<{ id: string; user_id: string; submitted_at: string }>(supabase.from("submissions").select("id,user_id,submitted_at,users!inner(team_id)")
+      .eq("users.team_id", teamId).gte("submitted_at", since).order("id")) : none,
+    mentorView ? readPages<{ id: string }>(supabase.from("users").select("id").eq("team_id", teamId).not("telegram_id", "is", null).order("id")) : none,
+  ]);
+  const failed = [points, stars, activity, telegram].find((item) => item.error);
+  if (failed) {
+    console.warn("Network stats are temporarily unavailable", { error: failed.error?.message });
+    return null;
+  }
+  const stats = new Map<string, NetworkStats>();
+  const entry = (id: string) => { const key = String(id); let value = stats.get(key); if (!value) stats.set(key, value = {}); return value; };
+  for (const row of points.data || []) entry(row.id).points = Number(row.points) || 0;
+  for (const row of stars.data || []) entry(row.id).stars = Number(row.points) || 0;
+  if (mentorView) {
+    for (const row of points.data || []) Object.assign(entry(row.id), { recentSubmissions: 0, hasTelegram: false });
+    for (const row of activity.data || []) {
+      const value = entry(row.user_id);
+      value.recentSubmissions = (value.recentSubmissions || 0) + 1;
+      if (!value.lastSubmittedAt || row.submitted_at > value.lastSubmittedAt) value.lastSubmittedAt = String(row.submitted_at);
+    }
+    for (const row of telegram.data || []) entry(row.id).hasTelegram = true;
+  }
+  return stats;
 }
 
 export async function updateNetworkUser(actor: AuthUser, targetId: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean }) {
@@ -174,6 +215,7 @@ export function mapNetworkUser(row: NetworkUserRow) {
     role: row.role === "admin" ? "admin" : "member", teamId: row.team_id ? String(row.team_id) : undefined,
     parentUserId: row.parent_user_id ? String(row.parent_user_id) : undefined,
     canReview: Boolean(row.can_review), canPublishTasks: Boolean(row.can_publish_tasks), canInviteMembers: Boolean(row.can_invite_members),
+    teamJoinedAt: row.team_joined_at ? String(row.team_joined_at) : undefined,
     createdAt: String(row.created_at || new Date().toISOString()),
   };
 }
