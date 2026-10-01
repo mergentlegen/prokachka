@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Submission, Task } from "@/shared/domain/types";
 import { externalHref, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
 import { PinBadge } from "@/frontend/shared/PublicationPin";
@@ -15,6 +15,7 @@ import { CompanyVoyageGame } from "./CompanyVoyageGame";
 import { CaptainCruiseGame } from "./CaptainCruiseGame";
 import { CountYourDreamGame } from "./CountYourDreamGame";
 import { DreamRouteGame } from "./DreamRouteGame";
+import { deadlineInfo } from "./member-progress";
 import styles from "./TaskCard.module.css";
 
 export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
@@ -29,6 +30,8 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const expired = Boolean(deadline && new Date(deadline).getTime() <= Date.now());
   const status = submission?.status || (expired ? "missed" : "new");
   const statusText = captainPending ? "Тренировка пройдена · ждём скриншот" : surveyInProgress ? `Сохранено ${submission?.points} из 5 ответов` : status === "accepted" ? "Принято" : status === "pending" ? "На проверке" : status === "revision" ? "На доработку" : status === "missed" ? "Срок истёк" : "Не начато";
+  const countdown = deadlineInfo(deadline);
+  const step = task.publicationType === "sequential" && task.position ? task.position : undefined;
   const resource = externalHref(task.resourceUrl);
   const canSubmit = task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   const submitLabel = status === "revision" ? "Отправить повторно" : expired ? "Отправить с опозданием" : "Отправить ответ";
@@ -55,10 +58,13 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     <article className={styles.card}>
       {task.isPinned && <PinBadge />}
       <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
+      {step && <div className={styles.program}><span>{task.programTitle ? `«${task.programTitle}» · ` : "Программа · "}шаг {step}{task.programSteps ? ` из ${task.programSteps}` : ""}</span>{task.programSteps && <i style={{ "--progress": `${Math.max(4, Math.min(100, ((step - 1) / task.programSteps) * 100))}%` } as CSSProperties} />}</div>}
       <h3><button className={styles.title} onClick={() => setOpen(true)} aria-haspopup="dialog">{task.title}</button></h3>
       <p className={styles.preview}>{task.description}</p>
       {Boolean(task.attachments?.length) && <p className={styles.attachmentHint}>PDF-материалы · {task.attachments?.length} {task.attachments?.length === 1 ? "файл" : "файла"}</p>}
-      {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>}
+      {deadline && (countdown && canSubmit && !captainPending && !surveyInProgress
+        ? <p className={`${styles.countdown} ${styles[countdown.tone]}`}><span>{countdown.text}</span><small>{countdown.tone === "expired" ? "можно отправить с опозданием" : `до ${formatDateTime(deadline)}`}</small></p>
+        : <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>)}
       <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isSurvey ? "Открыть опросник" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
     </article>
     {open && <ModalSheet title={isInteractive ? task.title : "Задание"} variant={isInteractive ? "immersive" : "default"} onClose={() => setOpen(false)}>

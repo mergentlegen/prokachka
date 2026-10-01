@@ -1175,11 +1175,11 @@ button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 
   .member-shell .logout-link { min-height:44px; }
   .member-shell .content-grid,.member-shell .welcome-section { width:calc(100% - 32px); }
   .member-shell:not(.member-tab-home) .content-grid { padding-top:28px; }
-  .member-shell .bottom-nav { position:fixed; inset:auto 0 0; z-index:8; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0; width:100%; height:calc(64px + env(safe-area-inset-bottom)); padding:4px max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:#fffffff5; backdrop-filter:blur(14px); }
-  .member-shell .bottom-nav button { display:grid; place-items:center; align-content:center; gap:5px; width:100%; min-width:0; min-height:0; padding:4px 1px; border:0; border-radius:8px; background:none; color:#7b879b; font-size:clamp(9px,2.6vw,11px); }
-  .member-shell .bottom-nav button > span:first-child { font-size:21px; line-height:1; }
+  .member-shell .bottom-nav { position:fixed; inset:auto 0 0; z-index:8; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; width:100%; height:calc(66px + env(safe-area-inset-bottom)); padding:4px max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:#fffffff2; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); box-shadow:0 -8px 24px #10203a0f; }
+  .member-shell .bottom-nav button { display:grid; place-items:center; align-content:center; gap:3px; width:100%; min-width:0; min-height:0; padding:4px 1px; border:0; border-radius:12px; background:none; color:#7b879b; font-size:clamp(10px,2.7vw,11px); -webkit-tap-highlight-color:transparent; }
+  .member-shell .bottom-nav button > span:first-child { line-height:0; }
   .member-shell .bottom-nav .bottom-nav-label { display:block; width:100%; min-width:0; font-size:inherit; line-height:1.25; white-space:nowrap; }
-  .member-shell .bottom-nav button.active { color:var(--blue); background:#eef3fe; font-weight:700; }
+  .member-shell .bottom-nav button.active { color:var(--blue); background:none; font-weight:700; }
   .member-shell { padding-bottom:calc(84px + env(safe-area-inset-bottom)); }
   .member-shell.member-tab-home .content-grid { padding-bottom:0; }
   .member-shell .member-section-tasks .section-heading,.member-shell .ranking-heading { grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:14px; }
@@ -1405,3 +1405,18 @@ button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 
   .history-kind-switch { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; margin-bottom:16px; overflow:visible; }
   .history-kind-switch button { min-width:0; padding:9px 3px; font-size:12px; }
 }
+
+/* Member: task filters, gentle screen transitions and sidebar icons. */
+.member-shell .task-filters { display:flex; gap:8px; margin:-4px 0 18px; padding:0 28px 2px 0; overflow-x:auto; scrollbar-width:none; -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent); mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent); }
+.member-shell .task-filters::-webkit-scrollbar { display:none; }
+.member-shell .task-filters button { display:inline-flex; flex:0 0 auto; align-items:center; gap:7px; min-height:40px; padding:8px 14px; border:1px solid #dfe5ef; border-radius:99px; background:#fff; color:#5b6b85; font:inherit; font-size:13px; font-weight:650; transition:background-color .2s, color .2s, border-color .2s, transform .15s; }
+.member-shell .task-filters button b { min-width:20px; padding:1px 6px; border-radius:99px; background:#eef2f8; color:#5b6b85; font-size:11px; text-align:center; }
+.member-shell .task-filters button.active { border-color:var(--blue); background:var(--blue); color:#fff; }
+.member-shell .task-filters button.active b { background:#ffffff2e; color:#fff; }
+.member-shell .task-filters button:active { transform:scale(.96); }
+.member-shell .member-section,.member-shell .welcome-section { animation:member-enter .3s ease backwards; } /* backwards, not both: a finished transform animation must not trap fixed-position sheets. */
+@keyframes member-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.member-sidebar-nav button span { display:grid; place-items:center; width:22px; }
+.member-sidebar-nav button span svg { width:20px; height:20px; }
+@media (max-width:760px) { .member-shell .logout-link { display:none; } }
+@media (prefers-reduced-motion:reduce) { .member-shell .member-section,.member-shell .welcome-section { animation:none; } }

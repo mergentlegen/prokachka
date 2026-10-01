@@ -9,6 +9,13 @@ import { ProfileEditor } from "@/frontend/features/profile/ProfileEditor";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { Toast } from "@/frontend/shared/Toast";
 import { MemberNetwork } from "@/frontend/features/member/MemberNetwork";
+import { HomeOverview } from "./HomeOverview";
+import { RankingBoard } from "./RankingBoard";
+import { CelebrationWatcher } from "./Celebration";
+import { MemberBottomNav, memberNavIcons, memberNavItems } from "./MemberNav";
+import { latestSubmissions, plural, taskState, type TaskState } from "./member-progress";
+import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
+import { CountUp } from "@/frontend/shared/hooks/use-count-up";
 import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
 import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { userScope } from "@/shared/domain/live-updates";
@@ -44,14 +51,8 @@ function hasMentorAccess(user: AuthUser) {
 }
 
 function MemberSidebar({ tab, onChange, feedbackUnread }: { tab: MemberTab; onChange: (tab: MemberTab) => void; feedbackUnread: number }) {
-  const items: Array<[Exclude<MemberTab, "profile">, string, string]> = [
-    ["home", "Обзор", "⌂"],
-    ["tasks", "Задания", "☷"],
-    ["feedback", "Обратная связь", "✉"],
-    ["ranking", "Рейтинг", "♛"],
-    ["network", "Моя сеть", "⌘"],
-  ];
-  return <aside className="member-sidebar"><p className="eyebrow">Навигация</p><nav className="member-sidebar-nav">{items.map(([id, label, icon]) => <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => onChange(id)} aria-current={tab === id ? "page" : undefined}><span>{icon}</span>{label}{id === "feedback" && feedbackUnread > 0 && <b className="feedback-unread-badge">{feedbackUnread}</b>}</button>)}<button type="button" className={tab === "profile" ? "active" : ""} onClick={() => onChange("profile")} aria-current={tab === "profile" ? "page" : undefined}><span>◌</span>Профиль</button></nav></aside>;
+  const items = memberNavItems;
+  return <aside className="member-sidebar"><p className="eyebrow">Навигация</p><nav className="member-sidebar-nav">{items.map(([id, label]) => <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => onChange(id)} aria-current={tab === id ? "page" : undefined}><span>{memberNavIcons[id]}</span>{label}{id === "feedback" && feedbackUnread > 0 && <b className="feedback-unread-badge">{feedbackUnread}</b>}</button>)}<button type="button" className={tab === "profile" ? "active" : ""} onClick={() => onChange("profile")} aria-current={tab === "profile" ? "page" : undefined}><span>◌</span>Профиль</button></nav></aside>;
 }
 
 export function MemberApp() {
@@ -70,6 +71,7 @@ export function MemberApp() {
     } else window.scrollTo({ top: 0, behavior: "instant" });
     setTab(next);
   }
+  async function refreshAll() { setFeedbackVersion((value) => value + 1); await refreshData(); }
   function openFeedback(taskId: string) { setFeedbackTaskId(taskId); navigate("feedback"); }
   useEffect(() => {
     if (!user?.id || !new URLSearchParams(window.location?.search || "").has("feedback")) return;
@@ -87,9 +89,10 @@ export function MemberApp() {
   }, [user?.id, user?.teamId, feedbackVersion]);
   const [ratingType, setRatingType] = useState<"points" | "stars">("points");
   const [taskView, setTaskView] = useState<"regular" | "programs">("regular");
+  const [taskFilter, setTaskFilter] = useState<"all" | TaskState>("all");
   const [toast, setToast] = useState("");
   const [showLogin, setShowLogin] = useState(false);
-  const [, setClock] = useState(() => Date.now());
+  const [now, setClock] = useState(() => Date.now());
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
@@ -146,6 +149,14 @@ export function MemberApp() {
   const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort(compareTaskFeed);
   const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" && !task.interactiveKind : task.publicationType !== "sequential" || Boolean(task.interactiveKind));
+  const latestByTask = latestSubmissions(store.submissions, user?.id || "");
+  const taskCounts = { todo: 0, review: 0, done: 0, closed: 0 };
+  visibleTasks.forEach((task) => { taskCounts[taskState(task, latestByTask.get(task.id), now)]++; });
+  const activeFilter = taskFilter !== "all" && taskCounts[taskFilter] ? taskFilter : "all";
+  const shownTasks = activeFilter === "all" ? visibleTasks : visibleTasks.filter((task) => taskState(task, latestByTask.get(task.id), now) === activeFilter);
+  const taskFilters: Array<["all" | TaskState, string, number]> = [["all", "Все", visibleTasks.length], ["todo", "Нужно сделать", taskCounts.todo], ["review", "На проверке", taskCounts.review], ["done", "Готово", taskCounts.done]];
+
+
 
   async function hydrateUser(nextUser: AuthUser) {
     if (nextUser.role === "ceo") { window.location.href = "/ceo"; return; }
@@ -254,15 +265,18 @@ export function MemberApp() {
   return <><main className={`app-shell member-shell member-tab-${tab === "profile" ? previousTab : tab}`}>
     <header className="topbar"><a className="brand" href="/" aria-label="На главную"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="topbar-actions">{hasMentorAccess(user) && <a className="mentor-link" href="/admin">Панель наставника</a>}<button className="logout-link" onClick={logout}>Выйти</button><button className="avatar-button" onClick={() => navigate("profile")} aria-label="Открыть профиль"><Avatar name={user.name} src={user.avatarUrl} className="header-avatar" eager /></button></div></header>
 <div className="member-layout"><MemberSidebar tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} /><div className="member-main">
-    <section className="welcome-section page-width"><div><h1>Привет, {user.name.split(" ")[0]} <span className="wave">⌁</span></h1></div><div className="score-card"><span className="score-label">Общий результат</span><div className={"score-value " + (ratingType === "stars" ? "is-stars" : "")}><strong>{ratingType === "stars" ? currentStars : currentPoints}</strong><span className="score-unit">{ratingType === "stars" ? "★ звёзд" : milesUnit(currentPoints)}</span></div><span className="rank-line">{currentRank ? `${currentRank} место в рейтинге` : "Пока нет места в рейтинге"} <i>↗</i></span></div></section>
-<div className="page-width content-grid"><SectionBoundary loading={tab !== "profile" && dataLoading} error={tab !== "profile" ? dataError : undefined} onRetry={() => void refreshData()}><section className="main-column"><div className="member-section member-section-announcements"><AnnouncementsBlock announcements={store.announcements} /></div><div className="member-section member-section-network"><MemberNetwork users={networkUsers} currentUserId={user.id} canInvite={Boolean(user.teamId)} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={() => void createInviteLink()} onCopyInvite={(url) => void copyInviteLink(url)} /></div><div className="member-section member-section-feedback">{tab === "feedback" && <FeedbackPanel viewerId={user.id} refreshKey={feedbackVersion} selectedTaskId={feedbackTaskId} selectedThreadId={feedbackTaskId ? null : typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}</div><div className="member-section member-section-tasks"><div className="section-heading"><div><p className="eyebrow">Практика</p><h2>Актуальные задания</h2></div><div className="task-switch"><button className={taskView === "regular" ? "active" : ""} onClick={() => setTaskView("regular")}>Задания</button><button className={taskView === "programs" ? "active" : ""} onClick={() => setTaskView("programs")}>Программы</button></div><span className="task-count">{visibleTasks.length} заданий</span></div>{visibleTasks.length === 0 ? <EmptyState text="Пока нет активных заданий." /> : <div className="task-list">{visibleTasks.map((task) => {
+    <section className="welcome-section page-width"><div><h1>Привет, {user.name.split(" ")[0]} <span className="wave">⌁</span></h1></div><div className="score-card"><span className="score-label">Общий результат</span><div className={"score-value " + (ratingType === "stars" ? "is-stars" : "")}><strong><CountUp value={ratingType === "stars" ? currentStars : currentPoints} /></strong><span className="score-unit">{ratingType === "stars" ? "★ звёзд" : milesUnit(currentPoints)}</span></div><span className="rank-line">{currentRank ? `${currentRank} место в рейтинге` : "Пока нет места в рейтинге"} <i>↗</i></span></div></section>
+<div className="page-width content-grid"><SectionBoundary loading={tab !== "profile" && dataLoading} error={tab !== "profile" ? dataError : undefined} onRetry={() => void refreshData()}><section className="main-column"><div className="member-section member-section-announcements"><HomeOverview userId={user.id} tasks={activeTasks} submissions={store.submissions} ranking={teamRanking} feedbackUnread={feedbackUnread} now={now} onOpen={(next) => { if (next === "ranking") setRatingType("points"); if (next === "tasks") setTaskFilter("todo"); navigate(next); }} />
+        <AnnouncementsBlock announcements={store.announcements} /></div><div className="member-section member-section-network"><MemberNetwork users={networkUsers} currentUserId={user.id} canInvite={Boolean(user.teamId)} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={() => void createInviteLink()} onCopyInvite={(url) => void copyInviteLink(url)} /></div><div className="member-section member-section-feedback">{tab === "feedback" && <FeedbackPanel viewerId={user.id} refreshKey={feedbackVersion} selectedTaskId={feedbackTaskId} selectedThreadId={feedbackTaskId ? null : typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}</div><div className="member-section member-section-tasks"><div className="section-heading"><div><p className="eyebrow">Практика</p><h2>Актуальные задания</h2></div><div className="task-switch"><button className={taskView === "regular" ? "active" : ""} onClick={() => setTaskView("regular")}>Задания</button><button className={taskView === "programs" ? "active" : ""} onClick={() => setTaskView("programs")}>Программы</button></div><span className="task-count">{visibleTasks.length} {plural(visibleTasks.length, "задание", "задания", "заданий")}</span></div>
+        {visibleTasks.length > 0 && <div className="task-filters" role="group" aria-label="Фильтр заданий">{taskFilters.filter(([id, , count]) => id === "all" || count > 0).map(([id, label, count]) => <button type="button" key={id} className={activeFilter === id ? "active" : ""} aria-pressed={activeFilter === id} onClick={() => setTaskFilter(id)}>{label}<b>{count}</b></button>)}</div>}
+        {visibleTasks.length === 0 ? <EmptyState text="Пока нет активных заданий." /> : <div className="task-list">{shownTasks.map((task) => {
       const latest = store.submissions.filter((submission) => submission.userId === user.id && submission.taskId === task.id).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))[0];
       return <TaskCard key={task.id} task={task} submission={latest} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} />;
-    })}</div>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><div className="section-heading ranking-heading"><div className="ranking-title"><div><p className="eyebrow">Команда</p><h2>Рейтинг</h2></div><span className="trophy">♛</span></div><div className="rating-switch"><button className={ratingType === "points" ? "active" : ""} onClick={() => setRatingType("points")}>Мили</button><button className={ratingType === "stars" ? "active" : ""} onClick={() => setRatingType("stars")}>Звёзды</button></div></div>{ranking.length === 0 ? <EmptyState text="Рейтинг пока пуст." /> : <div className={"ranking-list " + (ratingType === "stars" ? "stars-ranking-list" : "")}>{ranking.map((member, index) => <div className={`rank-row ${member.id === user.id ? "current" : ""}`} key={member.id}><span className={`rank-position rank-${index + 1}`}>{index + 1}</span><Avatar className="rank-avatar" name={member.name} src={member.avatarUrl} /><span className="rank-name">{member.name}{member.id === user.id && <small>это вы</small>}</span><strong>{member.points}{ratingType === "stars" ? " ★" : ` ${milesUnit(member.points)}`}</strong></div>)}</div>}</aside></SectionBoundary></div></div></div>
-    <nav className="bottom-nav" aria-label="Основная навигация"><button aria-current={tab === "home" ? "page" : undefined} className={tab === "home" ? "active" : ""} onClick={() => navigate("home")}><span>⌂</span><span className="bottom-nav-label">Обзор</span></button><button aria-current={tab === "tasks" ? "page" : undefined} className={tab === "tasks" ? "active" : ""} onClick={() => navigate("tasks")}><span>☷</span><span className="bottom-nav-label">Задания</span></button><button aria-current={tab === "feedback" ? "page" : undefined} className={tab === "feedback" ? "active" : ""} onClick={() => navigate("feedback")}><span>✉</span><span className="bottom-nav-label">Отклик</span>{feedbackUnread > 0 && <b className="feedback-unread-badge">{feedbackUnread}</b>}</button><button aria-current={tab === "ranking" ? "page" : undefined} className={tab === "ranking" ? "active" : ""} onClick={() => navigate("ranking")}><span>♛</span><span className="bottom-nav-label">Рейтинг</span></button><button aria-current={tab === "network" ? "page" : undefined} className={tab === "network" ? "active" : ""} onClick={() => navigate("network")}><span>⌘</span><span className="bottom-nav-label">Сеть</span></button><button aria-current={tab === "profile" ? "page" : undefined} className={tab === "profile" ? "active" : ""} onClick={() => navigate("profile")}><span>◌</span><span className="bottom-nav-label">Профиль</span></button></nav>
+    })}</div>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={ranking} metric={ratingType} onMetric={setRatingType} userId={user.id} /></aside></SectionBoundary></div></div></div>
+    <MemberBottomNav tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} />
     {tab === "profile" && <ProfileModal loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onClose={closeProfile} onLogout={logout} />}
     {showLogin && <div className="modal-backdrop" onClick={() => setShowLogin(false)}><div className="simple-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}>×</button><p className="eyebrow">Нужна идентификация</p><h2>Сначала представься</h2><p>Войди или создай аккаунт, чтобы отправить работу.</p><button className="primary-button full" onClick={() => { setShowLogin(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Перейти ко входу</button></div></div>}
-    {toast && <Toast message={toast} onClose={() => setToast("")} />}
+    {toast && <Toast message={toast} onClose={() => setToast("")} />}<PullToRefresh onRefresh={refreshAll} /><CelebrationWatcher userId={user.id} submissions={store.submissions} rank={currentRank} />
   </main><WelcomeVideoGate user={user} /></>;
 }
 

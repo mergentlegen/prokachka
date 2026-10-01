@@ -103,6 +103,7 @@ export function mapTask(row: ApiRow): Task {
     deadlineAt: row.deadline_at ? String(row.deadline_at) : undefined, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, teamId: row.team_id ? String(row.team_id) : undefined,
     publicationType: row.publication_type === "sequential" || row.publication_type === "evergreen" ? row.publication_type : "fixed",
     programId: row.program_id ? String(row.program_id) : undefined, position: row.position ? Number(row.position) : undefined,
+    programTitle: row.program_title ? String(row.program_title) : undefined, programSteps: typeof row.program_steps === "number" && row.program_steps > 0 ? row.program_steps : undefined,
     deadlineHours: row.deadline_hours ? Number(row.deadline_hours) : undefined, unlockedAt: row.unlocked_at ? String(row.unlocked_at) : undefined,
     resourceUrl: row.resource_url ? String(row.resource_url) : undefined,
     dueAt: row.due_at ? String(row.due_at) : undefined, createdAt: String(row.created_at || new Date().toISOString()),

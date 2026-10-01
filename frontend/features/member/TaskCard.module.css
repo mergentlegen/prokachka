@@ -32,3 +32,21 @@
 .comment p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .detailAction { display:flex; justify-content:flex-end; margin-top:24px; padding-top:16px; border-top:1px solid var(--line); }
 @media(max-width:560px) { .card { padding:18px 16px; } .title { font-size:19px; } .actions { gap:8px; } .detailAction .submit { width:100%; } }
+.countdown { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin:16px 0 0; font-size:12px; line-height:1.4; }
+.countdown span { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:99px; font-weight:700; }
+.countdown span::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
+.countdown small { color:#8490a3; font-size:12px; }
+.calm span { background:#eaf0fb; color:#3f5f9e; }
+.soon span { background:#fdf2dc; color:#a26a20; }
+.urgent span,.countdown.expired span { background:#fde7e7; color:#b23e4d; }
+.urgent span::before { animation:countdown-pulse 1.4s ease-in-out infinite; }
+.program { display:grid; gap:6px; margin-top:14px; color:#5b6b85; font-size:12px; font-weight:600; }
+.program i { display:block; height:5px; overflow:hidden; border-radius:3px; background:#e4e9f3; }
+.program i::before { content:""; display:block; width:var(--progress); height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--blue),#5b7fd6); }
+.program + h3 { margin-top:10px; }
+.card { animation:card-rise .35s ease backwards; }
+.submit,.read { transition:transform .15s; }
+.submit:active:not(:disabled),.read:active { transform:scale(.97); }
+@keyframes countdown-pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+@keyframes card-rise { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce) { .card,.urgent span::before { animation:none; } .submit,.read { transition:none; } }

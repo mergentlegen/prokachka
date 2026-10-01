@@ -1,0 +1,22 @@
+.backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 24px; background: #0d182bb3; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: fade .25s ease both; }
+.confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -16px; left: var(--x); width: 8px; height: 14px; border-radius: 2px; background: var(--color); opacity: 0; animation: fall var(--fall) cubic-bezier(.25, .6, .4, 1) var(--delay) both; }
+.confetti i:nth-child(3n) { width: 10px; height: 10px; border-radius: 50%; }
+.card { position: relative; display: grid; justify-items: center; gap: 8px; width: min(360px, 100%); padding: 30px 24px 24px; border-radius: 24px; background: #fff; text-align: center; box-shadow: 0 30px 80px #0b183a55; animation: pop .45s cubic-bezier(.2, 1.4, .4, 1) both .05s; }
+.amount { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.amount b { color: var(--green); font: 800 52px/1 'Manrope', sans-serif; letter-spacing: -.03em; }
+.amount span { color: var(--muted); font-size: 16px; font-weight: 700; }
+.card h2 { margin: 4px 0 0; color: var(--navy); font-size: 22px; }
+.tasks { margin: 0; color: #5b6b85; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.rank { margin: 4px 0 0; padding: 6px 12px; border-radius: 99px; background: #fdf2dc; color: #a26a20; font-size: 13px; font-weight: 700; }
+.close { width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 14px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 700; box-shadow: 0 8px 20px #3151a340; transition: transform .15s; }
+.close:active { transform: scale(.97); }
+.close:focus-visible { outline: 3px solid #cddaff; outline-offset: 2px; }
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(.85) translateY(10px); } }
+@keyframes fall {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  100% { opacity: 0; transform: translate(var(--drift), 105vh) rotate(var(--spin)); }
+}
+@media (prefers-reduced-motion: reduce) { .backdrop, .card { animation: none; } .confetti { display: none; } }

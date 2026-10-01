@@ -1,0 +1,10 @@
+/* Layout and visibility of the bar live in globals.css (.member-shell .bottom-nav); this adds the icon pill. */
+.nav button { transition: color .2s; }
+.icon { position: relative; display: grid; place-items: center; width: 56px; height: 30px; border-radius: 15px; transition: background-color .25s, transform .15s; }
+.icon svg { width: 23px; height: 23px; transition: transform .25s; }
+.active .icon { background: #e3eafc; }
+.active .icon svg { transform: translateY(-1px) scale(1.06); }
+.nav button:active .icon { transform: scale(.92); }
+.badge { position: absolute; top: -3px; right: 6px; display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border: 2px solid #fff; border-radius: 99px; background: #d68d15; color: #fff; font-size: 9px; font-weight: 800; line-height: 1; }
+@media (max-width: 360px) { .icon { width: 48px; } }
+@media (prefers-reduced-motion: reduce) { .nav button, .icon, .icon svg { transition: none; } }

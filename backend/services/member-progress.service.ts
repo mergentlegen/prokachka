@@ -37,6 +37,8 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     }
   }
   const programsById = new Map(programs.map((program) => [String(program.id), program]));
+  const programSteps = new Map<string, number>();
+  for (const task of tasks) if (task.publication_type === "sequential" && task.program_id) programSteps.set(String(task.program_id), (programSteps.get(String(task.program_id)) || 0) + 1);
   const programIds = new Set(programsById.keys());
   const eligible = tasks.filter((task) => {
     if (task.program_id && !programIds.has(String(task.program_id))) return false;
@@ -76,6 +78,6 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;
     const progress = existing.get(String(task.program_id));
-    return { ...publication, unlocked_at: progress?.unlocked_at, due_at: progress?.due_at };
+    return { ...publication, unlocked_at: progress?.unlocked_at, due_at: progress?.due_at, program_title: program?.title, program_steps: programSteps.get(String(task.program_id)) };
   }) };
 }

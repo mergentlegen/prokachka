@@ -9,7 +9,7 @@ import { ScopeChangedError } from "@/frontend/shared/lib/query-cache";
 
 export type MemberTab = "home" | "tasks" | "feedback" | "ranking" | "network" | "profile";
 const datasets: Record<MemberTab, MemberDataset[]> = {
-  home: ["announcements", "ranking"], tasks: ["tasks", "submissions"], ranking: ["ranking"],
+  home: ["announcements", "ranking", "tasks", "submissions"], tasks: ["tasks", "submissions"], ranking: ["ranking"],
   network: ["network"], feedback: [], profile: ["tasks", "submissions", "stars", "ranking"],
 };
 const empty = (): MemberData => ({ store: { users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] }, ranking: [], starRanking: [], network: [] });
