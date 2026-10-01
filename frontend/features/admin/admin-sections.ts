@@ -4,12 +4,12 @@ export type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "hist
 
 export const sectionDatasets: Record<AdminSection, readonly AdminDataset[]> = {
   dashboard: ["users", "tasks", "submissions"],
-  tasks: ["tasks", "submissions", "programs"],
+  tasks: ["tasks", "submissions", "programs", "users"],
   programs: ["programs", "tasks"],
   review: ["users", "tasks", "submissions"],
   history: ["users", "tasks", "submissions"],
-  feedback: [],
-  requests: [],
+  feedback: ["submissions", "users", "tasks"],
+  requests: ["users"],
   announcements: ["announcements"],
   stars: ["users", "starAwards"],
   network: [],

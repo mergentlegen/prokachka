@@ -1,0 +1,31 @@
+.panel { display: grid; gap: 12px; min-width: 0; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.bar > div { display: grid; gap: 3px; }
+.bar strong { color: var(--navy); font-size: 15px; }
+.bar small { color: var(--muted); font-size: 12px; }
+.bar :global(.button) { min-height: 44px; padding: 10px 16px; border-radius: 12px; font-size: 13px; }
+.list { display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff; list-style: none; }
+.list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eef1f6; }
+.list li:last-child { border-bottom: 0; }
+.person { display: flex; flex: 1 1 260px; align-items: center; gap: 12px; min-width: 0; }
+.person .avatar { flex: 0 0 44px; width: 44px; height: 44px; font-size: 14px; }
+.person > div { display: grid; gap: 2px; min-width: 0; }
+.person strong { color: var(--navy); font-size: 15px; overflow-wrap: anywhere; }
+.person span { color: #5b6b85; font-size: 13px; }
+.person span b { color: var(--navy); font-weight: 650; }
+.person small { color: var(--muted); font-size: 12px; }
+.person em { font-style: normal; font-weight: 700; }
+.fresh { color: #3f5f9e; }
+.waiting { color: #a26a20; }
+.late { color: #b23e4d; }
+.actions { display: flex; gap: 8px; }
+.actions :global(.button) { min-width: 110px; min-height: 44px; border-radius: 12px; font-size: 13px; }
+.empty { display: grid; justify-items: center; gap: 6px; padding: 32px 20px; border: 1px solid var(--line); border-radius: 16px; background: #fff; text-align: center; }
+.empty span { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #dff3ea; color: var(--green); font-size: 22px; font-weight: 800; }
+.empty strong { color: var(--navy); font-size: 16px; }
+.empty p { max-width: 320px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+@media (max-width: 560px) {
+  .actions { width: 100%; }
+  .actions :global(.button) { flex: 1; min-width: 0; }
+  .bar :global(.button) { width: 100%; }
+}

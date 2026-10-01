@@ -32,7 +32,7 @@ export function useAdminData(user: AuthUser | null, section: AdminSection) {
       const [patch, counts, requests, programHistory, publicationHistory, networkUsers] = await Promise.all([
         loadAdminData(sectionDatasets[section]), loadMentorCounts(),
         section === "requests" ? loadTeamRequests() : null,
-        section === "history" ? loadAdminProgramHistory() : null,
+        section === "history" || section === "programs" ? loadAdminProgramHistory() : null,
         section === "history" ? loadAdminPublicationHistory() : null,
         section === "network" ? loadNetwork() : null,
       ]);

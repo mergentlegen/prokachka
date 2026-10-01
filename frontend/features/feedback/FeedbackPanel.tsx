@@ -20,8 +20,9 @@ function participantsLabel(count: number) {
   return `${count} ${lastTwo >= 11 && lastTwo <= 14 ? "участников" : last === 1 ? "участник" : last >= 2 && last <= 4 ? "участника" : "участников"}`;
 }
 
-export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, selectedTaskId, selectedThreadId }: {
+export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, selectedTaskId, selectedThreadId, templates = [], onOpenSubmission }: {
   viewerId: string; mentor?: boolean; refreshKey?: number; selectedTaskId?: string | null; selectedThreadId?: string | null;
+  templates?: string[]; onOpenSubmission?: (submissionId: string) => void;
 }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
@@ -175,18 +176,25 @@ export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, select
     finally { setBusy(false); }
   }
 
+  const [query, setQuery] = useState("");
+  const search = query.trim().toLocaleLowerCase("ru");
   const selectedGroup = selectedTaskKey ? taskGroups.find((group) => group.key === selectedTaskKey) : null;
-  const visible = threads;
+  const visible = mentor && search ? threads.filter((thread) => thread.memberName.toLocaleLowerCase("ru").includes(search)) : threads;
+  const visibleGroups = search ? taskGroups.filter((group) => group.title.toLocaleLowerCase("ru").includes(search)) : taskGroups;
+  const workStatus = detail ? latestWorkStatus(detail.events) : null;
+  function applyTemplate(text: string) { setDraft((value) => value.trim() ? `${value.trim()} ${text}` : text); }
   const showTaskList = mentor && !selectedTaskKey;
   const showConversation = !mentor || !!selectedTaskKey;
   return <div className={styles.shell}>
 <div className={styles.heading}><div>{!mentor && <><p className={styles.eyebrow}>Ваши задания</p><h2>Обратная связь</h2></>}<p>{mentor ? "Выберите задание, затем участника — история и ответ откроются рядом." : "Здесь ваши работы, решения и сообщения наставника."}</p></div>{mentor && <div className={styles.filters}><button type="button" className={filter === "all" ? styles.active : ""} onClick={() => { if (filter !== "all") { setLoading(true); setSelectedId(null); setSelectedTaskKey(null); setThreads([]); setFilter("all"); } }}>Все</button><button type="button" className={filter === "reply" ? styles.active : ""} onClick={() => { if (filter !== "reply") { setLoading(true); setSelectedId(null); setSelectedTaskKey(null); setThreads([]); setFilter("reply"); } }}>Нужен ответ</button></div>}</div>
     {error && <div className={styles.error} role="alert">{error}</div>}
     {loading ? <p className={styles.empty}>Загружаем переписки…</p> : <>
-      {mentor && selectedTaskKey && <div className={styles.breadcrumb}><button type="button" onClick={() => { setSelectedTaskKey(null); setSelectedId(null); setDetail(null); }}>← Все задания</button><span aria-hidden="true">/</span><strong>{selectedGroup?.title || detail?.taskTitle || "Задание"}</strong></div>}
+      {mentor && (showTaskList ? taskGroups.length > 0 : threads.length > 0) && <label className={styles.search}><span>{showTaskList ? "Поиск задания" : "Поиск участника"}</span>
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={showTaskList ? "Название задания" : "Имя участника"} /></label>}
+      {mentor && selectedTaskKey && <div className={styles.breadcrumb}><button type="button" onClick={() => { setQuery(""); setSelectedTaskKey(null); setSelectedId(null); setDetail(null); }}>← Все задания</button><span aria-hidden="true">/</span><strong>{selectedGroup?.title || detail?.taskTitle || "Задание"}</strong></div>}
       {showTaskList && <div className={styles.taskGrid} aria-label="Задания с обратной связью">
-        {taskGroups.length === 0 && <p className={styles.empty}>{filter === "reply" ? "Сейчас никто не ждёт ответа." : "Переписки появятся после отправки работ."}</p>}
-        {taskGroups.map((group) => <button type="button" key={group.key} className={styles.taskCard} onClick={() => { setParticipantsLoading(true); setSelectedTaskKey(group.key); setSelectedId(null); setDetail(null); setThreads([]); }}>
+        {visibleGroups.length === 0 && <p className={styles.empty}>{search ? "Ничего не нашлось." : filter === "reply" ? "Сейчас никто не ждёт ответа." : "Переписки появятся после отправки работ."}</p>}
+        {visibleGroups.map((group) => <button type="button" key={group.key} className={styles.taskCard} onClick={() => { setQuery(""); setParticipantsLoading(true); setSelectedTaskKey(group.key); setSelectedId(null); setDetail(null); setThreads([]); }}>
           <span className={styles.taskCardTop}><span className={styles.taskIcon}>☷</span><span>{date(group.lastAt)}</span></span>
           <strong>{group.title}</strong><span className={styles.taskCardBottom}>{participantsLabel(group.participants)}{group.needsReply > 0 && <b>{group.needsReply} {plural(group.needsReply, "ждёт", "ждут", "ждут")} ответа</b>}{group.unread > 0 && <i aria-label={`${group.unread} непрочитанных`}>{group.unread} {plural(group.unread, "новое", "новых", "новых")}</i>}</span>
         </button>)}
@@ -196,7 +204,7 @@ export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, select
         <div className={`${styles.list} ${selectedId ? styles.hasSelection : ""}`} aria-label={mentor ? "Участники задания" : "Ваши переписки"}>
           {mentor && <div className={styles.listHeading}>Участники <span>{selectedGroup?.participants ?? visible.length}</span></div>}
           {participantsLoading && <p className={styles.empty}>Загружаем участников…</p>}
-          {!participantsLoading && visible.length === 0 && <p className={styles.empty}>{mentor && filter === "reply" ? "По этому заданию больше нет ожидающих ответа." : "Переписки появятся после отправки работы."}</p>}
+          {!participantsLoading && visible.length === 0 && <p className={styles.empty}>{search ? "Никого не нашли среди загруженных участников." : mentor && filter === "reply" ? "По этому заданию больше нет ожидающих ответа." : "Переписки появятся после отправки работы."}</p>}
           {visible.map((thread) => <button type="button" key={thread.id} className={`${styles.item} ${selectedId === thread.id ? styles.selected : ""}`} onClick={() => { setSelectedId(thread.id); setDetail(null); }}>
             <span className={styles.itemTop}><strong>{mentor ? thread.memberName : thread.taskTitle}</strong>{thread.unread && <span className={styles.dot} aria-label="Непрочитано" />}</span>
             <span className={styles.preview}>{thread.lastKind === "review" ? "Решение наставника" : thread.lastBody || "Работа отправлена"}</span>
@@ -206,7 +214,8 @@ export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, select
         </div>
         <div className={`${styles.conversation} ${selectedId ? styles.open : ""}`}>
           {!selectedId ? <div className={styles.conversationPlaceholder}><span>✉</span><strong>Выберите {mentor ? "участника" : "задание"}</strong><p>История переписки и поле ответа появятся здесь.</p></div> : !detail || detail.id !== selectedId ? <p className={styles.empty}>Открываем переписку…</p> : <>
-            <div className={styles.conversationHead}><button type="button" className={styles.back} onClick={() => setSelectedId(null)}>← Назад</button><div><strong>{mentor ? detail.memberName : detail.taskTitle}</strong><span>{mentor ? detail.taskTitle : "Переписка с наставником"}</span></div></div>
+            <div className={styles.conversationHead}><button type="button" className={styles.back} onClick={() => setSelectedId(null)}>← Назад</button><div><strong>{mentor ? detail.memberName : detail.taskTitle}</strong><span>{mentor ? detail.taskTitle : "Переписка с наставником"}</span>
+              {mentor && workStatus && <span className={styles.workLine}><b className={`${styles.workStatus} ${styles[`work_${workStatus.status}`]}`}>{workStatus.label}</b>{onOpenSubmission && <button type="button" className={styles.openWork} onClick={() => onOpenSubmission(workStatus.submissionId)}>Открыть работу →</button>}</span>}</div></div>
             <div className={styles.events} aria-live="polite">{detail.events.map((item) => item.kind === "message" ? <article key={item.id} className={`${styles.message} ${item.authorId === viewerId ? styles.own : ""}`}>
               <div className={styles.eventTop}><strong>{item.authorId === viewerId ? "Вы" : item.authorName}</strong><time dateTime={item.createdAt}>{date(item.createdAt)}</time></div>
               <p className={styles.body}>{item.body}</p>
@@ -215,10 +224,23 @@ export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, select
               <div><div className={styles.activityTop}><strong>{item.kind === "submission" ? "Работа отправлена" : item.reviewStatus === "accepted" ? `Работа принята · +${item.points ?? 0} миль` : "Нужна доработка"}</strong><time dateTime={item.createdAt}>{date(item.createdAt)}</time></div>
                 {item.body && <p className={styles.body}>{item.body}</p>}</div>
             </article>)}</div>
-            <form className={styles.composer} onSubmit={(event) => void send(event)}><label htmlFor="feedback-message">Сообщение {mentor ? "участнику" : "наставнику"}</label><textarea id="feedback-message" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={4000} rows={3} placeholder="Напишите сообщение…" /><div><small>Сообщение не меняет статус работы и мили.</small><button type="submit" disabled={busy || !draft.trim()}>{busy ? "Отправляем…" : "Отправить"}</button></div></form>
+            <form className={styles.composer} onSubmit={(event) => void send(event)}><label htmlFor="feedback-message">Сообщение {mentor ? "участнику" : "наставнику"}</label>{mentor && templates.length > 0 && <div className={styles.templates} aria-label="Готовые комментарии">{templates.map((text) => <button type="button" key={text} onClick={() => applyTemplate(text)}>{text}</button>)}</div>}<textarea id="feedback-message" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={4000} rows={3} placeholder="Напишите сообщение…" /><div><small>Сообщение не меняет статус работы и мили.</small><button type="submit" disabled={busy || !draft.trim()}>{busy ? "Отправляем…" : "Отправить"}</button></div></form>
           </>}
         </div>
       </div>}
     </>}
   </div>;
+}
+
+// The state of the participant's latest work in this thread, read from the event history.
+export function latestWorkStatus(events: Event[]): { submissionId: string; status: "pending" | "accepted" | "revision"; label: string } | null {
+  let submissionId = "", status: "pending" | "accepted" | "revision" | "" = "";
+  for (const item of events) {
+    if (!item.submissionId) continue;
+    if (item.kind === "submission") { submissionId = item.submissionId; status = "pending"; }
+    else if (item.kind === "review" && item.reviewStatus && item.submissionId === submissionId) status = item.reviewStatus;
+    else if (item.kind === "review" && item.reviewStatus && !submissionId) { submissionId = item.submissionId; status = item.reviewStatus; }
+  }
+  if (!submissionId || !status) return null;
+  return { submissionId, status, label: status === "accepted" ? "Работа принята" : status === "revision" ? "На доработке" : "Ждёт проверки" };
 }

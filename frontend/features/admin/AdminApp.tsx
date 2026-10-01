@@ -29,14 +29,16 @@ import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest, User 
 import { validMiles } from "@/shared/domain/miles";
 import { TaskEditorModal, ReviewModal, DeleteModal, CompletionModal } from "./AdminModals";
 import type { TaskDraft, ReviewDraft } from "./AdminModals";
-import { AccessDenied, TasksView, ReviewView, HistoryView, RequestsView } from "./AdminViews";
+import { AccessDenied, TasksView, ReviewView, HistoryView } from "./AdminViews";
+import { RequestsPanel } from "./RequestsPanel";
 import { AdminDashboard } from "./AdminDashboard";
-import { ReviewFlow, type ReviewDecision } from "./ReviewFlow";
+import { DEFAULT_REVIEW_TEMPLATES, ReviewFlow, type ReviewDecision } from "./ReviewFlow";
 import { ReviewTemplatesEditor } from "./ReviewTemplatesEditor";
 import { adminIcons, homeIcon, logoutIcon, profileIcon } from "./AdminIcons";
 import { reviewQueue } from "./review-queue";
 import { loadReviewTemplates, saveReviewTemplates } from "@/frontend/shared/api/review-templates-client";
 import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
+import { TaskResultsSheet } from "./TaskResultsSheet";
 
 import type { AdminSection } from "./admin-sections";
 import { useAdminData } from "./use-admin-data";
@@ -81,9 +83,10 @@ export function AdminApp() {
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [reviewFlow, setReviewFlow] = useState<{ startId: string; intent?: "accepted" | "revision" } | null>(null);
+  const [reviewFlow, setReviewFlow] = useState<{ startId: string; intent?: "accepted" | "revision"; single?: boolean } | null>(null);
   const [templates, setTemplates] = useState<{ list: string[]; canEdit: boolean }>({ list: [], canEdit: false });
   const [templatesEditorOpen, setTemplatesEditorOpen] = useState(false);
+  const [resultsTaskId, setResultsTaskId] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const shellRef = useRef<HTMLElement>(null);
   const openMobileMenu = useCallback(() => setMobileMenuOpen(true), []);
@@ -275,6 +278,12 @@ export function AdminApp() {
     if (!modalBusy) setModal(null);
   }
 
+  // Opens one participant's work from a conversation: the answer and the decision in the review window.
+  function openSubmission(submissionId: string) {
+    if (store.submissions.some((item) => item.id === submissionId)) setReviewFlow({ startId: submissionId, single: true });
+    else setToast("Работа не найдена: возможно, её удалили вместе с заданием.");
+  }
+
   async function saveDecision(submission: Submission, decision: ReviewDecision) {
     try {
       const updated = await reviewAdminSubmission(submission.id, { ...decision, expectedVersion: submission.reviewVersion ?? 0 });
@@ -328,10 +337,12 @@ export function AdminApp() {
     try {
       const updated = await reviewTeamJoinRequest(teamRequest.id, status);
       setRequests((current) => current.map((item) => item.id === updated.id ? updated : item));
-      await refreshData();
+      void refreshData();
       setToast(status === "approved" ? "Участник принят в команду." : "Заявка отклонена.");
+      return true;
     } catch {
       setToast("Не удалось обработать заявку.");
+      return false;
     }
   }
 
@@ -483,12 +494,12 @@ export function AdminApp() {
         {section === "dashboard" && <AdminDashboard store={store} queue={queue} feedbackNeedsReply={feedbackNeedsReply} requests={counts.requests} canReview={canReview} now={now} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
           <ReadyProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />
-          <TasksView store={store} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
+          <TasksView store={store} onOpenResults={(task) => setResultsTaskId(task.id)} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
         </div>}
         {section === "review" && <ReviewView store={store} submissions={queue} onReview={(submission, intent) => setReviewFlow({ startId: submission.id, intent })} onStart={() => { if (queue[0]) setReviewFlow({ startId: queue[0].id }); }} onEditTemplates={templates.canEdit ? () => setTemplatesEditorOpen(true) : undefined} />}
-{section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
-        {section === "requests" && <RequestsView requests={pendingRequests} onReview={reviewRequest} />}
+{section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} templates={templates.list.length ? templates.list : DEFAULT_REVIEW_TEMPLATES} onOpenSubmission={openSubmission} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel history={programHistory} taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "requests" && <RequestsPanel requests={pendingRequests} users={store.users} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
         {section === "welcome-video" && canPublishContent && <WelcomeVideoSettingsPanel user={authUser} />}
         </SectionBoundary>
@@ -512,8 +523,10 @@ export function AdminApp() {
     {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     <PullToRefresh onRefresh={async () => { setFeedbackVersion((value) => value + 1); await refreshData(); }} />
-    {reviewFlow && <ReviewFlow queue={queue} startId={reviewFlow.startId} intent={reviewFlow.intent} store={store} templates={templates.list} canEditTemplates={templates.canEdit}
+    {reviewFlow && <ReviewFlow queue={reviewFlow.single ? store.submissions.filter((item) => item.id === reviewFlow.startId) : queue} startId={reviewFlow.startId} intent={reviewFlow.intent} store={store} templates={templates.list} canEditTemplates={templates.canEdit}
       onSave={saveDecision} onEditTemplates={() => setTemplatesEditorOpen(true)} onClose={() => setReviewFlow(null)} />}
+    {resultsTaskId && store.tasks.some((task) => task.id === resultsTaskId) && <TaskResultsSheet task={store.tasks.find((task) => task.id === resultsTaskId)!} store={store} actorId={authUser.id}
+      onReview={openReviewModal} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} onClose={() => setResultsTaskId("")} />}
     {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
     {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}

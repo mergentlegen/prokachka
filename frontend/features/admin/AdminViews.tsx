@@ -3,12 +3,14 @@ import { useState } from "react";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
-import type { Store, Submission, Task, TeamJoinRequest, User } from "@/shared/domain/types";
+import type { Store, Submission, Task, User } from "@/shared/domain/types";
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 import { formatDate, formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
 import { SubmissionCard } from "./SubmissionCard";
 import { plural, waitingInfo } from "./review-queue";
 import { actionIcons } from "./AdminIcons";
+import { taskParticipantResults, taskProgress } from "./task-results";
+import { TaskResultsSheet } from "./TaskResultsSheet";
 function isTaskExpired(task: Task) { return Boolean(task.deadlineAt && new Date(task.deadlineAt).getTime() <= Date.now()); }
 
 export function AccessDenied({ onLogout }: { onLogout: () => void }) { return <main className="admin-login"><div className="admin-login-card"><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><p className="eyebrow">Доступ ограничен</p><h1>Это раздел наставника</h1><p>Твой аккаунт участника не может открыть админ-панель.</p><button className="primary-button full" onClick={() => { void onLogout(); }}>Выйти</button><a className="back-link" href="/">Вернуться к заданиям</a></div></main>; }
@@ -16,24 +18,40 @@ function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" 
   return <div className="task-kind-switch history-kind-switch"><button type="button" className={value === "regular" ? "active" : ""} onClick={() => onChange("regular")}>Задания</button><button type="button" className={value === "programs" ? "active" : ""} onClick={() => onChange("programs")}>Программы</button><button type="button" className={value === "publications" ? "active" : ""} onClick={() => onChange("publications")}>Публикации</button></div>;
 }
 type TaskRowsProps = {
-  tasks: Task[]; submissions?: Submission[]; actorId: string; canManageAll: boolean; busyId?: string;
+  tasks: Task[]; submissions?: Submission[]; users?: User[]; onOpenResults?: (task: Task) => void; actorId: string; canManageAll: boolean; busyId?: string;
   onToggle: (id: string) => void; onEdit: (task: Task) => void; onRemove: (task: Task) => void; onPin?: (task: Task) => void;
 };
 
-export function TasksView({ store, ...props }: Omit<TaskRowsProps, "tasks" | "submissions"> & { store: Store }) {
+type TaskFilter = "all" | "active" | "hidden" | "expired";
+const taskFilterOf = (task: Task): Exclude<TaskFilter, "all"> => !task.isActive ? "hidden" : isTaskExpired(task) ? "expired" : "active";
+
+export function TasksView({ store, ...props }: Omit<TaskRowsProps, "tasks" | "submissions" | "users"> & { store: Store }) {
+  const [filter, setFilter] = useState<TaskFilter>("all");
+  const [query, setQuery] = useState("");
   const readyProgramIds = new Set(store.programs.filter((program) => program.templateKey).map((program) => program.id));
   const tasks = store.tasks.filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && task.publicationType !== "sequential").sort(compareTaskFeed);
-  return <div className="admin-panel table-panel"><TaskRows tasks={tasks} submissions={store.submissions} {...props} /></div>;
+  const search = query.trim().toLocaleLowerCase("ru");
+  const shown = tasks.filter((task) => (filter === "all" || taskFilterOf(task) === filter) && (!search || task.title.toLocaleLowerCase("ru").includes(search)));
+  const count = (value: TaskFilter) => value === "all" ? tasks.length : tasks.filter((task) => taskFilterOf(task) === value).length;
+  const chips: Array<[TaskFilter, string]> = [["all", "Все"], ["active", "Активные"], ["hidden", "Скрытые"], ["expired", "Просроченные"]];
+  return <div className="admin-tasks">
+    {tasks.length > 0 && <div className="admin-list-tools">
+      <label className="admin-search"><span className="sr-label">Поиск задания</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти задание по названию" /></label>
+      <div className="admin-chips" role="group" aria-label="Показать задания">{chips.filter(([id]) => id === "all" || count(id) > 0).map(([id, label]) => <button type="button" key={id} className={filter === id ? "active" : ""} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}<b>{count(id)}</b></button>)}</div>
+    </div>}
+    <div className="admin-panel table-panel">{tasks.length > 0 && shown.length === 0 ? <EmptyAdmin text="Ничего не нашлось. Измените поиск или фильтр." /> : <TaskRows tasks={shown} submissions={store.submissions} users={store.users} {...props} />}</div>
+  </div>;
 }
 
-export function TaskRows({ tasks, submissions = [], actorId, canManageAll, onToggle, onEdit, onRemove, onPin, busyId }: TaskRowsProps) {
+export function TaskRows({ tasks, submissions = [], users, onOpenResults, actorId, canManageAll, onToggle, onEdit, onRemove, onPin, busyId }: TaskRowsProps) {
   return <>{tasks.length === 0 ? <EmptyAdmin text="Заданий пока нет." /> : tasks.map((task) => {
     const status = !task.isActive ? "inactive" : isTaskExpired(task) ? "expired" : "active";
     const taskMeta = task.publicationType === "sequential" ? "Шаг " + (task.position || "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";
     const canManage = canManageAll || task.publisherId === actorId;
     return <div className="task-admin-row" key={task.id}>
       <div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div>
-        {task.isPinned && <PinBadge />}<strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta}{submissions.length > 0 ? " · " + submissions.filter((submission) => submission.taskId === task.id).length + " отправлений" : ""}</span>
+        {task.isPinned && <PinBadge />}<strong>{task.title}</strong><span>{formatDate(task.createdAt)} · {taskMeta}</span>
+        {users && onOpenResults && <TaskProgressLine task={task} users={users} submissions={submissions} onOpen={() => onOpenResults(task)} />}
       </div></div>
       <span className={"admin-status " + status}>{status === "active" ? "Активно" : status === "expired" ? "Просрочено" : "Скрыто"}</span>
       <span className="task-max">до {formatMiles(task.maxPoints)}</span>
@@ -46,6 +64,15 @@ export function TaskRows({ tasks, submissions = [], actorId, canManageAll, onTog
     </div>;
   })}</>;
 }
+function TaskProgressLine({ task, users, submissions, onOpen }: { task: Task; users: User[]; submissions: Submission[]; onOpen: () => void }) {
+  const progress = taskProgress(taskParticipantResults(task, { users, submissions }));
+  if (!progress.total) return null;
+  return <button type="button" className="task-progress" onClick={onOpen} aria-label={`Кто сдал задание «${task.title}»`}>
+    <span><b>Ответили {progress.sent} из {progress.total}</b>{progress.pending > 0 && <em>{progress.pending} на проверке</em>}<b className="task-progress-arrow" aria-hidden="true">→</b></span>
+    <i className="task-progress-bar" aria-hidden="true"><i style={{ width: `${(progress.accepted / progress.total) * 100}%` }} /><i className="waiting" style={{ width: `${((progress.pending + progress.revision) / progress.total) * 100}%` }} /></i>
+  </button>;
+}
+
 export function ReviewView({ store, submissions, onReview, onStart, onEditTemplates }: { store: Store; submissions: Submission[]; onReview: (submission: Submission, status: "accepted" | "revision") => void; onStart: () => void; onEditTemplates?: () => void }) {
   const oldest = submissions[0] ? waitingInfo(submissions[0].submittedAt) : null;
   return <div className="submission-review-list">
@@ -55,29 +82,6 @@ export function ReviewView({ store, submissions, onReview, onStart, onEditTempla
       <SubmissionCard key={submission.id} submission={submission} name={store.users.find((user) => user.id === submission.userId)?.name || "Неизвестный участник"} avatarUrl={store.users.find((user) => user.id === submission.userId)?.avatarUrl} taskTitle={submission.taskTitle || store.tasks.find((task) => task.id === submission.taskId)?.title || "Удалённое задание"} onReview={onReview} />
     )}</div>;
 }
-export function RequestsView({ requests, onReview }: { requests: TeamJoinRequest[]; onReview: (teamRequest: TeamJoinRequest, status: "approved" | "rejected") => void }) {
-  return <div className="admin-panel table-panel">{requests.length === 0 ? <EmptyAdmin text="Новых заявок в команду нет." /> : requests.map((teamRequest) => <div className="review-row" key={teamRequest.id}><div className="submission-row"><Avatar className="rank-avatar" name={teamRequest.userName || "У"} src={teamRequest.userAvatarUrl} /><div><strong>{teamRequest.userName || "Новый участник"}</strong><span>Заявка на вступление в команду</span></div><time>{formatDateTime(teamRequest.createdAt)}</time></div><div className="review-actions"><span className="request-team-name">{teamRequest.teamName || "Твоя команда"}</span><div><button className="button button-success" onClick={() => onReview(teamRequest, "approved")}>Принять</button><button className="button button-danger" onClick={() => onReview(teamRequest, "rejected")}>Отклонить</button></div></div></div>)}</div>;
-}
-type ParticipantResult = { user: User; status: "accepted" | "revision" | "pending" | "overdue" | "not_started"; submission?: Submission };
-
-function taskParticipantResults(task: Task, store: Store): ParticipantResult[] {
-  const latestByUser = new Map<string, Submission>();
-  store.submissions.filter((submission) => submission.taskId === task.id).sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)).forEach((submission) => latestByUser.set(submission.userId, submission));
-  const expired = Boolean(task.deadlineAt && new Date(task.deadlineAt).getTime() <= Date.now());
-  return store.users.filter((user) => user.role === "member").map((user) => {
-    const submission = latestByUser.get(user.id);
-    return { user, submission, status: submission?.status || (expired ? "overdue" : "not_started") };
-  });
-}
-
-function participantStatusText(status: ParticipantResult["status"]) {
-  if (status === "accepted") return "Выполнено";
-  if (status === "revision") return "На доработке";
-  if (status === "pending") return "На проверке";
-  if (status === "overdue") return "Просрочил";
-  return "Не отправил";
-}
-
 function programHistoryStatusText(status: ProgramHistory["members"][number]["status"]) {
   if (status === "on_time") return "Успел в срок";
   if (status === "active") return "Срок ещё идёт";
@@ -113,7 +117,6 @@ export function HistoryView({ store, programs, publications, onReview, actorId, 
   const tasks = [...store.tasks].filter((task) => task.publicationType !== "sequential" && publicationTaskIds.has(task.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const visiblePrograms = programs.filter((program) => publicationProgramIds.has(program.id) && program.steps.length > 0);
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
-  const selectedResults = selectedTask ? taskParticipantResults(selectedTask, store) : [];
   const selectedProgram = visiblePrograms.find((program) => program.id === selectedProgramId);
   return <>
     <HistoryKindSwitch value={kind} onChange={setKind} />
@@ -127,26 +130,7 @@ export function HistoryView({ store, programs, publications, onReview, actorId, 
       const counts = program.members.reduce((result, member) => { result[member.status] = (result[member.status] || 0) + 1; return result; }, {} as Record<string, number>);
       return <button type="button" className="program-history-row" key={program.id} onClick={() => { setSelectedProgramId(program.id); setSelectedStepPosition(1); }}><div className="program-history-main"><span className={"program-history-dot " + (program.isActive ? "active" : "muted")} /><div><strong>{program.title}</strong><span>{stepCountLabel(program.steps.length)} · {program.deadlineHours} ч на шаг · опубликовано {formatDate(program.createdAt)}</span></div></div><div className="program-history-summary"><span className="summary-completed">{counts.on_time || 0} успели</span><span className="summary-active">{counts.active || 0} ещё успевают</span><span className="summary-warning">{counts.late || 0} с опозданием</span><span className="summary-overdue">{counts.missed || 0} пропустили</span><span className="summary-completed">{counts.completed || 0} завершили</span></div><b>→</b></button>;
     })}</div>}
-    {selectedTask && kind === "regular" && <div className="modal-backdrop history-modal-backdrop" onMouseDown={() => setSelectedTaskId(null)}>
-      <div className="task-history-modal" role="dialog" aria-modal="true" aria-labelledby="task-history-title" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="history-modal-header">
-          <div className="history-modal-heading">
-            <p className="eyebrow">История задания</p>
-            <h2 id="task-history-title">{selectedTask.title}</h2>
-            <p className="task-history-deadline">{selectedTask.deadlineAt ? "Дедлайн: " + formatDateTime(selectedTask.deadlineAt) : "Задание без дедлайна"}</p>
-          </div>
-          <button type="button" className="modal-close" onClick={() => setSelectedTaskId(null)} aria-label="Закрыть">×</button>
-        </div>
-        <div className="history-modal-body">
-          <div className="history-modal-section-title"><strong>Участники</strong><span>{selectedResults.length}</span></div>
-          <div className="task-report-list">{selectedResults.length === 0 ? <EmptyAdmin text="В команде пока нет участников." /> : selectedResults.map((result) => <div className="task-report-row" key={result.user.id}>
-            <Avatar className="rank-avatar" name={result.user.name} src={result.user.avatarUrl} />
-            <div className="task-report-main"><strong>{result.user.name}</strong>{result.submission?.comment && result.status === "revision" && <small>{result.submission.comment}</small>}</div>
-            <div className={"task-report-status " + result.status}><span>{participantStatusText(result.status)}</span>{result.status === "accepted" && <b>+{formatMiles(result.submission?.points || 0)}</b>}{result.submission && result.submission.source !== "interactive" && (result.status === "accepted" || result.status === "revision") && <button type="button" className={"button " + (result.status === "accepted" ? "button-danger" : "button-success")} onClick={(event) => { event.stopPropagation(); onReview(result.submission as Submission, result.status === "accepted" ? "revision" : "accepted"); }}>{result.status === "accepted" ? "Вернуть" : "Принять"}</button>}{onComplete && selectedTask.isActive && !selectedTask.interactiveKind && result.user.id !== actorId && (result.status === "not_started" || result.status === "overdue") && <button type="button" className="button button-success" title="Участник выполнил задание, но не нажал «Отправить ответ»" onClick={(event) => { event.stopPropagation(); onComplete(selectedTask, result.user); }}>Засчитать</button>}</div>
-          </div>)}</div>
-        </div>
-      </div>
-    </div>}
+    {selectedTask && kind === "regular" && <TaskResultsSheet task={selectedTask} store={store} actorId={actorId} onReview={onReview} onComplete={onComplete} onClose={() => setSelectedTaskId(null)} />}
     {selectedProgram && kind === "programs" && (() => {
       const selectedStep = selectedProgram.steps.find((step) => step.position === selectedStepPosition) || selectedProgram.steps[0];
       const members = selectedStep?.members || [];

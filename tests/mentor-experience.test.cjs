@@ -117,3 +117,48 @@ test('mentor overview lists only what needs attention, or a calm state', () => {
   const publisher = renderToStaticMarkup(React.createElement(AdminDashboard, { store, queue: [], feedbackNeedsReply: 0, requests: 0, canReview: false, now, onNavigate() {} }));
   assert.ok(!publisher.includes('Требует внимания'), 'publish-only mentors do not see review tiles');
 });
+
+test('task progress counts who answered, what waits and who is missing', () => {
+  const { taskParticipantResults, taskProgress } = loadTs('frontend/features/admin/task-results.ts');
+  const users = [person('a'), person('b'), person('c'), person('d'), person('lead', { role: 'admin' })];
+  const task = { id: 't', title: 'T', deadlineAt: at(-DAY), isActive: true };
+  const submissions = [work('1', { userId: 'a', taskId: 't', status: 'accepted' }), work('2', { userId: 'b', taskId: 't', status: 'pending' }), work('3', { userId: 'c', taskId: 't', status: 'revision' })];
+  const results = taskParticipantResults(task, { users, submissions }, now);
+  assert.deepEqual(results.map((item) => [item.user.id, item.status]), [['a', 'accepted'], ['b', 'pending'], ['c', 'revision'], ['d', 'overdue']]);
+  assert.deepEqual(taskProgress(results), { total: 4, sent: 3, accepted: 1, pending: 1, revision: 1, missing: 1 });
+});
+
+test('program funnel shows how many participants stand on each step and who finished', () => {
+  const { programFunnel } = loadTs('frontend/features/admin/ProgramsPanel.tsx', { './AdminViews': {} });
+  const steps = [{ id: 's1', title: 'Знакомство', position: 1 }, { id: 's2', title: 'Контакты', position: 2 }, { id: 's3', title: 'Встреча', position: 3 }];
+  const progress = { members: [{ status: 'active', currentStep: 1 }, { status: 'late', currentStep: 2 }, { status: 'missed', currentStep: 2 }, { status: 'completed' }] };
+  const funnel = programFunnel(progress, steps);
+  assert.deepEqual(funnel.rows.map((row) => row.count), [1, 2, 0]);
+  assert.equal(funnel.completed, 1);
+  assert.equal(funnel.total, 4);
+  assert.equal(programFunnel(undefined, steps).total, 0);
+});
+
+test('conversation header reads the latest work status from the thread history', () => {
+  const { latestWorkStatus } = loadTs('frontend/features/feedback/FeedbackPanel.tsx');
+  const event = (kind, submissionId, reviewStatus = null) => ({ id: kind + submissionId + reviewStatus, kind, submissionId, reviewStatus });
+  assert.deepEqual(latestWorkStatus([event('submission', 's1')]), { submissionId: 's1', status: 'pending', label: 'Ждёт проверки' });
+  assert.equal(latestWorkStatus([event('submission', 's1'), event('review', 's1', 'revision')]).label, 'На доработке');
+  assert.deepEqual(latestWorkStatus([event('submission', 's1'), event('review', 's1', 'revision'), event('submission', 's2')]).submissionId, 's2', 'a resubmission is waiting again');
+  assert.equal(latestWorkStatus([event('submission', 's1'), event('review', 's1', 'accepted'), { id: 'm', kind: 'message', submissionId: null }]).status, 'accepted');
+  assert.equal(latestWorkStatus([{ id: 'm', kind: 'message', submissionId: null }]), null);
+});
+
+test('join requests show the inviter and offer "accept everyone" only for several people', () => {
+  const { RequestsPanel } = loadTs('frontend/features/admin/RequestsPanel.tsx', { '@/frontend/shared/ConfirmModal': { ConfirmModal: () => null } });
+  const request = (id, extra = {}) => ({ id, userId: 'n' + id, teamId: 'team', status: 'pending', createdAt: at(-5 * HOUR), userName: 'Новичок ' + id, ...extra });
+  const users = [person('u0', { name: 'Анна Ким' })];
+  const two = renderToStaticMarkup(React.createElement(RequestsPanel, { requests: [request('1', { invitedByUserId: 'u0' }), request('2')], users, onReview: async () => true }));
+  assert.match(two, /Пригласил\(а\): <b>Анна Ким<\/b>/);
+  assert.match(two, /Сам\(а\) выбрал\(а\) команду/);
+  assert.match(two, /2 заявки ждут решения/);
+  assert.match(two, /Принять всех/);
+  const one = renderToStaticMarkup(React.createElement(RequestsPanel, { requests: [request('1')], users, onReview: async () => true }));
+  assert.ok(!one.includes('Принять всех'));
+  assert.match(renderToStaticMarkup(React.createElement(RequestsPanel, { requests: [], users, onReview: async () => true })), /Новых заявок нет/);
+});

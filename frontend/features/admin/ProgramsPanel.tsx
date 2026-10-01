@@ -8,17 +8,19 @@ import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { formatDate, formatMiles } from "@/frontend/shared/lib/format";
 import type { Task, TaskProgram } from "@/shared/domain/types";
+import type { ProgramHistory } from "@/shared/domain/history";
+import { plural } from "@/frontend/shared/lib/plural";
 import { TaskRows } from "./AdminViews";
 import styles from "./ProgramsPanel.module.css";
 
 type Props = {
-  programs: TaskProgram[]; tasks: Task[]; actorId: string; canManageAll: boolean;
+  programs: TaskProgram[]; tasks: Task[]; actorId: string; canManageAll: boolean; history?: ProgramHistory[];
   taskBusyId?: string;
   onChange: (programs: TaskProgram[], tasks: Task[]) => void; onError: (message: string) => void;
   onEditTask: (task: Task) => void; onToggleTask: (id: string) => void; onRemoveTask: (task: Task) => void;
 };
 
-export function ProgramsPanel({ programs, tasks, actorId, canManageAll, taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask }: Props) {
+export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history = [], taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask }: Props) {
   const customPrograms = programs.filter((program) => !program.templateKey).sort(comparePublications);
   const [busyId, setBusyId] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, taskBusy
             </div>}
           </div>
           {isExpanded && <div id={"program-steps-" + program.id} className={styles.steps}>
+            <ProgramFunnel progress={history.find((item) => item.id === program.id)} steps={steps} />
             <div className={styles.stepsHeading}>Задания программы <span>По порядку прохождения</span></div>
             <TaskRows tasks={steps} actorId={actorId} canManageAll={canManageAll} busyId={taskBusyId} onEdit={onEditTask} onToggle={onToggleTask} onRemove={onRemoveTask} />
           </div>}
@@ -80,4 +83,34 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, taskBusy
     </div>
     {deleteTarget && <ConfirmModal title="Удалить программу?" description={<>«{deleteTarget.title}», все её шаги и отправленные работы будут удалены без возможности восстановления.</>} confirmLabel="Удалить программу" busy={Boolean(busyId)} onClose={() => { if (!busyId) setDeleteTarget(null); }} onConfirm={() => void remove()} />}
   </>;
+}
+
+// Where participants are right now: one bar per step, plus everyone who finished.
+export function programFunnel(progress: ProgramHistory | undefined, steps: Task[]) {
+  const atStep = new Map<number, number>();
+  let completed = 0;
+  for (const member of progress?.members || []) {
+    if (member.status === "completed") completed++;
+    else if (member.currentStep) atStep.set(member.currentStep, (atStep.get(member.currentStep) || 0) + 1);
+  }
+  return { total: progress?.members.length || 0, completed, rows: steps.map((step, index) => ({ id: step.id, title: step.title, position: step.position || index + 1, count: atStep.get(step.position || index + 1) || 0 })) };
+}
+
+function ProgramFunnel({ progress, steps }: { progress?: ProgramHistory; steps: Task[] }) {
+  const funnel = programFunnel(progress, steps);
+  if (!progress || funnel.total === 0) return <p className={styles.funnelEmpty}>{progress ? "Программу пока никто не начал." : "Загружаем, кто на каком шаге…"}</p>;
+  const max = Math.max(1, funnel.completed, ...funnel.rows.map((row) => row.count));
+  return <section className={styles.funnel} aria-label="Кто на каком шаге">
+    <div className={styles.funnelHead}><strong>Кто на каком шаге</strong><span>{funnel.total} {plural(funnel.total, "участник", "участника", "участников")} в программе</span></div>
+    {funnel.rows.map((row) => <div className={styles.funnelRow} key={row.id}>
+      <span className={styles.funnelLabel}><b>{row.position}</b>{row.title}</span>
+      <span className={styles.funnelBar}><i style={{ width: `${(row.count / max) * 100}%` }} /></span>
+      <strong>{row.count}</strong>
+    </div>)}
+    <div className={`${styles.funnelRow} ${styles.funnelDone}`}>
+      <span className={styles.funnelLabel}><b>✓</b>Завершили программу</span>
+      <span className={styles.funnelBar}><i style={{ width: `${(funnel.completed / max) * 100}%` }} /></span>
+      <strong>{funnel.completed}</strong>
+    </div>
+  </section>;
 }
