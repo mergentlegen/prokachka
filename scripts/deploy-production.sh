@@ -116,4 +116,21 @@ switched=1
 activate "$release_dir"
 restart
 "$NODE_BIN" "$release_dir/scripts/smoke-test.cjs" "http://127.0.0.1:$APP_PORT" "$release_id"
+
+# Keeps disk usage flat: the newest releases and archives stay, the active and the
+# rollback release are never removed. A cleanup problem must not fail a healthy deploy.
+prune_old_releases() {
+  local keep=5 entry
+  while IFS= read -r entry; do
+    [[ "$entry" =~ ^[a-f0-9]{40}-[0-9]+-[0-9]+$ ]] || continue
+    [[ "$APP_ROOT/releases/$entry" == "$release_dir" || "$APP_ROOT/releases/$entry" == "$previous" ]] && continue
+    rm -rf -- "${APP_ROOT:?}/releases/$entry"
+  done < <(find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' | sort -rn | tail -n +$((keep + 1)) | cut -d' ' -f2-)
+  while IFS= read -r entry; do
+    [[ "$entry" =~ ^[a-f0-9]{40}-[0-9]+-[0-9]+\.tar\.gz$ ]] || continue
+    rm -f -- "${APP_ROOT:?}/incoming/$entry"
+  done < <(find "$APP_ROOT/incoming" -mindepth 1 -maxdepth 1 -type f -printf '%T@ %f\n' | sort -rn | tail -n +$((keep + 1)) | cut -d' ' -f2-)
+  return 0
+}
+prune_old_releases || echo 'Old releases were not cleaned up; free disk space manually if needed' >&2
 echo "Deployment is healthy: $release_id"

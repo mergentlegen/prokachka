@@ -118,6 +118,16 @@ async function scenario(t, mode, options = {}) {
   for (const directory of [previous, source, bin, path.join(root, 'incoming')]) fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(path.join(source, 'release.json'), JSON.stringify({ ...metadata, release: newId }));
   fs.writeFileSync(path.join(previous, 'release.json'), JSON.stringify({ ...metadata, release: oldId }));
+  const stale = [];
+  for (let index = 0; index < (options.staleReleases || 0); index++) {
+    const id = String(index).repeat(40).slice(0, 40) + '-1-1';
+    const old = new Date(Date.now() - (index + 2) * 86_400_000);
+    fs.mkdirSync(path.join(root, 'releases', id));
+    fs.writeFileSync(path.join(root, 'incoming', id + '.tar.gz'), 'old');
+    fs.utimesSync(path.join(root, 'releases', id), old, old);
+    fs.utimesSync(path.join(root, 'incoming', id + '.tar.gz'), old, old);
+    stale.push(id);
+  }
   const legacy = path.join(temp, 'legacy');
   if (options.legacy) {
     fs.mkdirSync(path.join(legacy, '.next'), { recursive: true });
@@ -158,7 +168,7 @@ exit 99
     result = { ...(await run('bash', [path.resolve(__dirname, '../scripts/deploy-production.sh'), newId,
       options.badChecksum ? '0'.repeat(64) : digest], { env, timeout: 15000 })), code: 0 };
   } catch (error) { result = error; }
-  return { result, previous, current: fs.existsSync(path.join(root, 'current')) ? fs.readlinkSync(path.join(root, 'current')) : null,
+  return { result, previous, root, stale, current: fs.existsSync(path.join(root, 'current')) ? fs.readlinkSync(path.join(root, 'current')) : null,
     commands: fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '' };
 }
 
@@ -168,6 +178,17 @@ test('successful deploy activates the exact tested release and restarts once', l
   assert.equal(state.result.code, 0, state.result.stderr);
   assert.ok(state.current.endsWith(newId));
   assert.equal(state.commands.match(/^restart /gm).length, 1);
+});
+test('successful deploy keeps only the newest five releases and archives', linuxOnly, async (t) => {
+  const state = await scenario(t, 'success', { staleReleases: 8 });
+  assert.equal(state.result.code, 0, state.result.stderr);
+  const releases = fs.readdirSync(path.join(state.root, 'releases'));
+  assert.equal(releases.length, 5);
+  assert.ok(releases.includes(newId) && releases.includes(oldId), 'active or rollback release was removed');
+  assert.deepEqual(state.stale.filter((id) => releases.includes(id)), state.stale.slice(0, 3), 'the oldest releases must go first');
+  const archives = fs.readdirSync(path.join(state.root, 'incoming'));
+  assert.equal(archives.length, 5);
+  assert.ok(archives.includes(newId + '.tar.gz'));
 });
 test('failed candidate leaves the running release and service untouched', linuxOnly, async (t) => {
   const state = await scenario(t, 'preflight_fail');
