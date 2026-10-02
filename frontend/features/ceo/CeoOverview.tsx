@@ -2,19 +2,20 @@
 
 import { useState, type ReactNode } from "react";
 import type { Team, TeamJoinRequest, User } from "@/shared/domain/types";
-import type { CeoStats } from "@/frontend/shared/api/ceo-client";
+import type { CeoJournalEntry, CeoStats } from "@/frontend/shared/api/ceo-client";
 import { CountUp } from "@/frontend/shared/hooks/use-count-up";
 import { DailyBars } from "@/frontend/shared/DailyBars";
 import { plural } from "@/frontend/shared/lib/plural";
 import { ceoIcons } from "./CeoIcons";
+import { CeoRecentActions } from "./CeoJournal";
 import { attentionItems, daysFromStats, formatHours, teamHealth, type Health } from "./ceo-insights";
 import styles from "./CeoOverview.module.css";
 
 export type CeoSection = "overview" | "teams" | "requests" | "users" | "journal";
 export const healthLabels: Record<Health, string> = { growing: "Растёт", steady: "Стабильно", quiet: "Затихла", empty: "Пока пусто" };
 
-export function CeoOverview({ teams, users, requests, stats, onNavigate, onOpenTeam }: {
-  teams: Team[]; users: User[]; requests: TeamJoinRequest[]; stats: CeoStats | null; onNavigate: (section: CeoSection) => void; onOpenTeam: (teamId: string) => void;
+export function CeoOverview({ teams, users, requests, stats, journal = [], onNavigate, onOpenTeam }: {
+  teams: Team[]; users: User[]; requests: TeamJoinRequest[]; stats: CeoStats | null; journal?: CeoJournalEntry[]; onNavigate: (section: CeoSection) => void; onOpenTeam: (teamId: string) => void;
 }) {
   const [series, setSeries] = useState<"submissions" | "newUsers">("submissions");
   const attention = attentionItems({ teams, users, requests, stats });
@@ -74,6 +75,7 @@ export function CeoOverview({ teams, users, requests, stats, onNavigate, onOpenT
         </button></li>;
       })}</ul>}
     </section>
+    <CeoRecentActions entries={journal} onOpen={() => onNavigate("journal")} />
   </div>;
 }
 

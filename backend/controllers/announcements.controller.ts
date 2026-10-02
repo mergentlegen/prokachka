@@ -9,6 +9,19 @@ import {
   patchAnnouncement,
   removeAnnouncement,
 } from "@/backend/services/announcements.service";
+import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
+import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
+
+/** Queues the announcement for the participants who see it; returns how many messages will go out. */
+async function queueAnnouncementTelegram(actorId: string, announcementId: string) {
+  try {
+    const result = await getSupabaseAdmin()?.rpc("app_queue_announcement", { p_actor: actorId, p_announcement: announcementId });
+    if (!result || result.error) return null;
+    scheduleTelegramDelivery();
+    return Number(result.data || 0);
+  } catch { return null; }
+}
 
 
 function validateText(value: unknown, min: number, max: number) {
@@ -29,7 +42,7 @@ async function readAnnouncementBody(request: Request) {
     keepPhotoIds = parsed;
   }
   return {
-    body: { title: form.get("title"), content: form.get("content"), resourceUrl: form.get("resourceUrl") },
+    body: { title: form.get("title"), content: form.get("content"), resourceUrl: form.get("resourceUrl"), notifyTelegram: form.get("notifyTelegram") === "true" },
     photoFiles: photoFiles as File[], keepPhotoIds,
   };
 }
@@ -85,7 +98,11 @@ export async function createAnnouncement(request: Request) {
     if ("validationError" in result) return failure(result.validationError || "Некорректная фотография.", 400);
     if ("storageError" in result) return failure("Не удалось загрузить фотографию в Storage.", 502);
     if ("error" in result && result.error) return failure("Не удалось создать объявление.");
-    return ok({ announcement: result.data }, 201);
+    const announcementId = String(result.data?.id || "");
+    // The announcement is already published; a Telegram problem only changes the message shown to the mentor.
+    const telegramQueued = body.notifyTelegram === true && announcementId ? await queueAnnouncementTelegram(user.id, announcementId) : undefined;
+    await recordAudit(user, { action: "announcement.create", targetId: announcementId, targetLabel: body.title.trim(), teamId: user.teamId, details: telegramQueued === undefined ? {} : { telegram: telegramQueued ?? 0 } });
+    return ok({ announcement: result.data, telegramQueued: telegramQueued === undefined ? undefined : telegramQueued ?? -1 }, 201);
   } catch (error) {
     return requestBodyFailure(error) || failure("Некорректные данные.", 400);
   }
@@ -142,9 +159,11 @@ export async function deleteAnnouncement(request: Request, id: string) {
   if (!user || (user.role !== "ceo" && user.role !== "admin" && !user.canPublishTasks)) return failure("Недостаточно прав.", user ? 403 : 401);
   if (user.role !== "ceo" && !user.teamId) return failure("Сначала назначьте команду.", 400);
 
+  const before = await auditRecord("announcements", id);
   const result = await removeAnnouncement(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этому объявлению.", 403);
   if (result.error) return failure("Не удалось удалить объявление.");
+  await recordAudit(user, { action: "announcement.delete", targetId: id, targetLabel: before?.label, teamId: before?.teamId });
   return ok({});
 }

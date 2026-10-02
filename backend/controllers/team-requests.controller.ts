@@ -3,6 +3,7 @@ import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { createJoinRequest, findJoinRequests, findReviewableJoinRequests, reviewJoinRequest } from "@/backend/services/team-requests.service";
+import { auditPersonRecord, recordAudit } from "@/backend/services/audit-log.service";
 
 
 export async function listTeamRequests(request: Request) {
@@ -48,6 +49,8 @@ export async function reviewTeamRequest(request: Request, id: string) {
     if ("forbidden" in result) return failure("Заявка не относится к вашей ветке или команде.", 403);
     if ("validationError" in result) return failure(result.validationError || "Заявка не может быть обработана.", 400);
     if ("error" in result) return failure("Не удалось обработать заявку.");
+    const reviewed = await auditPersonRecord("team_join_requests", id);
+    await recordAudit(user, { action: status === "approved" ? "request.approve" : "request.reject", targetId: id, targetLabel: reviewed?.label, teamId: reviewed?.teamId });
     return ok({ request: result.data });
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

@@ -55,18 +55,23 @@ type AdminAnnouncementPatch = Partial<Omit<Pick<Announcement, "title" | "content
 export async function createAdminAnnouncement(input: AdminAnnouncementInput): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements", { method: "POST", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function updateAdminAnnouncement(id: string, input: AdminAnnouncementPatch): Promise<Announcement> { const response = await request<ApiResponse<{ announcement: ApiRow }>>("/api/announcements/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapAnnouncement(response.announcement); }
 export async function deleteAdminAnnouncement(id: string) { await request<ApiResponse<Record<string, never>>>("/api/announcements/" + id, { method: "DELETE" }); }
-export async function saveAdminAnnouncementWithPhotos(input: AdminAnnouncementInput & { files: File[]; keepPhotoIds?: string[]; id?: string }): Promise<Announcement> {
+// telegramQueued: messages queued for participants (-1 when queueing failed), only when notifyTelegram was asked.
+export async function saveAdminAnnouncementWithPhotos(input: AdminAnnouncementInput & { files: File[]; keepPhotoIds?: string[]; id?: string; notifyTelegram?: boolean }): Promise<{ announcement: Announcement; telegramQueued?: number }> {
   const url = input.id ? `/api/announcements/${encodeURIComponent(input.id)}` : "/api/announcements";
   const form = new FormData();
   form.set("title", input.title); form.set("content", input.content); form.set("resourceUrl", input.resourceUrl || "");
   if (input.keepPhotoIds) form.set("keepPhotoIds", JSON.stringify(input.keepPhotoIds));
+  if (input.notifyTelegram) form.set("notifyTelegram", "true");
   for (const file of input.files) form.append("photos", file, file.name);
   const response = await authFetch(url, { method: input.id ? "PATCH" : "POST", body: form }, 90_000);
-  const body = await response.json().catch(() => ({})) as ApiResponse<{ announcement?: ApiRow }>;
+  const body = await response.json().catch(() => ({})) as ApiResponse<{ announcement?: ApiRow; telegramQueued?: number }>;
   if (!response.ok || !body.announcement) throw new ApiError(body.message || "Не удалось сохранить объявление с фотографиями.", response.status);
   announceMutation(mutationTopics(url, input.id ? "PATCH" : "POST"));
-  return mapAnnouncement(body.announcement);
+  return { announcement: mapAnnouncement(body.announcement), telegramQueued: typeof body.telegramQueued === "number" ? body.telegramQueued : undefined };
 }
+export type TaskNudgeState = { reachable: number; unreachable: number; queued: number; lastSentAt: string | null; nextAllowedAt: string | null };
+export async function loadTaskNudge(taskId: string): Promise<TaskNudgeState> { const response = await request<ApiResponse<{ nudge: TaskNudgeState }>>(`/api/tasks/${encodeURIComponent(taskId)}/nudge`, { cache: "no-store" }); return response.nudge; }
+export async function sendTaskNudge(taskId: string): Promise<TaskNudgeState> { const response = await request<ApiResponse<{ nudge: TaskNudgeState }>>(`/api/tasks/${encodeURIComponent(taskId)}/nudge`, { method: "POST" }); return response.nudge; }
 export async function createAdminStarAward(input: { userId: string; kind: StarAwardKind; comment: string }): Promise<StarAward> { const response = await request<ApiResponse<{ award: ApiRow }>>("/api/stars", { method: "POST", body: JSON.stringify(input) }); return mapStarAward(response.award); }
 export async function deleteAdminStarAward(id: string) { await request<ApiResponse<Record<string, never>>>("/api/stars/" + id, { method: "DELETE" }); }
 export type ProgramCreateInput = { title: string; deadlineHours: number; tasks: Array<{ title: string; description: string; maxPoints: number; resourceUrl?: string | null }> };

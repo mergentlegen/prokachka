@@ -1,0 +1,52 @@
+.panel { display: grid; gap: 12px; min-width: 0; }
+.intro { margin: 0; color: #5b6b85; font-size: 14px; line-height: 1.5; }
+.tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, 240px); gap: 10px; }
+.tools label { display: grid; gap: 6px; min-width: 0; color: #657187; font-size: 12px; font-weight: 700; }
+.search span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tools .search { align-self: end; }
+.tools input, .tools select { width: 100%; min-width: 0; min-height: 46px; padding: 11px 14px; border: 1px solid #dce4ef; border-radius: 12px; outline: none; background: #fff; color: var(--navy); font: inherit; font-size: 16px; font-weight: 400; }
+.tools input:focus, .tools select:focus { border-color: #92a6dd; box-shadow: 0 0 0 3px #dfe7ff; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; min-height: 40px; padding: 8px 13px; border: 1px solid #dfe5ef; border-radius: 99px; background: #fff; color: #5b6b85; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.chips button b { min-width: 20px; padding: 1px 6px; border-radius: 99px; background: #eef2f8; font-size: 11px; text-align: center; }
+.chips .active { border-color: var(--blue); background: var(--blue); color: #fff; }
+.chips .active b { background: #ffffff2e; color: #fff; }
+
+.day { display: grid; gap: 8px; animation: rise .3s ease backwards; }
+.day h3 { margin: 6px 0 0; color: #6b7a92; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.list { display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff; list-style: none; }
+.row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; }
+.row + .row { border-top: 1px solid #eef1f6; }
+.badge { display: grid; flex: 0 0 34px; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #eef2fb; color: var(--blue); }
+.badge svg { width: 18px; height: 18px; }
+.good { background: #e3f4ec; color: var(--green); }
+.danger { background: #fde8eb; color: #b23e4d; }
+.body { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.head { margin: 0; color: #44536b; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.head strong { color: var(--navy); }
+.lines { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 2px 0 1px; padding: 0; list-style: none; }
+.lines li { padding: 2px 8px; border-radius: 7px; background: #f3f5f9; color: #4d5c74; font-size: 12px; line-height: 1.45; }
+.meta { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.time { flex-shrink: 0; padding-top: 1px; color: #8a96aa; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.empty { display: grid; justify-items: center; gap: 6px; padding: 28px 20px; border: 1px solid var(--line); border-radius: 16px; background: #fff; text-align: center; }
+.empty > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: #eef2fb; color: var(--blue); }
+.empty > span svg { width: 22px; height: 22px; }
+.empty strong { color: var(--navy); font-size: 15px; }
+.empty p { max-width: 420px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.empty :global(.button) { min-height: 42px; margin-top: 6px; padding: 9px 18px; border-radius: 11px; font-size: 13px; }
+.more { justify-self: center; min-height: 44px; padding: 10px 20px; border: 1px solid #dfe5ef; border-radius: 12px; background: #fff; color: var(--blue); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.more:disabled { opacity: .6; cursor: wait; }
+
+.recent { display: grid; gap: 10px; min-width: 0; }
+.recentHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.recentHead h2 { margin: 0; color: var(--navy); font-size: 18px; }
+.recentHead button { min-height: 40px; padding: 8px 4px; border: 0; background: none; color: var(--blue); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+@media (max-width: 620px) {
+  .tools { grid-template-columns: minmax(0, 1fr); }
+  .row { gap: 10px; padding: 12px; }
+}

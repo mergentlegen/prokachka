@@ -3,13 +3,13 @@
 import { Avatar } from "@/frontend/shared/Avatar";
 import { Toast } from "@/frontend/shared/Toast";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
 import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
 import { dataCache } from "@/frontend/shared/api/data-cache";
 import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
-import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, loadCeoStats, previewCeoUserDeletion, reviewCeoRequest, updateCeoTeam, updateCeoUser, type CeoStats, type UserDeletionImpact } from "@/frontend/shared/api/ceo-client";
+import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, loadCeoJournal, loadCeoStats, previewCeoUserDeletion, reviewCeoRequest, updateCeoTeam, updateCeoUser, type CeoJournalEntry, type CeoStats, type UserDeletionImpact } from "@/frontend/shared/api/ceo-client";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { FormSheet } from "@/frontend/shared/FormSheet";
@@ -19,20 +19,38 @@ import { CeoOverview, type CeoSection } from "./CeoOverview";
 import { CeoTeamSheet, CeoTeamsView } from "./CeoTeams";
 import { CeoUserSheet, CeoUsersView } from "./CeoUsers";
 import { ceoIcons } from "./CeoIcons";
+import { CeoJournalView } from "./CeoJournal";
 
 type TeamDraft = { id?: string; name: string; description: string; isActive: boolean };
 type UserDraft = { id: string; role: "admin" | "member"; teamId: string };
 type DeleteTarget = { type: "team"; item: Team } | { type: "user"; item: User } | null;
 
-type NavSection = Exclude<CeoSection, "journal">;
-const sectionLabels: Record<NavSection, string> = { overview: "Обзор", teams: "Команды", requests: "Заявки", users: "Пользователи" };
+const sectionLabels: Record<CeoSection, string> = { overview: "Обзор", teams: "Команды", requests: "Заявки", users: "Пользователи", journal: "Журнал" };
+// Four tabs fit the phone's bottom bar; the journal opens from the top bar and the overview there.
+const mobileSections: CeoSection[] = ["overview", "teams", "requests", "users"];
+
+type JournalState = { entries: CeoJournalEntry[]; hasMore: boolean; loading: boolean; failed: boolean };
+
+// Without `before` the first page replaces the list; with it, older entries are appended.
+async function loadJournalPage(setJournal: Dispatch<SetStateAction<JournalState>>, before?: number) {
+  const epoch = dataCache.epoch;
+  const more = before !== undefined;
+  setJournal((current) => ({ ...current, loading: true, failed: false }));
+  try {
+    const page = await loadCeoJournal(before);
+    if (epoch !== dataCache.epoch) return;
+    setJournal((current) => ({ entries: more ? [...current.entries, ...page.entries.filter((entry) => !current.entries.some((item) => item.id === entry.id))] : page.entries, hasMore: page.hasMore, loading: false, failed: false }));
+  } catch {
+    if (epoch === dataCache.epoch) setJournal((current) => ({ ...current, loading: false, failed: true }));
+  }
+}
 
 export function CEOApp() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [section, setSection] = useState<NavSection>("overview");
+  const [section, setSection] = useState<CeoSection>("overview");
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [requests, setRequests] = useState<TeamJoinRequest[]>([]);
@@ -46,7 +64,10 @@ export function CEOApp() {
   const [stats, setStats] = useState<CeoStats | null>(null);
   const [openTeamId, setOpenTeamId] = useState("");
   const [openUserId, setOpenUserId] = useState("");
+  const [journal, setJournal] = useState<JournalState>({ entries: [], hasMore: false, loading: false, failed: false });
   const refreshRevision = useRef(0);
+
+
 
   async function refresh(silent = false) {
     if (!silent) setDataLoading(true);
@@ -60,6 +81,7 @@ export function CEOApp() {
       setRequests(data.requests);
       // Statistics are a bonus: if they fail, the panel still works.
       void loadCeoStats().then((next) => { if (epoch === dataCache.epoch) setStats(next); }).catch(() => undefined);
+      void loadJournalPage(setJournal);
     } catch {
       if (epoch === dataCache.epoch) setToast("Не удалось загрузить данные CEO-панели.");
     } finally {
@@ -250,13 +272,13 @@ export function CEOApp() {
 
   const openTeam = teams.find((team) => team.id === openTeamId);
   const openUser = users.find((user) => user.id === openUserId);
-  const navItems = Object.keys(sectionLabels) as NavSection[];
-  const navigate = (next: CeoSection) => { if (next !== "journal") setSection(next); window.scrollTo({ top: 0, behavior: "instant" }); };
+  const navItems = Object.keys(sectionLabels) as CeoSection[];
+  const navigate = (next: CeoSection) => { setSection(next); window.scrollTo({ top: 0, behavior: "instant" }); };
 
   return <main className="ceo-shell">
     <header className="ceo-topbar">
       <a className="ceo-brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /><span><i>|</i> Центр управления</span></a>
-      <div className="ceo-top-actions"><button type="button" className="ceo-logout" onClick={logout}><span aria-hidden="true">{ceoIcons.logout}</span><span className="ceo-logout-label">Выйти</span></button></div>
+      <div className="ceo-top-actions"><button type="button" className={`ceo-journal-link${section === "journal" ? " active" : ""}`} aria-label="Журнал действий" aria-current={section === "journal" ? "page" : undefined} onClick={() => navigate("journal")}><span aria-hidden="true">{ceoIcons.journal}</span></button><button type="button" className="ceo-logout" onClick={logout}><span aria-hidden="true">{ceoIcons.logout}</span><span className="ceo-logout-label">Выйти</span></button></div>
     </header>
     <div className="ceo-layout">
       <aside className="ceo-sidebar">
@@ -264,17 +286,18 @@ export function CEOApp() {
         <nav className="ceo-nav">{navItems.map((item) => <button key={item} className={section === item ? "active" : ""} aria-current={section === item ? "page" : undefined} onClick={() => navigate(item)}><span>{ceoIcons[item]}</span>{sectionLabels[item]}{item === "requests" && pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>)}</nav>
       </aside>
       <section className="ceo-content">
-        <div className="ceo-heading"><div><p className="eyebrow">Пульт руководителя</p><h1>{section === "overview" ? "Как идут дела" : sectionLabels[section]}</h1>{dataLoading && hasLoaded && <span className="ceo-sync">Синхронизация…</span>}</div>
+        <div className="ceo-heading"><div><p className="eyebrow">Пульт руководителя</p><h1>{section === "overview" ? "Как идут дела" : section === "journal" ? "Журнал действий" : sectionLabels[section]}</h1>{dataLoading && hasLoaded && <span className="ceo-sync">Синхронизация…</span>}</div>
           {section === "teams" && <button type="button" className="admin-create-button" onClick={() => setTeamDraft({ name: "", description: "", isActive: true })}><span aria-hidden="true">+</span>Создать команду</button>}</div>
         <SectionBoundary key={section} loading={dataLoading && !hasLoaded}>
-          {section === "overview" && <CeoOverview teams={teams} users={users} requests={pendingRequests} stats={stats} onNavigate={navigate} onOpenTeam={setOpenTeamId} />}
+          {section === "overview" && <CeoOverview teams={teams} users={users} requests={pendingRequests} stats={stats} journal={journal.entries} onNavigate={navigate} onOpenTeam={setOpenTeamId} />}
           {section === "teams" && <CeoTeamsView teams={teams} users={users} stats={stats} onOpen={(team) => setOpenTeamId(team.id)} onEdit={editTeam} onToggle={toggleTeam} onDelete={requestDeleteTeam} actionId={actionId} />}
           {section === "requests" && <RequestsView requests={requests} onResolve={resolveRequest} actionId={actionId} />}
           {section === "users" && <CeoUsersView users={users} teams={teams} stats={stats} onOpen={(user) => setOpenUserId(user.id)} />}
+          {section === "journal" && <CeoJournalView teams={teams} entries={journal.entries} hasMore={journal.hasMore} loading={journal.loading} failed={journal.failed} onMore={() => void loadJournalPage(setJournal, journal.entries.at(-1)?.id)} onRetry={() => void loadJournalPage(setJournal)} />}
         </SectionBoundary>
       </section>
     </div>
-    <nav className="ceo-mobile-nav" aria-label="Разделы">{navItems.map((item) => <button key={item} className={section === item ? "active" : ""} aria-current={section === item ? "page" : undefined} onClick={() => navigate(item)}><span>{ceoIcons[item]}</span>{sectionLabels[item]}{item === "requests" && pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>)}</nav>
+    <nav className="ceo-mobile-nav" aria-label="Разделы">{mobileSections.map((item) => <button key={item} className={section === item ? "active" : ""} aria-current={section === item ? "page" : undefined} onClick={() => navigate(item)}><span>{ceoIcons[item]}</span>{sectionLabels[item]}{item === "requests" && pendingRequests.length > 0 && <b>{pendingRequests.length}</b>}</button>)}</nav>
     {openTeam && <CeoTeamSheet team={openTeam} users={users} stats={stats} onClose={() => setOpenTeamId("")} onEdit={editTeam} onToggle={toggleTeam} onDelete={requestDeleteTeam} actionId={actionId} />}
     {openUser && <CeoUserSheet user={openUser} users={users} teams={teams} stats={stats} onClose={() => setOpenUserId("")} deleting={actionId === `delete-user:${openUser.id}`}
       onEdit={(user) => setUserDraft({ id: user.id, role: user.role === "admin" ? "admin" : "member", teamId: user.teamId || "" })} onDelete={requestDeleteUser} />}

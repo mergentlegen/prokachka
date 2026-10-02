@@ -74,8 +74,11 @@ export function MemberApp() {
   async function refreshAll() { setFeedbackVersion((value) => value + 1); await refreshData(); }
   function openFeedback(taskId: string) { setFeedbackTaskId(taskId); navigate("feedback"); }
   useEffect(() => {
-    if (!user?.id || !new URLSearchParams(window.location?.search || "").has("feedback")) return;
-    const timer = window.setTimeout(() => setTab("feedback"), 0);
+    // Telegram links: ?feedback=<thread> opens a conversation, ?tab=tasks the task list.
+    const params = new URLSearchParams(window.location?.search || "");
+    const target: MemberTab | null = params.has("feedback") ? "feedback" : params.get("tab") === "tasks" ? "tasks" : null;
+    if (!user?.id || !target) return;
+    const timer = window.setTimeout(() => setTab(target), 0);
     return () => window.clearTimeout(timer);
   }, [user?.id]);
 

@@ -82,9 +82,39 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 }
 
 type NotificationJob = {
-  id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null; kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder";
-  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string }; summary_sent: boolean; attempts: number; lock_token: string;
+  id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null;
+  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder";
+  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number }; summary_sent: boolean; attempts: number; lock_token: string;
 };
+
+// Mass mailings go out at this pace: one worker run a minute, personal notifications first.
+const JOBS_PER_RUN = 20;
+
+const almatyDateTime = new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Almaty", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+const almatyHour = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Almaty", hour: "numeric", hourCycle: "h23" });
+
+/** Start reminders are queued only in the Almaty daytime so nobody gets a message at night. */
+export function isAlmatyDaytime(now = new Date()) {
+  const hour = Number(almatyHour.format(now));
+  return hour >= 10 && hour < 20;
+}
+
+/** Texts of the three "you have not started yet" reminders: friendly, practical, then an offer of help. */
+export function startReminderText(step: number, firstName: string, teamName: string, link: string) {
+  const name = firstName.trim().slice(0, 60);
+  const team = teamName.trim().slice(0, 120) || "ваша команда";
+  const lines = step <= 1 ? [
+    "👋 " + (name ? name + ", " : "") + "добро пожаловать в «Прокачку»!",
+    "Вы уже в команде «" + team + "», а первое задание ещё ждёт вас. Начните сегодня — это займёт несколько минут, а за выполненные задания начисляются мили.",
+  ] : step === 2 ? [
+    (name ? name + ", з" : "З") + "адания команды «" + team + "» ждут вас 🙂",
+    "Выберите любое, выполните и нажмите «Отправить ответ». Наставник проверит работу и даст обратную связь.",
+  ] : [
+    (name ? name + ", в" : "В") + "ы пока не выполнили ни одного задания.",
+    "Если что-то непонятно или не получается начать — напишите своему наставнику, он поможет сделать первый шаг.",
+  ];
+  return [...lines, link ? "Открыть задания: " + link : ""].filter(Boolean).join("\n");
+}
 
 export function scheduleTelegramDelivery() {
   after(async () => {
@@ -100,7 +130,7 @@ export async function deliverTelegramNotifications() {
   let delivered = 0;
   let failed = 0;
   const started = Date.now();
-  for (let count = 0; count < 10 && Date.now() - started < 20_000; count++) {
+  for (let count = 0; count < JOBS_PER_RUN && Date.now() - started < 40_000; count++) {
     const claimed = await supabase.rpc("tg_claim_notification");
     if (claimed.error) throw new Error("Cannot claim Telegram notification");
     const job = claimed.data?.[0] as NotificationJob | undefined;
@@ -143,6 +173,46 @@ export async function deliverTelegramNotifications() {
           "Если вы уже всё выполнили, нажмите «Отправить ответ» в задании. Без этого наставник не сможет дать обратную связь и начислить мили.",
           appUrl() ? "Открыть задания: " + appUrl() + "/" : "",
         ].filter(Boolean).join("\n"));
+      } else if (job.kind === "task-nudge") {
+        const taskId = String(job.payload.taskId || "");
+        // The participant may have answered, or the deadline passed, since the mentor pressed the button.
+        const due = await supabase.rpc("app_task_nudge_due", { p_user: user.id, p_task: taskId });
+        if (due.error) throw new Error("Cannot verify task nudge");
+        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const task = await supabase.from("tasks").select("title,deadline_at").eq("id", taskId).maybeSingle();
+        if (task.error || !task.data) throw new Error("Cannot load nudge task");
+        delivery = await sendTelegramMessage(chatId, [
+          "📌 Наставник напоминает о задании «" + String(task.data.title || "Задание").slice(0, 200) + "»",
+          "Вы ещё не отправили ответ." + (task.data.deadline_at ? " Срок — до " + almatyDateTime.format(new Date(String(task.data.deadline_at))) + "." : ""),
+          appUrl() ? "Открыть задания: " + appUrl() + "/?tab=tasks" : "",
+        ].filter(Boolean).join("\n"));
+      } else if (job.kind === "announcement") {
+        const announcementId = String(job.payload.announcementId || "");
+        const allowed = await supabase.rpc("app_announcement_recipient_ok", { p_user: user.id, p_announcement: announcementId });
+        if (allowed.error) throw new Error("Cannot verify announcement recipient");
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const announcement = await supabase.from("announcements").select("title,content,resource_url,photos,teams(name)").eq("id", announcementId).maybeSingle();
+        if (announcement.error || !announcement.data) throw new Error("Cannot load announcement");
+        const item = announcement.data;
+        const team = Array.isArray(item.teams) ? item.teams[0] : item.teams;
+        const content = String(item.content || "");
+        // Paragraphs separated by an empty line; the text is trimmed to stay within Telegram's limit.
+        delivery = await sendTelegramMessage(chatId, [
+          "📢 Объявление" + (team?.name ? " команды «" + String(team.name).slice(0, 120) + "»" : ""),
+          String(item.title || "").slice(0, 200),
+          content.length > 3000 ? content.slice(0, 3000).trimEnd() + "…" : content,
+          item.resource_url ? "Ссылка: " + String(item.resource_url) : "",
+          Array.isArray(item.photos) && item.photos.length ? "Фото — в объявлении на сайте." : "",
+          appUrl() ? "Открыть на сайте: " + appUrl() + "/" : "",
+        ].filter(Boolean).join("\n\n"));
+      } else if (job.kind === "start-reminder") {
+        const due = await supabase.rpc("app_start_reminder_due", { p_user: user.id });
+        if (due.error) throw new Error("Cannot verify start reminder");
+        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const profile = await supabase.from("users").select("first_name,name,teams(name)").eq("id", user.id).maybeSingle();
+        if (profile.error || !profile.data) throw new Error("Cannot load reminder recipient");
+        const team = Array.isArray(profile.data.teams) ? profile.data.teams[0] : profile.data.teams;
+        delivery = await sendTelegramMessage(chatId, startReminderText(Number(job.payload.step || 1), String(profile.data.first_name || ""), String(team?.name || ""), appUrl() ? appUrl() + "/?tab=tasks" : ""));
       } else if (job.kind === "permissions") {
         const review = job.payload.canReview && (user.role === "admin" || user.can_review);
         const publish = job.payload.canPublishTasks && (user.role === "admin" || user.can_publish_tasks);
@@ -296,5 +366,11 @@ export async function deliverTelegramNotifications() {
     const reminders = await supabase.rpc("app_queue_task_reminders", {});
     if (reminders.error) console.warn("Task reminders were not queued", { code: reminders.error.code });
   } catch { console.warn("Task reminders were not queued"); }
+  if (isAlmatyDaytime()) {
+    try {
+      const starters = await supabase.rpc("app_queue_start_reminders", {});
+      if (starters.error) console.warn("Start reminders were not queued", { code: starters.error.code });
+    } catch { console.warn("Start reminders were not queued"); }
+  }
   return { delivered, failed };
 }

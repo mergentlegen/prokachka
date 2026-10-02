@@ -4,6 +4,7 @@ import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
 import { createTeamInvitation, getNetworkForViewer, updateNetworkUser } from "@/backend/services/network.service";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
+import { auditUser, recordAudit } from "@/backend/services/audit-log.service";
 
 
 export async function listNetwork(request: Request) {
@@ -37,6 +38,7 @@ export async function patchNetworkUser(request: Request, id: string) {
     for (const key of ["canReview", "canPublishTasks"]) {
       if (body[key] !== undefined && typeof body[key] !== "boolean") return failure("Некорректное значение разрешения.", 400);
     }
+    const before = await auditUser(id);
     const result = await updateNetworkUser(user, id, {
       parentUserId: body.parentUserId === "" ? null : body.parentUserId,
       canReview: body.canReview,
@@ -47,6 +49,14 @@ export async function patchNetworkUser(request: Request, id: string) {
     if ("validationError" in result) return failure(result.validationError || "Некорректные данные.", 400);
     if ("error" in result) return failure("Не удалось сохранить структуру сети.");
     scheduleTelegramDelivery();
+    if (before) {
+      const details: Record<string, unknown> = {};
+      if (typeof body.canReview === "boolean" && body.canReview !== before.canReview) details.canReview = body.canReview;
+      if (typeof body.canPublishTasks === "boolean" && body.canPublishTasks !== before.canPublishTasks) details.canPublishTasks = body.canPublishTasks;
+      const nextParent = body.parentUserId === undefined ? before.parentUserId : body.parentUserId || null;
+      if (nextParent !== before.parentUserId) details.parent = [before.parentUserId ? (await auditUser(before.parentUserId))?.name || null : null, nextParent ? (await auditUser(String(nextParent)))?.name || null : null];
+      if (Object.keys(details).length) await recordAudit(user, { action: "user.network", targetId: id, targetLabel: before.name, teamId: user.teamId, details });
+    }
     return ok({ user: result.data });
   } catch (error) {
     return requestBodyFailure(error) || failure("Некорректные данные.", 400);

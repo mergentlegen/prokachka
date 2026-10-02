@@ -27,6 +27,7 @@ export function resourceTopics(url: string): ChangeTopic[] {
   if (path === "/api/team-requests") return ["requests", "users", "teams"];
   if (path === "/api/teams") return ["teams"];
   if (path === "/api/ceo/stats") return ["submissions", "users", "teams", "stars", "tasks"];
+  if (path === "/api/ceo/journal") return ["users", "teams", "requests", "tasks", "programs", "announcements", "stars", "network"];
   return [];
 }
 export function mutationTopics(url: string, method: string): ChangeTopic[] {
@@ -37,6 +38,8 @@ export function mutationTopics(url: string, method: string): ChangeTopic[] {
   if (url.startsWith("/api/users")) return ["users", "network", "requests"];
   if (url.startsWith("/api/teams")) return ["teams", "users", "network", "requests"];
   if (url.startsWith("/api/programs")) return ["programs", "tasks"];
+  // A reminder only queues Telegram messages; nothing on the page changes.
+  if (url.startsWith("/api/tasks/") && url.endsWith("/nudge")) return [];
   if (url.startsWith("/api/tasks")) return ["tasks", "submissions"];
   if (url.startsWith("/api/stars")) return ["stars"];
   if (url.startsWith("/api/announcements")) return ["announcements"];

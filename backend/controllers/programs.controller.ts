@@ -5,6 +5,7 @@ import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { createProgram, deleteProgram, findPrograms, updateProgram } from "@/backend/services/programs.service";
 import { findProgramHistory } from "@/backend/services/program-history.service";
+import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
 
 function validText(value: unknown, max: number) { return typeof value === "string" && value.trim().length >= 2 && value.trim().length <= max; }
 
@@ -63,6 +64,7 @@ export async function postProgram(request: Request) {
     const result = await createProgram({ teamId, title: body.title.trim(), deadlineHours, tasks, publisherId: user.id === "ceo" ? undefined : user.id, audienceRootId: user.role === "member" ? user.id : null });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure("Не удалось создать программу.");
+    await recordAudit(user, { action: "program.create", targetId: String(result.data.program?.id || ""), targetLabel: body.title.trim(), teamId, details: { steps: tasks.length } });
     return ok({ program: result.data.program, tasks: result.data.tasks }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
@@ -90,10 +92,12 @@ export async function deleteProgramController(request: Request, id: string) {
   if (!user || !canPublish(user)) return failure("Недостаточно прав.", user ? 403 : 401);
   if (!isUuid(id)) return failure("Некорректная программа.", 400);
   if (user.role !== "ceo" && !user.teamId) return failure("За пользователем не закреплена команда.", 403);
+  const before = await auditRecord("task_programs", id);
   const result = await deleteProgram(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
   if ("validationError" in result) return failure(result.validationError || "Используйте каталог готовых заданий.", 409);
   if (result.error) return failure("Не удалось удалить программу.");
+  await recordAudit(user, { action: "program.delete", targetId: id, targetLabel: before?.label, teamId: before?.teamId });
   return ok({ storageCleanupWarning: result.storageCleanupWarning });
 }

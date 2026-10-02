@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/backend/http/current-user";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
+import { auditRecord, auditUser, recordAudit } from "@/backend/services/audit-log.service";
 
 export async function listUsers(request: Request) {
   const currentUser = await getCurrentUser(request);
@@ -50,12 +51,18 @@ export async function updateUserAccessController(request: Request, id: string) {
     const body = await readLimitedJson(request);
     if (body.role !== "admin" && body.role !== "member") return failure("Можно назначить только участника или наставника.", 400);
     if (body.teamId !== undefined && body.teamId !== null && body.teamId !== "" && !isUuid(body.teamId)) return failure("Некорректная команда.", 400);
+    const before = await auditUser(id);
     const result = await updateUserAccess(id, { role: body.role, teamId: body.teamId });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure(result.error.code === "23514"
       ? "Не удалось изменить команду. Сначала переподчините участников нижней ветки и проверьте выбранную команду."
       : "Не удалось обновить доступ пользователя.", result.error.code === "23514" ? 409 : 500);
     scheduleTelegramDelivery();
+    const nextTeamId = body.teamId ? String(body.teamId) : null;
+    const details: Record<string, unknown> = {};
+    if (before && before.role !== body.role) details.role = [before.role, body.role];
+    if (before && before.teamId !== nextTeamId) details.team = [before.teamId ? (await auditRecord("teams", before.teamId))?.label || null : null, nextTeamId ? (await auditRecord("teams", nextTeamId))?.label || null : null];
+    if (!before || Object.keys(details).length) await recordAudit(currentUser, { action: "user.access", targetId: id, targetLabel: before?.name || String(result.data?.name || ""), teamId: nextTeamId || before?.teamId, details });
     return ok({ user: (await withAvatarUrls([result.data]))[0] });
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
@@ -76,6 +83,7 @@ export async function deleteUserController(request: Request, id: string) {
   const currentUser = await getCurrentUser(request);
   if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
   if (!currentUser || currentUser.role !== "ceo") return failure("Недостаточно прав.", currentUser ? 403 : 401);
+  const before = await auditUser(id);
   const result = await deleteUser(id);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if (result.error) return failure(result.error.code === "23503"
@@ -83,5 +91,6 @@ export async function deleteUserController(request: Request, id: string) {
     : "Не удалось удалить пользователя. Ничего не удалено.", result.error.code === "23503" ? 409 : 500);
   if (result.data?.notFound) return failure("Пользователь уже удалён. Обновите список.", 404);
   if (result.data?.forbidden) return failure("Нельзя удалить учётную запись CEO.", 403);
+  await recordAudit(currentUser, { action: "user.delete", targetId: id, targetLabel: before?.name, details: before ? { role: before.role } : {} });
   return ok({ cleanupPending: result.data?.cleanupPending === true });
 }

@@ -1559,3 +1559,9 @@ button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 
 @media (min-width:621px) { .ceo-heading { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px; } }
 @media (max-width:620px) { .ceo-heading { align-items:stretch; text-align:left; } }
 @media (max-width:620px) { .ceo-logout-label { display:none; } .ceo-heading .admin-create-button { width:100%; } }
+/* CEO: the journal button sits in the phone's top bar; the desktop sidebar already lists it. */
+.ceo-top-actions .ceo-journal-link { display:none; place-items:center; width:44px; height:44px; margin-right:8px; border:1px solid #dfe5ef; border-radius:12px; background:#fff; color:#5b6b85; cursor:pointer; }
+.ceo-journal-link span { display:grid; line-height:0; }
+.ceo-journal-link svg { width:20px; height:20px; }
+.ceo-top-actions .ceo-journal-link.active { border-color:var(--blue); background:#eef3ff; color:var(--blue); }
+@media (max-width:620px) { .ceo-top-actions .ceo-journal-link { display:grid; } }

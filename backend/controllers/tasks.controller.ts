@@ -7,6 +7,7 @@ import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from
 import { listTaskAttachments } from "@/backend/services/task-attachments.service";
 import { applyTaskFeedOrder } from "@/backend/services/task-feed-order.service";
 import { validMiles } from "@/shared/domain/miles";
+import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
 
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
@@ -78,6 +79,7 @@ export async function createTask(request: Request) {
     if ("forbidden" in result) return failure("Нельзя добавить задание в чужую программу.", 403);
     if ("validationError" in result) return failure(result.validationError || "Выберите команду.", 400);
     if (result.error) return failure("Не удалось создать задание.");
+    await recordAudit(user, { action: "task.create", targetId: String(result.data?.id || ""), targetLabel: body.title.trim(), teamId: teamId || null, details: { miles: Number(result.data?.max_points ?? body.maxPoints ?? 0), ...(body.publicationType === "sequential" ? { programStep: true } : {}) } });
     return ok({ task: result.data }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
@@ -116,10 +118,12 @@ export async function deleteTask(request: Request, id: string) {
   if (!user) return failure("Недостаточно прав.", 401);
   if (!canPublish(user)) return failure("Недостаточно прав для удаления заданий.", 403);
   if (user.role !== "ceo" && !user.teamId) return failure("За пользователем не закреплена команда.", 403);
+  const before = await auditRecord("tasks", id);
   const result = await deleteTaskRecord(id, user);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("У вас нет доступа к этому заданию.", 403);
   if ("validationError" in result) return failure(result.validationError || "Используйте каталог готовых заданий.", 409);
   if (result.error) return failure("Не удалось удалить задание.");
+  await recordAudit(user, { action: "task.delete", targetId: id, targetLabel: before?.label, teamId: before?.teamId });
   return ok({ storageCleanupWarning: result.storageCleanupWarning });
 }

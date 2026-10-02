@@ -14,8 +14,9 @@ import { FileDropZone } from "@/frontend/shared/FileDropZone";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { prepareAnnouncementPhoto } from "@/frontend/features/announcements/prepare-photo";
 import { ANNOUNCEMENT_PHOTO_LIMIT } from "@/shared/domain/announcement-photos";
+import { plural } from "@/frontend/shared/lib/plural";
 
-type Draft = { title: string; content: string; resourceUrl: string };
+type Draft = { title: string; content: string; resourceUrl: string; notifyTelegram?: boolean };
 type PendingPhoto = { id: string; file: File; url: string };
 type Props = {
   announcements: Announcement[];
@@ -23,9 +24,19 @@ type Props = {
   canManageAll: boolean;
   onChange: (announcements: Announcement[]) => void;
   onError: (message: string) => void;
+  onNotice?: (message: string) => void;
 };
 
-export function AnnouncementsPanel({ announcements, actorId, canManageAll, onChange, onError }: Props) {
+/** What the mentor is told after publishing with "send to Telegram". 20 messages go out a minute. */
+export function telegramNotice(queued: number | undefined) {
+  if (queued === undefined) return "";
+  if (queued < 0) return "Объявление опубликовано, но отправить его в Telegram не удалось.";
+  if (queued === 0) return "Объявление опубликовано. В Telegram отправлять некому: у участников не подключён бот.";
+  const minutes = Math.max(1, Math.ceil(queued / 20));
+  return `Объявление опубликовано. В Telegram получат ${queued} ${plural(queued, "участник", "участника", "участников")}${minutes > 1 ? ` — в течение ${minutes} мин.` : "."}`;
+}
+
+export function AnnouncementsPanel({ announcements, actorId, canManageAll, onChange, onError, onNotice = onError }: Props) {
   const [draft, setDraft] = useState<Draft>({ title: "", content: "", resourceUrl: "" });
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -83,19 +94,22 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
 
     if (preparing) return;
     setBusy(true);
+    let notice = "";
     try {
       if (editing) {
-        const updated = await saveAdminAnnouncementWithPhotos({ id: editing.id, title, content, resourceUrl: draft.resourceUrl.trim() || null, files: pendingPhotos.map((photo) => photo.file), keepPhotoIds });
+        const { announcement: updated } = await saveAdminAnnouncementWithPhotos({ id: editing.id, title, content, resourceUrl: draft.resourceUrl.trim() || null, files: pendingPhotos.map((photo) => photo.file), keepPhotoIds });
         onChange(announcements.map((item) => (item.id === updated.id ? updated : item)));
       } else {
-        const created = await saveAdminAnnouncementWithPhotos({ title, content, resourceUrl: draft.resourceUrl.trim() || null, files: pendingPhotos.map((photo) => photo.file) });
+        const { announcement: created, telegramQueued } = await saveAdminAnnouncementWithPhotos({ title, content, resourceUrl: draft.resourceUrl.trim() || null, files: pendingPhotos.map((photo) => photo.file), notifyTelegram: draft.notifyTelegram });
         onChange([...announcements, created]);
+        notice = telegramNotice(telegramQueued);
       }
       clearPending(); setKeepPhotoIds([]);
       setEditorOpen(false);
       setEditing(null);
       setDraft({ title: "", content: "", resourceUrl: "" });
       onError("");
+      if (notice) onNotice(notice);
     } catch (error) {
       onError(error instanceof Error ? error.message : "Не удалось сохранить объявление.");
     } finally {
@@ -187,6 +201,8 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
           <input type="url" value={draft.resourceUrl} onChange={(event) => setDraft({ ...draft, resourceUrl: event.target.value })} placeholder="https://zoom.us/..." />
         </label>
         <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
+        {!editing && <label className="toggle-row"><span><strong>Отправить участникам в Telegram</strong><small>{draft.notifyTelegram ? "Придёт сообщение всем, у кого подключён бот" : "Объявление появится только на сайте"}</small></span>
+          <input type="checkbox" role="switch" className="toggle-switch" checked={Boolean(draft.notifyTelegram)} onChange={(event) => setDraft({ ...draft, notifyTelegram: event.target.checked })} /></label>}
         <div className="announcement-photo-editor">
           <div className="announcement-photo-heading"><strong>Фотографии <span className="field-hint">необязательно</span></strong><small>{keepPhotoIds.length + pendingPhotos.length} / {ANNOUNCEMENT_PHOTO_LIMIT}</small></div>
           <FileDropZone accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" disabled={busy || preparing || keepPhotoIds.length + pendingPhotos.length >= ANNOUNCEMENT_PHOTO_LIMIT}

@@ -6,6 +6,7 @@ import { Avatar } from "@/frontend/shared/Avatar";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { formatDateTime, formatMiles } from "@/frontend/shared/lib/format";
 import { participantStatusText, taskParticipantResults, taskProgress, type ParticipantStatus } from "./task-results";
+import { TaskNudge } from "./TaskNudge";
 import styles from "./TaskResultsSheet.module.css";
 
 type Filter = "all" | "sent" | "pending" | "missing";
@@ -17,14 +18,16 @@ const filterMatches: Record<Filter, (status: ParticipantStatus) => boolean> = {
 };
 
 // Who did a task and who did not, with the mentor's actions next to each person.
-export function TaskResultsSheet({ task, store, actorId, footer, onReview, onComplete, onClose }: {
-  task: Task; store: Pick<Store, "users" | "submissions">; actorId?: string; footer?: ReactNode;
+export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNotice, onReview, onComplete, onClose }: {
+  task: Task; store: Pick<Store, "users" | "submissions">; actorId?: string; footer?: ReactNode; canNudge?: boolean; onNotice?: (message: string) => void;
   onReview: (submission: Submission, status: "accepted" | "revision") => void; onComplete?: (task: Task, member: User) => void; onClose: () => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const results = taskParticipantResults(task, store);
   const progress = taskProgress(results);
   const shown = results.filter((result) => filterMatches[filter](result.status));
+  // Only while the task can still be sent: after the deadline nobody is "not started", they are overdue.
+  const nudgeable = canNudge && task.isActive && task.publicationType !== "sequential" && results.some((result) => result.status === "not_started");
   const chips: Array<[Filter, string, number]> = [["all", "Все", progress.total], ["sent", "Сдали", progress.accepted + progress.revision], ["pending", "На проверке", progress.pending], ["missing", "Не сдали", progress.missing]];
   return <ModalSheet title={task.title} tall onClose={onClose} footer={footer}>
     <div className={styles.sheet}>
@@ -34,6 +37,7 @@ export function TaskResultsSheet({ task, store, actorId, footer, onReview, onCom
         <i style={{ "--sent": `${progress.total ? (progress.accepted / progress.total) * 100 : 0}%`, "--waiting": `${progress.total ? ((progress.pending + progress.revision) / progress.total) * 100 : 0}%` } as CSSProperties} aria-hidden="true" />
         <span className={styles.legend}><b className={styles.accepted} />принято {progress.accepted}<b className={styles.waiting} />ждут решения или доработки {progress.pending + progress.revision}</span>
       </div>
+      {nudgeable && <TaskNudge taskId={task.id} missing={progress.missing} onNotice={onNotice} />}
       <div className={styles.chips} role="group" aria-label="Кого показать">
         {chips.map(([id, label, count]) => <button type="button" key={id} className={filter === id ? styles.active : ""} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}<b>{count}</b></button>)}
       </div>

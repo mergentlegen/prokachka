@@ -130,7 +130,7 @@ test('reminder names the task and asks to press the send button', async () => {
   assert.match(messages[0].text, /Отправить ответ/);
   assert.match(messages[0].text, /https:\/\/prokachka\.test\//);
   assert.ok(patches.some((patch) => patch.delivered_at));
-  assert.equal(rpcCalls.at(-1), 'app_queue_task_reminders', 'new reminders are queued after existing jobs');
+  assert.ok(rpcCalls.indexOf('app_queue_task_reminders') > rpcCalls.lastIndexOf('tg_claim_notification'), 'new reminders are queued after existing jobs');
 });
 
 test('reminder is cancelled silently once the work was sent', async () => {

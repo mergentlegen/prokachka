@@ -1,4 +1,4 @@
-import type { TeamJoinRequest } from "@/shared/domain/types";
+import type { TeamJoinRequest, UserRole } from "@/shared/domain/types";
 import { mapUser, request } from "@/frontend/shared/api/client";
 import { loadTeamRequests, mapTeam } from "@/frontend/shared/api/team-client";
 
@@ -60,4 +60,14 @@ export type CeoStats = {
 
 export async function loadCeoStats(): Promise<CeoStats> {
   return (await request<ApiResponse<{ stats: CeoStats }>>("/api/ceo/stats", { cache: "no-store" })).stats;
+}
+
+export type CeoJournalEntry = {
+  id: number; createdAt: string; actorId?: string; actorName: string; actorRole: UserRole; action: string;
+  targetId?: string; targetLabel?: string; teamId?: string; teamLabel?: string; details: Record<string, unknown>;
+};
+/** One page of the action journal, newest first; pass the last id shown to get older entries. */
+export async function loadCeoJournal(before?: number): Promise<{ entries: CeoJournalEntry[]; hasMore: boolean }> {
+  const response = await request<ApiResponse<{ entries: CeoJournalEntry[]; hasMore: boolean }>>("/api/ceo/journal" + (before ? `?before=${before}` : ""), { cache: "no-store" });
+  return { entries: response.entries, hasMore: response.hasMore };
 }
