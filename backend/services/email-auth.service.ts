@@ -46,20 +46,23 @@ export async function beginEmailRegistration(input: {
   const client = getSupabaseAuthClient();
   if (!admin || !client) return unavailable();
   const email = input.email.trim().toLowerCase();
-  const existing = await admin.from("users").select("id").eq("email", email).maybeSingle();
+  // The database is far away, so the read-only checks go out together; their answers are still judged in order.
+  const [existing, legacy, invitation, draft] = await Promise.all([
+    admin.from("users").select("id").eq("email", email).maybeSingle(),
+    admin.from("users").select("id").eq("login", email).maybeSingle(),
+    input.inviteToken ? findInvitationByToken(input.inviteToken) : Promise.resolve(null),
+    admin.from("email_registration_drafts").select("auth_user_id").eq("email", email).maybeSingle(),
+  ]);
   if (existing.error) return unavailable();
   if (existing.data) return { error: "Пользователь с таким email уже зарегистрирован.", status: 409 };
-  const legacy = await admin.from("users").select("id").eq("login", email).maybeSingle();
   if (legacy.error) return unavailable();
   if (legacy.data) return { error: "Пользователь с таким email уже зарегистрирован.", status: 409 };
   let invitationId: string | null = null;
-  if (input.inviteToken) {
-    const invitation = await findInvitationByToken(input.inviteToken);
+  if (invitation) {
     if ("validationError" in invitation) return { error: invitation.validationError || "Некорректная ссылка приглашения.", status: 400 };
     if ("error" in invitation || "unavailable" in invitation) return unavailable();
     invitationId = String(invitation.data.id);
   }
-  const draft = await admin.from("email_registration_drafts").select("auth_user_id").eq("email", email).maybeSingle();
   if (draft.error) return unavailable();
   if (draft.data) {
     const blocked = await gate(email, "resend");

@@ -122,7 +122,7 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
         </fieldset>
         {error && <div className={styles.notice} role="alert" id="auth-request-error"><span aria-hidden="true">!</span><div><strong>{mode === "login" ? "Не удалось войти" : "Не удалось зарегистрироваться"}</strong><p>{error}</p></div></div>}
         {success && <p className={styles.successNotice} role="status">{success}</p>}
-        <button type="submit" className={styles.submit} disabled={pending}>{pending ? "Проверяем..." : mode === "login" ? "Войти" : "Создать аккаунт"}</button>
+        <button type="submit" className={styles.submit} disabled={pending}>{pending ? (mode === "login" ? "Входим…" : "Создаём аккаунт…") : mode === "login" ? "Войти" : "Создать аккаунт"}</button>
         <p className={styles.registerPrompt}>{mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"} <button type="button" disabled={pending} onClick={() => switchMode(mode === "login" ? "register" : "login")}>{mode === "login" ? "Зарегистрируйтесь" : "Войти"}</button></p>
       </form>
   </AuthLayout>;
