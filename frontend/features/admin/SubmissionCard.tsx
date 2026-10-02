@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { request } from "@/frontend/shared/api/client";
 import { Avatar } from "@/frontend/shared/Avatar";
 import type { Submission } from "@/shared/domain/types";
 import { formatDateTime } from "@/frontend/shared/lib/format";
@@ -18,6 +19,25 @@ export function SubmissionHeader({ submission, name, avatarUrl, taskTitle }: Pro
   </header>;
 }
 
+// Old reviewed answers arrive as a preview; the rest of the text loads only when someone wants to read it.
+function AnswerText({ submission }: { submission: Submission }) {
+  const [full, setFull] = useState<string | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "failed">("idle");
+  async function expand() {
+    setState("loading");
+    try {
+      const body = await request<{ answerText: string }>(`/api/submissions/${encodeURIComponent(submission.id)}/answer`, { cache: "no-store" });
+      setFull(body.answerText); setState("idle");
+    } catch { setState("failed"); }
+  }
+  const truncated = submission.answerTruncated && full === null;
+  return <div className={styles.text}>
+    {full ?? submission.answerText}{truncated && "…"}
+    {truncated && <button type="button" className={styles.more} disabled={state === "loading"} onClick={() => void expand()}>
+      {state === "loading" ? "Загружаем…" : state === "failed" ? "Не удалось загрузить. Повторить" : "Показать полностью"}</button>}
+  </div>;
+}
+
 export function SubmissionAnswer({ submission }: { submission: Submission }) {
   const [showMedia, setShowMedia] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -26,7 +46,7 @@ export function SubmissionAnswer({ submission }: { submission: Submission }) {
   const hasMedia = type === "photo" || type === "video" || type === "document";
   const mediaUrl = `/api/submissions/${encodeURIComponent(submission.id)}/media`;
   return <div className={styles.answer}>
-    {submission.answerText && <div className={styles.text}>{submission.answerText}</div>}
+    {submission.answerText && <AnswerText key={submission.id} submission={submission} />}
     {!submission.answerText && !hasMedia && <p className={styles.muted}>Текст ответа отсутствует.</p>}
     {hasMedia && <div className={styles.media}>
       {!showMedia ? <button type="button" className={styles.open} onClick={() => setShowMedia(true)}>{type === "photo" ? "Посмотреть фото" : type === "video" ? "Посмотреть видео" : "Посмотреть файл"}</button> : <>

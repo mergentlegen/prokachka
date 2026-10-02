@@ -51,7 +51,7 @@ export type StarAward = {
 };
 export type Submission = {
   id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
-  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string;
+  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string; answerTruncated?: boolean;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number };

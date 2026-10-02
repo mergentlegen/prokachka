@@ -49,6 +49,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/(.*)", headers: securityHeaders },
       { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      // Fonts and brand images were re-checked on every visit (max-age=0). Their names are not hashed,
+      // so they are cached for a while and quietly refreshed in the background, not forever.
+      { source: "/fonts/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=604800" }] },
+      { source: "/brand/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }] },
       // PDF attachments open in the browser's built-in viewer, which the page CSP (object-src 'none') can block.
       { source: "/api/tasks/:id/attachments/:attachmentId/:fileName*", headers: [
         { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },

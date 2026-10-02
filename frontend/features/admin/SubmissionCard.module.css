@@ -12,6 +12,7 @@
 .waiting { background:#fdf2dc; color:#a26a20; }
 .late { background:#fde7e7; color:#b23e4d; }
 .answer { margin-top:20px; }
+.more { display:block; min-height:40px; margin-top:8px; padding:6px 0; border:0; background:none; color:var(--blue); font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
 .text { padding:18px; border:1px solid #e9edf4; border-radius:12px; background:#f8f9fc; color:#253853; font-size:16px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
 .muted { color:#6b7890; font-size:14px; }
 .media { margin-top:12px; }

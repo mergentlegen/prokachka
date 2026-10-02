@@ -3,7 +3,7 @@ import { validMiles } from "@/shared/domain/miles";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
-import { findSubmissionMedia, findSubmissions, findMentorCounts, recordMentorCompletion, saveReview } from "@/backend/services/submissions.service";
+import { findSubmissionAnswer, findSubmissionMedia, findSubmissions, findMentorCounts, recordMentorCompletion, saveReview } from "@/backend/services/submissions.service";
 import { prepareTelegramSubmission } from "@/backend/services/telegram-submission.service";
 import { serverEnv } from "@/backend/config/env";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
@@ -86,6 +86,17 @@ export async function recordCompletion(request: Request) {
     scheduleTelegramDelivery();
     return ok({ submission: result.data }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
+}
+
+export async function readSubmissionAnswer(request: Request, id: string) {
+  const user = await currentUser(request);
+  if (!user || (user.role !== "ceo" && user.role !== "admin" && !user.canReview)) return failure("Недостаточно прав.", user ? 403 : 401);
+  if (!isUuid(id)) return failure("Некорректная работа.", 400);
+  const result = await findSubmissionAnswer(id, user);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("forbidden" in result) return failure("Работа относится к другой команде.", 403);
+  if ("notFound" in result || !("data" in result)) return failure("Работа не найдена.", 404);
+  return ok({ answerText: result.data.answerText });
 }
 
 export async function streamSubmissionMedia(request: Request, id: string) {

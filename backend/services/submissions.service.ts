@@ -4,6 +4,14 @@ import { descendants, findTeamNetwork } from "@/backend/services/network.service
 type SubmissionViewer = { id: string; role: string; teamId?: string; canReview?: boolean };
 type FindOptions = { userId?: string; teamId?: string; viewer?: SubmissionViewer };
 const submissionSelect = "id,user_id,task_id,status,submission_source,interactive_completed,media_type,answer_text,points,comment,submitted_at,reviewed_at,review_version,created_at";
+// Team lists carry the whole history; reviewed answers travel as a preview, the full text opens on demand.
+export const ANSWER_PREVIEW_LENGTH = 300;
+
+export function previewAnswer<T extends { status?: unknown; answer_text?: unknown }>(row: T): T & { answer_truncated?: true } {
+  const text = typeof row.answer_text === "string" ? row.answer_text : "";
+  if (row.status === "pending" || text.length <= ANSWER_PREVIEW_LENGTH) return row;
+  return { ...row, answer_text: text.slice(0, ANSWER_PREVIEW_LENGTH).trimEnd(), answer_truncated: true };
+}
 
 export async function findMentorCounts(userId: string) {
   const supabase = getSupabaseAdmin();
@@ -12,19 +20,21 @@ export async function findMentorCounts(userId: string) {
   return result.error ? { error: result.error } : { data: result.data };
 }
 
-export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer) {
+// The same rule for a submission's file and its full text: the CEO, the team's leader, or a reviewer above the author.
+type Reviewable = { unavailable: true } | { notFound: true } | { forbidden: true } | { error: unknown } | { row: Record<string, unknown> };
+async function reviewableSubmission(id: string, viewer: SubmissionViewer | undefined, columns: string): Promise<Reviewable> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-
   const result = await supabase
     .from("submissions")
-    .select("telegram_file_id,media_type,users(id,team_id),tasks(team_id)")
+    .select(`${columns},users(id,team_id),tasks(team_id)`)
     .eq("id", id)
     .maybeSingle();
-  const task = Array.isArray(result.data?.tasks) ? result.data.tasks[0] : result.data?.tasks;
   if (result.error || !result.data) return { notFound: true as const };
+  const row = result.data as unknown as Record<string, unknown> & { users?: unknown; tasks?: unknown };
+  const task = (Array.isArray(row.tasks) ? row.tasks[0] : row.tasks) as { team_id?: string } | undefined;
   if (viewer?.role !== "ceo" && (!viewer?.teamId || String(task?.team_id || "") !== viewer.teamId)) return { forbidden: true as const };
-  const submitter = Array.isArray(result.data.users) ? result.data.users[0] : result.data.users;
+  const submitter = (Array.isArray(row.users) ? row.users[0] : row.users) as { id?: string; team_id?: string } | undefined;
   if (viewer?.role !== "ceo" && submitter?.team_id !== viewer?.teamId) return { forbidden: true as const };
   if (viewer?.role === "member") {
     const network = await findTeamNetwork(viewer.teamId || "");
@@ -32,10 +42,22 @@ export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer)
     if ("error" in network) return { error: network.error };
     if (!viewer.canReview || !descendants(network.data, viewer.id, false).has(String(submitter?.id || ""))) return { forbidden: true as const };
   }
-  if (!result.data.telegram_file_id || !["photo", "video", "document"].includes(String(result.data.media_type))) {
+  return { row };
+}
+
+export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer) {
+  const result = await reviewableSubmission(id, viewer, "telegram_file_id,media_type");
+  if (!("row" in result)) return result;
+  if (!result.row.telegram_file_id || !["photo", "video", "document"].includes(String(result.row.media_type))) {
     return { notFound: true as const };
   }
-  return { data: { fileId: String(result.data.telegram_file_id), mediaType: String(result.data.media_type) } };
+  return { data: { fileId: String(result.row.telegram_file_id), mediaType: String(result.row.media_type) } };
+}
+
+export async function findSubmissionAnswer(id: string, viewer?: SubmissionViewer) {
+  const result = await reviewableSubmission(id, viewer, "answer_text");
+  if (!("row" in result)) return result;
+  return { data: { answerText: typeof result.row.answer_text === "string" ? result.row.answer_text : "" } };
 }
 
 export async function findSubmissions(options: FindOptions = {}) {
@@ -62,9 +84,10 @@ export async function findSubmissions(options: FindOptions = {}) {
     return { data: rows.filter((row) => {
       const submitter = Array.isArray(row.users) ? row.users[0] : row.users;
       return options.viewer?.canReview === true && allowed.has(String(submitter?.id || ""));
-    }) };
+    }).map(previewAnswer) };
   }
-  return { data: rows };
+  // A participant's own list stays complete; mentors' team lists get previews.
+  return { data: options.userId ? rows : rows.map(previewAnswer) };
 }
 
 export async function saveReview(id: string, input: { status: "accepted" | "revision"; points: number; comment: string; expectedVersion: number }, viewer?: SubmissionViewer) {
