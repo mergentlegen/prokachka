@@ -18,7 +18,8 @@ send() {
 
 # report NAME FAILED(0|1) MESSAGE — the state file remembers when we last alerted and about what.
 report() {
-  local name=$1 failed=$2 message=$3 file="$STATE/$name"
+  local name=$1 failed=$2 message=$3
+  local file="$STATE/$name"
   if [ "$failed" = 1 ]; then
     if [ ! -f "$file" ]; then
       send "🔴 Прокачка: $message" && printf '%s\n%s\n' "$now" "$message" > "$file"
