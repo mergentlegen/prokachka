@@ -53,10 +53,13 @@ export async function findInvitationByToken(token: string) {
   if (!result.data || result.data.revoked_at || (result.data.expires_at && new Date(String(result.data.expires_at)).getTime() <= Date.now()) || (Number(result.data.max_uses) > 0 && Number(result.data.used_count) >= Number(result.data.max_uses))) {
     return { validationError: "Ссылка приглашения недействительна или уже исчерпала лимит." };
   }
-  const inviter = await supabase.from("users").select("id,team_id,role").eq("id", result.data.inviter_user_id).maybeSingle();
-  const team = await supabase.from("teams").select("id,is_active").eq("id", result.data.team_id).maybeSingle();
+  const [inviter, team] = await Promise.all([
+    supabase.from("users").select("id,team_id,role,name").eq("id", result.data.inviter_user_id).maybeSingle(),
+    supabase.from("teams").select("id,is_active,name").eq("id", result.data.team_id).maybeSingle(),
+  ]);
   if (inviter.error || !inviter.data || inviter.data.team_id !== result.data.team_id || !["admin", "member"].includes(String(inviter.data.role)) || team.error || !team.data?.is_active) return { validationError: "Автор приглашения или команда больше недоступны." };
-  return { data: result.data };
+  // Only names leave this function for a visitor: no ids, limits or dates.
+  return { data: result.data, preview: { inviterName: String(inviter.data.name || ""), teamName: String(team.data.name || "") } };
 }
 
 export async function createTeamInvitation(teamId: string, inviterId: string) {

@@ -65,9 +65,12 @@
 .forgotAction { min-height: 32px; padding: 4px 0; border: 0; border-radius: 4px; background: transparent; color: #b8d1ff; font: inherit; font-size: 13px; font-weight: 500; line-height: 20px; text-align: right; }
 .registerPrompt { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: 6px; margin: -6px 0 0; color: #b1bfd4; font-size: 13px; line-height: 1.5; text-align: center; }
 .registerPrompt button { min-height: 44px; padding: 8px 0; border: 0; border-radius: 4px; background: transparent; color: #b8d1ff; font: inherit; font-weight: 600; }
-.tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 4px; border: 1px solid #2c3e59; border-radius: 12px; background: #101d32; }
+.tabs { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 4px; border: 1px solid #2c3e59; border-radius: 12px; background: #101d32; }
+/* One pill slides under the chosen tab instead of two tabs swapping backgrounds. */
+.tabs::before { content: ""; box-sizing: border-box; position: absolute; z-index: -1; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 12px) / 2); border: 1px solid #475e80; border-radius: 8px; background: #2d4262; box-shadow: 0 2px 6px #0000001a; transition: transform .28s cubic-bezier(.3, .7, .2, 1); }
+.tabs[data-mode="register"]::before { transform: translateX(calc(100% + 4px)); }
 .tabs button { min-width: 0; min-height: 44px; padding: 10px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #aebed5; font: inherit; font-size: 13px; font-weight: 600; line-height: 20px; }
-.tabs .activeTab { border-color: #475e80; background: #2d4262; color: #fff; box-shadow: 0 2px 6px #0000001a; }
+.tabs .activeTab { color: #fff; }
 .submit {
   width: 100%;
   min-height: 52px;
@@ -121,6 +124,51 @@
   .card { padding-inline: 16px; }
   .heading { font-size: 24px; }
 }
+.card { animation: authRise .35s ease backwards; }
+.appear { animation: authFade .25s ease backwards; }
+
+.steps { display: flex; gap: 8px; margin: 0 0 20px; padding: 0; list-style: none; }
+.steps li { display: grid; flex: 1; gap: 7px; min-width: 0; color: #8193ad; font-size: 12px; font-weight: 600; line-height: 1.3; }
+.steps li::before { content: ""; height: 4px; border-radius: 2px; background: #2c3e59; transition: background .3s; }
+.steps li b { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border: 1px solid #40516e; border-radius: 50%; font-size: 10px; vertical-align: -4px; }
+.steps .stepNow { color: #f4f7fc; }
+.steps .stepNow::before, .steps .stepDone::before { background: #f2b94b; }
+.steps .stepNow b { border-color: #f2b94b; background: #f2b94b; color: #16253d; }
+.steps .stepDone { color: #c9d6ea; }
+.steps .stepDone b { border-color: #f2b94b80; color: #f2b94b; }
+
+.invite { display: flex; align-items: center; gap: 12px; margin: -6px 0 22px; padding: 14px; border: 1px solid #f2b94b55; border-radius: 14px; background: linear-gradient(135deg, #f2b94b1f, #f2b94b08); animation: authFade .3s ease backwards; }
+.invite > div { min-width: 0; }
+.inviteAvatar { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 50%; background: #f2b94b; color: #16253d; font-size: 15px; font-weight: 800; }
+.invite small { display: block; color: #d9c79c; font-size: 12px; line-height: 1.4; }
+.invite strong { display: block; color: #fff; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.invite p { margin: 2px 0 0; color: #d7e1f0; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.inviteLoading { border-color: #334762; background: #1d2e48; }
+.inviteLoading .inviteAvatar { background: #2c3e59; animation: authPulse 1.2s ease-in-out infinite; }
+.inviteLoading p { margin: 0; color: #b1bfd4; }
+.inviteInvalid { border-color: #d9a34a66; background: #d9a34a12; }
+.inviteInvalid .inviteAvatar { background: #d9a34a33; color: #f2c46b; }
+
+.checklist { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.checklist li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border: 1px solid #334762; border-radius: 99px; color: #b1bfd4; font-size: 12px; line-height: 1.4; transition: color .2s, border-color .2s, background .2s; }
+.checklist b { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid #52647e; border-radius: 50%; font-size: 10px; line-height: 1; }
+.checklist .met { border-color: #50b8975e; background: #50b89714; color: #b8efd8; }
+.checklist .met b { border-color: #50b897; background: #50b897; color: #0f2a22; animation: authPop .25s ease; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.matchNotice { margin: 0; color: #8fe0bf; font-size: 12px; line-height: 1.5; animation: authFade .2s ease backwards; }
+.suggestion { margin: 0; color: #b1bfd4; font-size: 13px; line-height: 1.5; animation: authFade .2s ease backwards; }
+.suggestion button { min-height: 0; padding: 0; border: 0; background: none; color: #f2c46b; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; overflow-wrap: anywhere; }
+
+.confirmed { display: grid; justify-items: center; text-align: center; }
+.confirmed .intro { margin-bottom: 6px; }
+.successMark { display: grid; place-items: center; width: 68px; height: 68px; margin: 8px 0 20px; border-radius: 50%; background: #50b897; color: #0f2a22; font-size: 34px; font-weight: 800; box-shadow: 0 0 0 10px #50b8971f; animation: authPop .45s ease; }
+
+@keyframes authRise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes authFade { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes authPop { 50% { transform: scale(1.2); } }
+@keyframes authPulse { 50% { opacity: .45; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .input, .submit { transition: none; }
+  .input, .submit, .tabs::before, .steps li::before, .checklist li { transition: none; }
+  .card, .appear, .invite, .inviteLoading .inviteAvatar, .checklist .met b, .matchNotice, .suggestion, .successMark { animation: none; }
 }

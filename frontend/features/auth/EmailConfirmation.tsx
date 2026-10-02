@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import type { AuthUser } from "@/shared/domain/types";
 import { AuthLayout } from "./AuthLayout";
 import styles from "./AuthScreen.module.css";
+import { AuthSteps } from "./AuthExtras";
 
 export type PendingEmailConfirmation = { email: string; resendAt: number };
 const storageKey = "prokachka-pending-email";
@@ -49,6 +50,7 @@ export function EmailConfirmation({ initial, onBack, onAuthenticated }: {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState<"verify" | "resend" | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const [resendAt, setResendAt] = useState(initial.resendAt);
   const [now, setNow] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,17 +62,19 @@ export function EmailConfirmation({ initial, onBack, onAuthenticated }: {
     return () => window.clearInterval(timer);
   }, []);
 
-  async function send(action: "verify" | "resend") {
-    if (pending || (action === "resend" && seconds > 0)) return;
+  // `typed` lets the sixth digit start the check before React has stored it.
+  async function send(action: "verify" | "resend", typed?: string) {
+    const value = typed ?? code;
+    if (pending || confirmed || (action === "resend" && seconds > 0)) return;
     setError(""); setNotice("");
-    if (action === "verify" && !/^\d{6}$/.test(code)) {
+    if (action === "verify" && !/^\d{6}$/.test(value)) {
       setError("Введите шестизначный код из письма."); inputRef.current?.focus(); return;
     }
     setPending(action);
     try {
       const response = await fetch(`/api/auth/${action === "verify" ? "verify-email" : "resend-email"}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: initial.email, ...(action === "verify" ? { code } : {}) }),
+        body: JSON.stringify({ email: initial.email, ...(action === "verify" ? { code: value } : {}) }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -89,14 +93,26 @@ export function EmailConfirmation({ initial, onBack, onAuthenticated }: {
         setNotice("Новый код отправлен. Используйте код из последнего письма.");
         inputRef.current?.focus();
       } else if (body.user && typeof body.user.id === "string") {
-        rememberEmailConfirmation(null); onAuthenticated(body);
+        // A short moment of success before the cabinet opens; finishing clears the pending e-mail.
+        setConfirmed(true);
+        window.setTimeout(() => onAuthenticated(body), 1100);
       } else setError("Не удалось завершить регистрацию. Попробуйте войти по почте и паролю.");
     } catch { setError("Нет связи с сервером. Проверьте интернет и попробуйте ещё раз."); }
     finally { setPending(null); }
   }
   function submit(event: FormEvent) { event.preventDefault(); void send("verify"); }
 
+  if (confirmed) return <AuthLayout>
+      <AuthSteps current={3} />
+      <div className={styles.confirmed} role="status">
+        <div className={styles.successMark} aria-hidden="true">✓</div>
+        <h1 className={styles.heading}>Почта подтверждена</h1>
+        <p className={styles.intro}>Аккаунт готов. Открываем кабинет…</p>
+      </div>
+  </AuthLayout>;
+
   return <AuthLayout>
+      <AuthSteps current={2} />
       <div className={styles.mailIcon} aria-hidden="true">✉</div>
       <h1 className={styles.heading}>Подтвердите почту</h1>
       <p className={styles.intro}>Введите код из письма на <strong className={styles.emailAddress}>{initial.email}</strong>. Если письмо не пришло, проверьте папку «Спам».</p>
@@ -108,7 +124,12 @@ export function EmailConfirmation({ initial, onBack, onAuthenticated }: {
               inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6}
               value={code} placeholder="000000" disabled={Boolean(pending)} required spellCheck={false}
               aria-invalid={Boolean(error)} aria-describedby={error ? "email-code-error" : "email-code-hint"}
-              onChange={(event) => { setCode(event.target.value.replace(/\D/g, "").slice(0, 6)); setError(""); }} />
+              onChange={(event) => {
+                const next = event.target.value.replace(/\D/g, "").slice(0, 6);
+                setCode(next); setError("");
+                // Typing or pasting the sixth digit checks the code right away.
+                if (next.length === 6 && next !== code) void send("verify", next);
+              }} />
           </div>
           <p id="email-code-hint" className={styles.codeHint}>6 цифр. Код действует 10 минут.</p>
         </div>

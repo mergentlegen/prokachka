@@ -4,9 +4,10 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import styles from "./AuthScreen.module.css";
 
-export function AuthField({ name, label, value, type, autoComplete, placeholder, error, credentialError = false, action, hint, onChange, onBlur }: {
+export function AuthField({ name, label, value, type, autoComplete, placeholder, error, credentialError = false, action, hint, extra, onChange, onBlur }: {
   name: string; label: string; value: string; type: string; autoComplete: string; placeholder: string;
-  error?: string; credentialError?: boolean; action?: ReactNode; hint?: string; onChange: (value: string) => void; onBlur?: () => void;
+  // A rich hint must carry id `auth-<name>-hint` itself so the input stays described by it.
+  error?: string; credentialError?: boolean; action?: ReactNode; hint?: ReactNode; extra?: ReactNode; onChange: (value: string) => void; onBlur?: () => void;
 }) {
   const [revealed, setRevealed] = useState(false);
   const invalid = Boolean(error) || credentialError;
@@ -22,7 +23,8 @@ export function AuthField({ name, label, value, type, autoComplete, placeholder,
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{revealed && <path d="m3 3 18 18" />}</svg>
       </button>}
     </div>
-    {hint && <p id={`${id}-hint`} className={styles.codeHint}>{hint}</p>}
+    {typeof hint === "string" ? <p id={`${id}-hint`} className={styles.codeHint}>{hint}</p> : hint}
     {error && <p id={`${id}-error`} className={styles.fieldError} role="alert">{error}</p>}
+    {extra}
   </div>;
 }

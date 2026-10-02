@@ -12,11 +12,20 @@ import styles from "./AuthScreen.module.css";
 import { EmailConfirmation, emailConfirmationSnapshot, rememberEmailConfirmation, restoreEmailConfirmation, subscribeEmailConfirmation } from "./EmailConfirmation";
 import { AuthField } from "./AuthField";
 import { AuthLayout } from "./AuthLayout";
-import { PASSWORD_HINT } from "@/shared/domain/password-policy";
 import { PasswordRecovery, passwordRecoverySnapshot, rememberPasswordRecovery, restorePasswordRecovery, subscribePasswordRecovery } from "./PasswordRecovery";
+import { AuthSteps, InviteCard, PasswordChecklist, type InvitationPreview } from "./AuthExtras";
+import { suggestEmail } from "@/frontend/shared/lib/email-typos";
+
+const noSubscribe = () => () => undefined;
+function readInviteToken() { return new URLSearchParams(window.location.search).get("invite") || ""; }
 
 export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthenticated: (user: AuthUser) => void; initialMode?: AuthMode }) {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  // An invitation link means a newcomer: open sign-up unless the person picks "Войти".
+  const invite = useSyncExternalStore(noSubscribe, readInviteToken, () => "");
+  const [chosenMode, setChosenMode] = useState<AuthMode | null>(null);
+  const mode = chosenMode ?? (invite ? "register" : initialMode);
+  const [invitationResult, setInvitationResult] = useState<InvitationPreview | null>(null);
+  const invitation = !invite ? null : invitationResult?.token === invite ? invitationResult : "loading";
   const [values, setValues] = useState<AuthValues>({ firstName: "", lastName: "", email: "", password: "", passwordConfirmation: "" });
   const [touched, setTouched] = useState<Set<AuthFieldName>>(new Set());
   const [attempted, setAttempted] = useState(false);
@@ -35,6 +44,19 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
+  useEffect(() => {
+    if (!invite) return;
+    let active = true;
+    fetch(`/api/invitations/${encodeURIComponent(invite)}`).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!active) return;
+      if (response.ok && body.invitation) setInvitationResult({ token: invite, status: "ok", inviterName: String(body.invitation.inviterName || "Наставник"), teamName: String(body.invitation.teamName || "") });
+      else if (response.status === 404) setInvitationResult({ token: invite, status: "invalid", message: typeof body.message === "string" ? body.message : "Ссылка устарела." });
+      // A network or server hiccup proves nothing: keep the link and let sign-up decide.
+      else setInvitationResult({ token: invite, status: "unchecked" });
+    }).catch(() => { if (active) setInvitationResult({ token: invite, status: "unchecked" }); });
+    return () => { active = false; };
+  }, [invite]);
   function finishAuthentication(body: { user: AuthUser; session?: string; devAuthMode?: boolean }) {
     rememberEmailConfirmation(null);
     rememberPasswordRecovery(null);
@@ -57,7 +79,8 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
     if (invalid) { focusField(invalid); return; }
     setPending(true);
     try {
-      const inviteToken = new URLSearchParams(window.location.search).get("invite") || undefined;
+      // A link the server already called dead is dropped, so it cannot block the sign-up itself.
+      const inviteToken = invite && !(invitation !== "loading" && invitation?.status === "invalid") ? invite : undefined;
       const payload = mode === "login"
         ? { email: values.email.trim(), password: values.password }
         : { ...values, firstName: values.firstName.trim(), lastName: values.lastName.trim(), email: values.email.trim(), inviteToken };
@@ -84,13 +107,15 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
   }
   function switchMode(next: AuthMode) {
     if (pending) return;
-    setMode(next); setTouched(new Set()); setAttempted(false); setServerErrors({}); setError(""); setCredentialsInvalid(false); setSuccess("");
+    setChosenMode(next); setTouched(new Set()); setAttempted(false); setServerErrors({}); setError(""); setCredentialsInvalid(false); setSuccess("");
   }
-  function field(name: AuthFieldName, label: string, autocomplete: string, placeholder: string, type = "text", action?: ReactNode) {
-    const message = serverErrors[name] || ((attempted || touched.has(name)) ? validation[name] : undefined);
+  function field(name: AuthFieldName, label: string, autocomplete: string, placeholder: string, type = "text", action?: ReactNode, extra?: ReactNode) {
+    // While signing up, the checklist already shows what the password lacks; the text waits for a submit.
+    const shown = attempted || (touched.has(name) && !(mode === "register" && name === "password"));
+    const message = serverErrors[name] || (shown ? validation[name] : undefined);
     const credentialError = credentialsInvalid && (name === "email" || name === "password");
     return <AuthField key={name} name={name} label={label} value={values[name]} type={type} autoComplete={autocomplete} placeholder={placeholder} action={action}
-      hint={mode === "register" && name === "password" ? PASSWORD_HINT : undefined}
+      hint={mode === "register" && name === "password" ? <PasswordChecklist id="auth-password-hint" password={values.password} /> : undefined} extra={extra}
       error={message} credentialError={credentialError} onChange={(value) => change(name, value)}
       onBlur={() => setTouched((current) => new Set(current).add(name))} />;
   }
@@ -105,20 +130,27 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
     rememberEmailConfirmation(null); setValues((current) => ({ ...current, email: confirmation.email }));
     setAttempted(false); setError("");
   }} />;
+  const emailSuggestion = mode === "register" && (attempted || touched.has("email")) ? suggestEmail(values.email) : null;
+  const invited = invitation !== "loading" && invitation?.status === "ok" ? invitation : null;
   return <AuthLayout>
+      {mode === "register" && <AuthSteps current={1} />}
       <h1 className={styles.heading}>{mode === "login" ? "Войти в аккаунт" : "Создать аккаунт"}</h1>
-      <p className={styles.intro}>{mode === "login" ? "С возвращением! Продолжайте выполнять задания и расти вместе с командой." : "Присоединяйтесь к команде: выполняйте задания, получайте обратную связь и следите за своим прогрессом."}</p>
+      <p className={styles.intro}>{mode === "login" ? "С возвращением! Продолжайте выполнять задания и расти вместе с командой."
+        : invited ? `После подтверждения почты заявка в команду «${invited.teamName}» отправится автоматически.` : "Присоединяйтесь к команде: выполняйте задания, получайте обратную связь и следите за своим прогрессом."}</p>
+      {invitation && <InviteCard invitation={invitation} />}
       <form ref={formRef} className={styles.form} noValidate onSubmit={submit} aria-busy={pending}>
-        <div className={styles.tabs} role="group" aria-label="Вход или регистрация"><button type="button" disabled={pending} className={mode === "login" ? styles.activeTab : ""} aria-pressed={mode === "login"} onClick={() => switchMode("login")}>Войти</button><button type="button" disabled={pending} className={mode === "register" ? styles.activeTab : ""} aria-pressed={mode === "register"} onClick={() => switchMode("register")}>Регистрация</button></div>
+        <div className={styles.tabs} data-mode={mode} role="group" aria-label="Вход или регистрация"><button type="button" disabled={pending} className={mode === "login" ? styles.activeTab : ""} aria-pressed={mode === "login"} onClick={() => switchMode("login")}>Войти</button><button type="button" disabled={pending} className={mode === "register" ? styles.activeTab : ""} aria-pressed={mode === "register"} onClick={() => switchMode("register")}>Регистрация</button></div>
         <fieldset className={styles.fields} disabled={pending}>
-          {mode === "register" && <div className={styles.names}>{field("firstName", "Имя", "given-name", "Имя")}{field("lastName", "Фамилия", "family-name", "Фамилия")}</div>}
-          {field("email", "Email", "email", "name@example.com", "email")}
+          {mode === "register" && <div className={`${styles.names} ${styles.appear}`}>{field("firstName", "Имя", "given-name", "Имя")}{field("lastName", "Фамилия", "family-name", "Фамилия")}</div>}
+          {field("email", "Email", "email", "name@example.com", "email", undefined, emailSuggestion &&
+            <p className={styles.suggestion}>Возможно, вы имели в виду <button type="button" onClick={() => change("email", emailSuggestion)}>{emailSuggestion}</button>?</p>)}
           {field("password", "Пароль", mode === "login" ? "current-password" : "new-password", mode === "register" ? "Придумайте пароль" : "Ваш пароль", "password", mode === "login" &&
             <button type="button" className={styles.forgotAction} disabled={pending} onClick={() => {
               setValues((current) => ({ ...current, password: "", passwordConfirmation: "" }));
               rememberPasswordRecovery({ step: "email", email: values.email.trim().slice(0, 254), resendAt: 0, expiresAt: Date.now() + 600_000 });
             }}>Забыли пароль?</button>)}
-          {mode === "register" && field("passwordConfirmation", "Повторите пароль", "new-password", "Повторите пароль", "password")}
+          {mode === "register" && <div className={styles.appear}>{field("passwordConfirmation", "Повторите пароль", "new-password", "Повторите пароль", "password", undefined,
+            values.passwordConfirmation && values.passwordConfirmation === values.password && !serverErrors.passwordConfirmation && <p className={styles.matchNotice} role="status">✓ Пароли совпадают</p>)}</div>}
         </fieldset>
         {error && <div className={styles.notice} role="alert" id="auth-request-error"><span aria-hidden="true">!</span><div><strong>{mode === "login" ? "Не удалось войти" : "Не удалось зарегистрироваться"}</strong><p>{error}</p></div></div>}
         {success && <p className={styles.successNotice} role="status">{success}</p>}
