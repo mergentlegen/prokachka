@@ -26,6 +26,7 @@ export function resourceTopics(url: string): ChangeTopic[] {
   if (path === "/api/network") return ["users", "network"];
   if (path === "/api/team-requests") return ["requests", "users", "teams"];
   if (path === "/api/teams") return ["teams"];
+  if (path === "/api/ceo/stats") return ["submissions", "users", "teams", "stars", "tasks"];
   return [];
 }
 export function mutationTopics(url: string, method: string): ChangeTopic[] {

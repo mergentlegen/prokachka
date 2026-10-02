@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Store, Submission } from "@/shared/domain/types";
 import { Avatar } from "@/frontend/shared/Avatar";
+import { DailyBars } from "@/frontend/shared/DailyBars";
 import { CountUp } from "@/frontend/shared/hooks/use-count-up";
 import { formatDate, milesUnit } from "@/frontend/shared/lib/format";
 import { adminIcons } from "./AdminIcons";
@@ -59,37 +60,11 @@ export function AdminDashboard({ store, queue, feedbackNeedsReply, requests, can
   </div>;
 }
 
-const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short" });
-const fullDay = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-
-// One series, one color: thin columns from a shared baseline, the busiest day and today labelled, the rest in the tooltip and table.
 function ActivityChart({ submissions, now }: { submissions: Submission[]; now: number }) {
   const days = dailyActivity(submissions, 14, now);
-  const [active, setActive] = useState<number | null>(null);
-  const max = Math.max(1, ...days.map((day) => day.count));
   const total = days.reduce((sum, day) => sum + day.count, 0);
-  const peak = days.reduce((best, day, index) => day.count > days[best].count ? index : best, 0);
-  const today = days.length - 1;
-  return <section className={styles.panel} aria-labelledby="activity-title">
-    <div className={styles.panelHead}>
-      <div><h2 id="activity-title">Работы за 14 дней</h2><p>{total ? `${total} ${plural(total, "работа", "работы", "работ")} · в среднем ${(total / days.length).toFixed(1).replace(".", ",")} в день` : "Пока ни одной работы"}</p></div>
-    </div>
-    <div className={styles.chart} onMouseLeave={() => setActive(null)}>
-      {days.map((day, index) => {
-        const label = `${fullDay.format(day.date)}: ${day.count} ${plural(day.count, "работа", "работы", "работ")}`;
-        const showValue = day.count > 0 && (index === peak || index === today);
-        return <button type="button" key={day.date.toISOString()} className={`${styles.column} ${active === index ? styles.activeColumn : ""}`} aria-label={label}
-          onMouseEnter={() => setActive(index)} onFocus={() => setActive(index)} onBlur={() => setActive(null)} onClick={() => setActive(active === index ? null : index)}>
-          <span className={styles.plot}>
-            {active === index && <span className={styles.tooltip} role="tooltip"><b>{day.count}</b> {plural(day.count, "работа", "работы", "работ")}<small>{formatDate(day.date.toISOString())}</small></span>}
-            {day.count > 0 && <i style={{ height: `${(day.count / max) * 100}%` }}>{showValue && active !== index && <span className={styles.value}>{day.count}</span>}</i>}
-          </span>
-          <span className={`${styles.day} ${index === today ? styles.today : ""}`}>{index === today ? "сег." : weekday.format(day.date).slice(0, 2)}</span>
-        </button>;
-      })}
-    </div>
-    <table className={styles.srOnly}><caption>Работы по дням</caption><tbody>{days.map((day) => <tr key={day.date.toISOString()}><th scope="row">{fullDay.format(day.date)}</th><td>{day.count}</td></tr>)}</tbody></table>
-  </section>;
+  return <DailyBars title="Работы за 14 дней" caption="Работы по дням" days={days} unit={["работа", "работы", "работ"]}
+    summary={total ? `${total} ${plural(total, "работа", "работы", "работ")} · в среднем ${(total / days.length).toFixed(1).replace(".", ",")} в день` : "Пока ни одной работы"} />;
 }
 
 function WeekLeaders({ store, now }: { store: Store; now: number }) {

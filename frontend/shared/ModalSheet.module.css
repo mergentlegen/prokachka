@@ -12,6 +12,8 @@
 .footer :global(.button-danger) { border-color:#b23e4d; background:#c2434f; color:#fff; }
 .footer :global(.button-warning) { border-color:#b8761f; background:#cf8a2c; color:#fff; }
 .footer :global(.button:disabled) { opacity:.55; }
+.footer :global(.button-outline-danger) { border-color:#f0d6da; background:#fff; color:#b23e4d; }
+.footer :global(.button-outline-warning) { border-color:#efd5a8; background:#fff; color:#a66b20; }
 .immersivePanel { width:min(840px,calc(100vw - 48px)); max-height:calc(100dvh - 48px); }
 .immersiveHeader { padding:10px 26px; }
 .immersiveHeader h2 { font-size:15px; }

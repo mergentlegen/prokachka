@@ -1,0 +1,24 @@
+.panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.head h2 { margin: 0; color: var(--navy); font-size: 16px; }
+.head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+
+.chart { display: grid; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); gap: 2px; height: 170px; margin-top: 16px; }
+.column { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.column:focus-visible { outline: 2px solid #cddaff; }
+.plot { position: relative; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid #d5dce8; }
+.plot i { position: relative; display: block; width: min(24px, 70%); min-height: 3px; border-radius: 4px 4px 0 0; background: var(--blue); transition: opacity .2s; animation: grow .5s ease backwards; transform-origin: bottom; }
+.chart:hover .plot i { opacity: .55; }
+.chart:hover .activeColumn .plot i { opacity: 1; }
+.value { position: absolute; bottom: calc(100% + 3px); left: 50%; color: var(--navy); font-size: 11px; font-style: normal; font-weight: 700; transform: translateX(-50%); }
+.tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 2; display: grid; justify-items: center; padding: 6px 10px; border-radius: 10px; background: var(--navy); color: #fff; font-size: 12px; white-space: nowrap; transform: translateX(-50%); box-shadow: 0 6px 18px #10203a40; pointer-events: none; }
+.tooltip small { color: #c9d4e6; font-size: 11px; }
+.tooltip.left { left: 0; transform: none; }
+.tooltip.right { left: auto; right: 0; transform: none; }
+.day { min-height: 18px; padding-top: 6px; color: var(--muted); font-size: 10px; text-align: center; white-space: nowrap; }
+.today { color: var(--blue); font-weight: 700; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@keyframes grow { from { transform: scaleY(0); } }
+@media (max-width: 560px) { .panel { padding: 16px 14px; } .chart { height: 150px; gap: 1px; } }
+@media (prefers-reduced-motion: reduce) { .plot i { animation: none; } }

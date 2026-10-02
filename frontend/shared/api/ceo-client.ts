@@ -49,3 +49,15 @@ export async function reviewCeoRequest(id: string, status: "approved" | "rejecte
   const response = await request<ApiResponse<{ request: ApiRow }>>(`/api/team-requests/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
   return response;
 }
+
+export type CeoStats = {
+  generatedAt: string;
+  platform: { pending: number; oldestPendingAt: string | null; avgReviewHours: number | null };
+  daily: Array<{ date: string; submissions: number; newUsers: number }>;
+  teams: Array<{ teamId: string; members: number; mentors: number; active14: number; submissions7: number; newMembers30: number; pending: number; oldestPendingAt: string | null; avgReviewHours: number | null; lastSubmissionAt: string | null; recentTasks: Array<{ id: string; title: string; createdAt: string }> }>;
+  users: Record<string, { miles: number; stars: number; works90: number; lastSubmittedAt: string | null; hasTelegram: boolean }>;
+};
+
+export async function loadCeoStats(): Promise<CeoStats> {
+  return (await request<ApiResponse<{ stats: CeoStats }>>("/api/ceo/stats", { cache: "no-store" })).stats;
+}
