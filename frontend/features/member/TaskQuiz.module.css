@@ -1,0 +1,24 @@
+.quiz { display: grid; gap: 12px; min-width: 0; }
+.quiz h4 { margin: 4px 0 0; color: var(--navy); font-size: 17px; }
+.list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.question { display: grid; gap: 10px; padding: 14px; border: 1px solid #e3e8f1; border-radius: 14px; background: #f8fafd; scroll-margin: 90px; }
+.missing { border-color: #e7a7b0; background: #fff6f7; }
+.prompt { margin: 0; color: var(--navy); font-size: 15px; font-weight: 650; line-height: 1.45; overflow-wrap: anywhere; }
+.prompt b { color: var(--blue); }
+.question textarea { width: 100%; min-width: 0; padding: 12px; border: 1px solid #dce4ef; border-radius: 12px; background: #fff; color: var(--navy); font: inherit; font-size: 16px; line-height: 1.5; resize: vertical; }
+.options { display: grid; gap: 8px; }
+.option { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 12px; background: #fff; color: #33445f; font-size: 15px; line-height: 1.4; cursor: pointer; transition: border-color .15s, background .15s; }
+.option input { flex: 0 0 auto; width: 20px; height: 20px; margin: 0; accent-color: var(--blue); }
+.option span { overflow-wrap: anywhere; }
+.checked { border-color: #9db3ea; background: #f1f5ff; }
+.muted { margin: 0; color: var(--muted); font-size: 12px; }
+.error { margin: 0; color: #b23e4d; font-size: 13px; font-weight: 600; }
+.send { min-height: 52px; padding: 12px 18px; border: 0; border-radius: 14px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+.send:disabled { opacity: .6; cursor: wait; }
+.locked, .sent { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; }
+.locked { border: 1px dashed #c9d3e3; background: #f7f9fc; }
+.locked > span { font-size: 22px; }
+.sent { border: 1px solid #cfe9dd; background: #f1faf6; }
+.sent > span { display: grid; flex: 0 0 36px; place-items: center; height: 36px; border-radius: 50%; background: #dff3ea; color: var(--green); font-weight: 800; }
+.locked strong, .sent strong { color: var(--navy); font-size: 15px; }
+.locked p, .sent p { margin: 3px 0 0; color: #5b6b85; font-size: 13px; line-height: 1.45; }

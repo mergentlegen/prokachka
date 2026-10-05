@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { resumableUploadTarget } from "@/backend/infrastructure/supabase/resumable-upload";
-import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
+import { canOpenTaskMaterials } from "@/backend/services/task-access.service";
 import { TASK_VIDEO_MAX_BYTES, TASK_VIDEO_TYPES, type TaskVideoSummary, type TaskVideoView } from "@/shared/domain/task-video";
 import type { AuthUser } from "@/shared/domain/types";
 
@@ -32,21 +32,13 @@ export async function taskVideoSummaries(taskIds: string[], manager: boolean) {
   return new Map((result.data as VideoRow[]).filter((row) => manager || row.video_path).map((row) => [String(row.task_id), summary(row, manager)]));
 }
 
-async function canManage(user: AuthUser, taskId: string) {
+export async function canManageTaskMaterials(user: AuthUser, taskId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
   const result = await supabase.rpc("app_task_video_can_manage", { p_actor: user.id, p_task: taskId });
   return result.error ? null : Boolean(result.data);
 }
 
-/** Mentors of the team see every video; a participant only videos of tasks in their own feed. */
-async function canWatch(user: AuthUser, taskId: string, teamId: string) {
-  if (!user.teamId || user.teamId !== teamId) return false;
-  if (user.role === "admin" || user.canReview || user.canPublishTasks) return true;
-  if (user.role !== "member") return false;
-  const feed = await getMemberTaskFeed(user.id, user.teamId, user.teamJoinedAt);
-  return "data" in feed && Boolean(feed.data?.some((task) => String(task.id) === taskId));
-}
 
 async function signedUrl(path: string) {
   const supabase = getSupabaseAdmin();
@@ -67,8 +59,8 @@ export async function getTaskVideo(user: AuthUser, taskId: string) {
   if (found.error) return { error: found.error };
   const row = found.data as VideoRow | null;
   if (!row) return { notFound: true as const };
-  if (!(await canWatch(user, taskId, row.team_id))) return { forbidden: true as const };
-  const manager = user.role !== "member" || Boolean(await canManage(user, taskId));
+  if (!(await canOpenTaskMaterials(user, taskId, row.team_id))) return { forbidden: true as const };
+  const manager = user.role !== "member" || Boolean(await canManageTaskMaterials(user, taskId));
   if (!row.video_path) return manager ? { data: { ...summary(row, true), fileName: row.file_name, watchedSeconds: 0, completed: false } satisfies TaskVideoView } : { notFound: true as const };
   const url = await signedUrl(row.video_path);
   if (!url) return { error: new Error("task_video_signed_url_failed") };
@@ -144,7 +136,7 @@ export async function finishTaskVideoUpload(user: AuthUser, taskId: string, inpu
 export async function removeTaskVideo(user: AuthUser, taskId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const allowed = await canManage(user, taskId);
+  const allowed = await canManageTaskMaterials(user, taskId);
   if (allowed === null) return { error: new Error("task_video_permission_failed") };
   if (!allowed) return { forbidden: true as const };
   // The table trigger queues the files for deletion from Storage.

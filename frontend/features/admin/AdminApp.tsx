@@ -40,6 +40,8 @@ import { loadReviewTemplates, saveReviewTemplates } from "@/frontend/shared/api/
 import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
 import { TaskResultsSheet } from "./TaskResultsSheet";
 import { removeTaskVideo, uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
+import { loadQuizForEditing, saveTaskQuiz } from "@/frontend/shared/api/task-quiz-client";
+import { validateQuiz, type QuizQuestion } from "@/shared/domain/task-quiz";
 
 import type { AdminSection } from "./admin-sections";
 import { useAdminData } from "./use-admin-data";
@@ -82,6 +84,8 @@ export function AdminApp() {
   const [taskVideoFile, setTaskVideoFile] = useState<File | null>(null);
   const [taskVideoRemoving, setTaskVideoRemoving] = useState(false);
   const [modalBusyLabel, setModalBusyLabel] = useState<string | undefined>(undefined);
+  // Questions of the task being edited; "dirty" means they differ from what is stored.
+  const [quizEdit, setQuizEdit] = useState<{ questions: QuizQuestion[]; loading: boolean; dirty: boolean }>({ questions: [], loading: false, dirty: false });
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
@@ -227,6 +231,9 @@ export function AdminApp() {
     setTaskFiles([]);
     setTaskVideoFile(null);
     setTaskVideoRemoving(false);
+    setQuizEdit({ questions: [], loading: Boolean(task?.quiz), dirty: false });
+    if (task?.quiz) loadQuizForEditing(task.id).then((questions) => setQuizEdit((current) => current.dirty ? current : { questions, loading: false, dirty: false }))
+      .catch(() => { setQuizEdit({ questions: [], loading: false, dirty: false }); setToast("Не удалось загрузить вопросы задания."); });
     setModal({ type: "task", task });
   }
 
@@ -383,6 +390,13 @@ export function AdminApp() {
       }
       deadlineAt = deadline.toISOString();
     }
+    // Questions are checked before anything is saved, so a typo never leaves a half-saved task.
+    let quizQuestions: QuizQuestion[] | null = null;
+    if (quizEdit.dirty) {
+      const checked = validateQuiz(quizEdit.questions);
+      if ("error" in checked) { setToast(checked.error); return; }
+      quizQuestions = checked.questions;
+    }
     setModalBusy(true);
     try {
       const taskRecord = modal.task
@@ -403,6 +417,18 @@ export function AdminApp() {
           return;
         }
       }
+      if (quizQuestions) {
+        try {
+          const stored = await saveTaskQuiz(saved.id, quizQuestions);
+          saved = { ...saved, quiz: stored.length ? { questions: stored.length } : undefined };
+          setQuizEdit({ questions: stored, loading: false, dirty: false });
+        } catch (error) {
+          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks.filter((item) => item.id !== saved.id), saved] }));
+          setModal({ type: "task", task: saved });
+          setToast(`Задание сохранено, но вопросы — нет. ${error instanceof Error ? error.message : "Попробуйте ещё раз."}`);
+          return;
+        }
+      } else saved = { ...saved, quiz: modal.task?.quiz };
       // The task itself is saved first; a video problem never loses the text the mentor typed.
       let videoNotice = "";
       if (taskVideoRemoving && !taskVideoFile && saved.video) {
@@ -559,7 +585,7 @@ export function AdminApp() {
       canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast}
       onReview={openReviewModal} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} onClose={() => setResultsTaskId("")} />}
     {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
-    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
+    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit({ questions, loading: false, dirty: true }) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}

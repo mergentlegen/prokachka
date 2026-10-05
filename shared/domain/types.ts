@@ -3,7 +3,7 @@ import type { TaskVideoSummary } from "./task-video";
 
 export type UserRole = "ceo" | "admin" | "member";
 export type SubmissionStatus = "pending" | "accepted" | "revision";
-export type SubmissionSource = "telegram" | "interactive" | "mentor";
+export type SubmissionSource = "telegram" | "interactive" | "mentor" | "site";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
@@ -41,7 +41,7 @@ export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; pinnedAt?: string; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; programTitle?: string; programSteps?: number; createdAt: string; updatedAt: string;
-  attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary;
+  attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary; quiz?: { questions: number };
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
@@ -52,7 +52,7 @@ export type StarAward = {
 };
 export type Submission = {
   id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
-  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string; answerTruncated?: boolean;
+  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "demo"; answerText?: string; answerTruncated?: boolean; quizScore?: number; quizTotal?: number;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number };

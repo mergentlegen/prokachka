@@ -41,7 +41,7 @@ export function mutationTopics(url: string, method: string): ChangeTopic[] {
   // A reminder only queues Telegram messages; nothing on the page changes.
   if (url.startsWith("/api/tasks/") && url.endsWith("/nudge")) return [];
   // Starting an upload and reporting how far a video was watched change nothing other pages show.
-  if (url.startsWith("/api/tasks/") && (url.endsWith("/video/upload") || url.endsWith("/video/progress"))) return [];
+  if (url.startsWith("/api/tasks/") && (url.endsWith("/video/upload") || url.endsWith("/video/progress") || url.endsWith("/quiz/draft"))) return [];
   if (url.startsWith("/api/tasks")) return ["tasks", "submissions"];
   if (url.startsWith("/api/stars")) return ["stars"];
   if (url.startsWith("/api/announcements")) return ["announcements"];

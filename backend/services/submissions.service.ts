@@ -3,7 +3,7 @@ import { descendants, findTeamNetwork } from "@/backend/services/network.service
 
 type SubmissionViewer = { id: string; role: string; teamId?: string; canReview?: boolean };
 type FindOptions = { userId?: string; teamId?: string; viewer?: SubmissionViewer };
-const submissionSelect = "id,user_id,task_id,status,submission_source,interactive_completed,media_type,answer_text,points,comment,submitted_at,reviewed_at,review_version,created_at";
+const submissionSelect = "id,user_id,task_id,status,submission_source,interactive_completed,media_type,answer_text,quiz_score,quiz_total,points,comment,submitted_at,reviewed_at,review_version,created_at";
 // Team lists carry the whole history; reviewed answers travel as a preview, the full text opens on demand.
 export const ANSWER_PREVIEW_LENGTH = 300;
 

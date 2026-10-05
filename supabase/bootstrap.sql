@@ -39,3 +39,4 @@
 \ir 20261020-review-comment-templates.sql
 \ir 20261021-audit-and-reminders.sql
 \ir 20261022-task-videos.sql
+\ir 20261023-task-quizzes.sql

@@ -6,13 +6,16 @@ import { FormSheet } from "@/frontend/shared/FormSheet";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { TaskFilePicker } from "./TaskFilePicker";
 import { TaskVideoField } from "./TaskVideoField";
+import { QuizEditor } from "./QuizEditor";
+import type { QuizQuestion } from "@/shared/domain/task-quiz";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { MAX_MILES } from "@/shared/domain/miles";
 export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 export type ReviewDraft = { points: string; comment: string };
 
-export function TaskEditorModal({ taskId, task, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, onChange, onClose, onSubmit }: { taskId?: string; task?: Task; draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
+export function TaskEditorModal({ taskId, task, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, quiz, onChange, onClose, onSubmit }: { taskId?: string; task?: Task; draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
   video: { file: File | null; removing: boolean; onFile: (file: File | null) => void; onRemove: (removing: boolean) => void; onError: (message: string) => void };
+  quiz: { questions: QuizQuestion[]; loading: boolean; onChange: (questions: QuizQuestion[]) => void };
   onChange: (key: keyof TaskDraft, value: string | boolean) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return <FormSheet title={editing ? "Изменить задание" : "Новое задание"} busy={busy} busyLabel={busyLabel} submitLabel={editing ? "Сохранить" : "Создать задание"} onClose={onClose} onSubmit={onSubmit}>
     <label>Название задания<input value={draft.title} onChange={(event) => onChange("title", event.target.value)} placeholder="Например, записать короткое видео" autoFocus /></label>
@@ -20,6 +23,7 @@ export function TaskEditorModal({ taskId, task, draft, editing, busy, busyLabel,
     <label><span className="field-label">Ссылка на материал <span className="field-hint">необязательно</span></span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
     <ResourceCard url={draft.resourceUrl} caption="Так участник увидит материал" />
     <TaskVideoField task={task} file={video.file} removing={video.removing} disabled={busy} onFile={video.onFile} onRemove={video.onRemove} onError={video.onError} />
+    <QuizEditor questions={quiz.questions} loading={quiz.loading} disabled={busy} onChange={quiz.onChange} />
     <TaskFilePicker taskId={taskId} attachments={attachments} files={files} disabled={busy} onFilesChange={onFilesChange} onRemove={onRemoveAttachment} />
     <label>Максимум миль<input type="number" inputMode="numeric" min="0" max={MAX_MILES} step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
     <label className="toggle-row"><span><strong>Срок сдачи</strong><small>{draft.hasDeadline ? "Участники должны отправить ответ до даты ниже" : "Без срока — можно отправить в любое время"}</small></span>

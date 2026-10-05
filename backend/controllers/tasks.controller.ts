@@ -8,6 +8,7 @@ import { listTaskAttachments } from "@/backend/services/task-attachments.service
 import { applyTaskFeedOrder } from "@/backend/services/task-feed-order.service";
 import { validMiles } from "@/shared/domain/miles";
 import { taskVideoSummaries } from "@/backend/services/task-videos.service";
+import { taskQuizSummaries } from "@/backend/services/task-quizzes.service";
 import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
 
 
@@ -38,8 +39,9 @@ export async function listTasks(request: Request) {
     if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
     const ordered = await applyTaskFeedOrder(result.data, user, false);
     if (!ordered.data) return failure("Не удалось загрузить порядок заданий.", 503);
-    const videos = await taskVideoSummaries(ordered.data.map((task) => String(task.id)), false);
-    return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [], video: videos.get(String(task.id)) })) });
+    const ids = ordered.data.map((task) => String(task.id));
+    const [videos, quizzes] = await Promise.all([taskVideoSummaries(ids, false), taskQuizSummaries(ids)]);
+    return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [], video: videos.get(String(task.id)), quiz: quizzes.get(String(task.id)) })) });
   }
   if ((user.role === "admin" || user.role === "member") && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "ceo" ? undefined : user.teamId, user);
@@ -50,8 +52,9 @@ export async function listTasks(request: Request) {
   if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
   const ordered = await applyTaskFeedOrder(result.data, user, true);
   if (!ordered.data) return failure("Не удалось загрузить порядок заданий.", 503);
-  const videos = await taskVideoSummaries(ordered.data.map((task) => String(task.id)), true);
-  return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [], video: videos.get(String(task.id)) })) });
+  const ids = ordered.data.map((task) => String(task.id));
+  const [videos, quizzes] = await Promise.all([taskVideoSummaries(ids, true), taskQuizSummaries(ids)]);
+  return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [], video: videos.get(String(task.id)), quiz: quizzes.get(String(task.id)) })) });
 }
 
 export async function createTask(request: Request) {

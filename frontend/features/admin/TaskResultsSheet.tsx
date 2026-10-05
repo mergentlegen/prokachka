@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { loadTaskVideoViews, type VideoView } from "@/frontend/shared/api/task-quiz-client";
 import type { Store, Submission, Task, User } from "@/shared/domain/types";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
@@ -23,6 +24,14 @@ export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNot
   onReview: (submission: Submission, status: "accepted" | "revision") => void; onComplete?: (task: Task, member: User) => void; onClose: () => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [views, setViews] = useState<Map<string, VideoView> | null>(null);
+  // Who watched the task video; loaded only for tasks that have one.
+  useEffect(() => {
+    if (!task.video?.playable) return;
+    let active = true;
+    loadTaskVideoViews(task.id).then((list) => { if (active) setViews(new Map(list.map((view) => [view.userId, view]))); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [task.id, task.video?.playable]);
   const results = taskParticipantResults(task, store);
   const progress = taskProgress(results);
   const shown = results.filter((result) => filterMatches[filter](result.status));
@@ -47,6 +56,10 @@ export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNot
           <div className={styles.person}>
             <strong>{result.user.name}</strong>
             <span className={`${styles.status} ${styles[result.status]}`}>{participantStatusText(result.status)}{result.status === "accepted" && ` · +${formatMiles(result.submission?.points || 0)}`}</span>
+            {(views || result.submission?.quizTotal) && <small className={styles.facts}>
+              {views && <span>{views.get(result.user.id)?.completed ? "▶ досмотрел видео" : views.get(result.user.id) ? `▶ видео: ${views.get(result.user.id)?.percent}%` : "▶ не смотрел видео"}</span>}
+              {result.submission?.quizTotal ? <span>тест {result.submission.quizScore ?? 0} из {result.submission.quizTotal}</span> : null}
+            </small>}
             {result.submission?.comment && result.status === "revision" && <small>{result.submission.comment}</small>}
           </div>
           {result.submission && result.submission.source !== "interactive" && (result.status === "accepted" || result.status === "revision") &&

@@ -15,9 +15,6 @@ export function taskVideoContentType(fileName: string, type: string) {
   return extension === "mp4" || extension === "m4v" ? "video/mp4" : extension === "mov" ? "video/quicktime" : extension === "webm" ? "video/webm" : "";
 }
 
-/** The author's mark that stays in the corner of every protected video. */
-export const VIDEO_AUTHOR_MARK = "Асель Баялинова";
-
 export function formatVideoTime(seconds: number) {
   const total = Math.max(0, Math.floor(seconds));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
