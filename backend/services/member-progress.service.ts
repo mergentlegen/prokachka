@@ -7,13 +7,14 @@ function addHours(value: string, hours: number) { return new Date(new Date(value
 export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt?: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const [tasksResult, programsResult, progressResult] = await Promise.all([
+  // The team structure is needed for every feed, so it travels together with the lists.
+  const [tasksResult, programsResult, progressResult, network] = await Promise.all([
     readPages(supabase.from("tasks").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
     readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
     readPages(supabase.from("member_program_progress").select("*").eq("user_id", userId).order("id")),
+    findTeamNetwork(teamId),
   ]);
   if (tasksResult.error || programsResult.error || progressResult.error) return { error: tasksResult.error || programsResult.error || progressResult.error };
-  const network = await findTeamNetwork(teamId);
   if ("unavailable" in network) return network;
   if ("error" in network) return network;
   const tasks = (tasksResult.data || []).filter((task) => isAudienceVisible(network.data, userId, task.audience_root_id));

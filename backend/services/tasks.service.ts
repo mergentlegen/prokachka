@@ -17,10 +17,11 @@ export async function findTasks(teamId?: string, viewer?: TaskViewer) {
   if (!supabase) return { unavailable: true as const };
   let query = supabase.from("tasks").select("*").order("is_pinned", { ascending: false }).order("pinned_at", { ascending: true }).order("created_at", { ascending: true });
   if (teamId) query = query.eq("team_id", teamId);
-  const result = await readPages(query.order("id"));
+  // Participants with rights also need the team structure; it is fetched at the same time, not after the list.
+  const filtered = Boolean(teamId && viewer && viewer.role !== "ceo" && viewer.role !== "admin");
+  const [result, network] = await Promise.all([readPages(query.order("id")), filtered ? findTeamNetwork(teamId || "") : Promise.resolve(null)]);
   if (result.error) return { error: result.error };
-  if (!teamId || !viewer || viewer.role === "ceo" || viewer.role === "admin") return { data: result.data };
-  const network = await findTeamNetwork(teamId);
+  if (!filtered || !network || !viewer) return { data: result.data };
   if ("unavailable" in network) return { unavailable: true as const };
   if ("error" in network) return { error: network.error };
   const allowedAuthors = descendants(network.data, viewer.id, true);

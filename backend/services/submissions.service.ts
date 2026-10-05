@@ -68,6 +68,9 @@ export async function findSubmissions(options: FindOptions = {}) {
   if (options.teamId) query = query.eq("tasks.team_id", options.teamId).eq("users.team_id", options.teamId);
   // Ignore legacy placeholders, but retain already reviewed history without rewriting scores.
   query = query.or("status.neq.pending,media_type.not.is.null,answer_text.neq.");
+  // A reviewing participant also needs the team structure; it is fetched together with the first page.
+  const branchOnly = !options.userId && options.viewer?.role === "member";
+  const networkRequest = branchOnly ? findTeamNetwork(options.viewer?.teamId || "") : null;
   let result = await query.range(0, 499);
   if (result.error) return { error: result.error };
   const rows = [...(result.data || [])];
@@ -76,8 +79,8 @@ export async function findSubmissions(options: FindOptions = {}) {
     if (result.error) return { error: result.error };
     rows.push(...(result.data || []));
   }
-  if (!options.userId && options.viewer?.role === "member") {
-    const network = await findTeamNetwork(options.viewer.teamId || "");
+  if (branchOnly && networkRequest && options.viewer) {
+    const network = await networkRequest;
     if ("unavailable" in network) return { unavailable: true as const };
     if ("error" in network) return { error: network.error };
     const allowed = descendants(network.data, options.viewer.id, false);

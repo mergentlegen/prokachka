@@ -29,10 +29,11 @@ export async function findAnnouncements(options: { teamId?: string; includeInact
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (!options.includeInactive) query = query.eq("is_active", true);
 
-  const result = await readPages(query.order("id"));
+  // Participants also need the team structure; it is fetched at the same time, not after the list.
+  const filtered = Boolean(options.teamId && options.viewer && options.viewer.role !== "ceo" && options.viewer.role !== "admin");
+  const [result, network] = await Promise.all([readPages(query.order("id")), filtered ? findTeamNetwork(options.teamId || "") : Promise.resolve(null)]);
   if (result.error) return { error: result.error };
-  if (!options.teamId || !options.viewer || options.viewer.role === "ceo" || options.viewer.role === "admin") return { data: await withAnnouncementPhotoUrls(result.data || []) };
-  const network = await findTeamNetwork(options.teamId);
+  if (!filtered || !network) return { data: await withAnnouncementPhotoUrls(result.data || []) };
   if ("unavailable" in network) return { unavailable: true as const };
   if ("error" in network) return { error: network.error };
   const allowedAuthors = descendants(network.data, options.viewer?.id || "", true);
