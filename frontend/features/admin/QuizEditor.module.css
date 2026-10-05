@@ -19,3 +19,8 @@
 .addOption { justify-self: start; min-height: 36px; padding: 6px 4px; border: 0; background: none; color: var(--blue); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .add { display: flex; flex-wrap: wrap; gap: 8px; }
 .add button { flex: 1 1 160px; min-height: 44px; padding: 8px 14px; border: 1px dashed #b9c8e6; border-radius: 12px; background: #f6f9ff; color: var(--blue); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+@media (max-width: 520px) {
+  .cardTop { flex-wrap: wrap; }
+  .cardTop select { flex-basis: 100%; order: 3; }
+  .tools { margin-left: auto; }
+}

@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { createAdminProgram } from "@/frontend/shared/api/admin-client";
 import { uploadTaskAttachment } from "@/frontend/shared/api/client";
+import { uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
+import { saveTaskQuiz } from "@/frontend/shared/api/task-quiz-client";
+import { validateQuiz, type QuizQuestion } from "@/shared/domain/task-quiz";
+import { TaskVideoField } from "./TaskVideoField";
+import { QuizEditor } from "./QuizEditor";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
@@ -10,7 +15,7 @@ import { formatMiles } from "@/frontend/shared/lib/format";
 import { MAX_MILES, validMiles } from "@/shared/domain/miles";
 import styles from "./ProgramsPanel.module.css";
 
-type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string; files: File[] };
+type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string; files: File[]; video: File | null; questions: QuizQuestion[] };
 function validLink(value: string) {
   if (!value.trim()) return true;
   try { return value.trim().length <= 2000 && ["http:", "https:"].includes(new URL(value.trim()).protocol); }
@@ -23,11 +28,18 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
   const [draftTasks, setDraftTasks] = useState<DraftTask[]>([]);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [progress, setProgress] = useState("");
   const nextId = useRef(0);
   const newStepInput = useRef<HTMLInputElement>(null);
   const focusNewStep = useRef(false);
   const reviewTitle = useRef<HTMLHeadingElement>(null);
-  const hasInvalidStep = draftTasks.some((task) =>
+  // The first problem in a step's questions, in plain words ("Шаг 2 · Вопрос 1: отметьте верный ответ.").
+  const quizProblem = draftTasks.map((task, index) => {
+    if (!task.questions.length) return "";
+    const checked = validateQuiz(task.questions);
+    return "error" in checked ? `Шаг ${index + 1} · ${checked.error}` : "";
+  }).find(Boolean) || "";
+  const hasInvalidStep = Boolean(quizProblem) || draftTasks.some((task) =>
     task.title.trim().length < 2 || task.title.trim().length > 160 ||
     task.description.trim().length < 2 || task.description.trim().length > 5000 ||
     !task.maxPoints.trim() || !validMiles(Number(task.maxPoints)) || !validLink(task.resourceUrl));
@@ -43,7 +55,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
   function addStep() {
     if (busy || draftTasks.length >= 100) return;
     focusNewStep.current = true;
-    const task = { id: nextId.current++, title: "", description: "", resourceUrl: "", maxPoints: "10", files: [] };
+    const task: DraftTask = { id: nextId.current++, title: "", description: "", resourceUrl: "", maxPoints: "10", files: [], video: null, questions: [] };
     setDraftTasks((current) => [...current, task]);
   }
   function updateTask<K extends keyof Omit<DraftTask, "id">>(id: number, key: K, value: DraftTask[K]) {
@@ -69,12 +81,32 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
             tasksWithFiles[taskIndex] = { ...tasksWithFiles[taskIndex], attachments: [...(tasksWithFiles[taskIndex].attachments || []), attachment] };
           } catch { uploadErrors.push(file.name); }
         }
+        // Questions and video of the step; a failure is reported, the published program stays.
+        const draft = draftTasks[index];
+        const taskIndex = tasksWithFiles.findIndex((item) => item.id === task.id);
+        if (draft.questions.length) {
+          try {
+            const checked = validateQuiz(draft.questions);
+            if ("error" in checked) throw new Error(checked.error);
+            const stored = await saveTaskQuiz(task.id, checked.questions);
+            tasksWithFiles[taskIndex] = { ...tasksWithFiles[taskIndex], quiz: { questions: stored.length } };
+          } catch { uploadErrors.push(`вопросы шага ${index + 1}`); }
+        }
+        if (draft.video) {
+          try {
+            setProgress(`Загружаем видео шага ${index + 1}… 0%`);
+            await uploadTaskVideo(task.id, draft.video, (percentage) => setProgress(`Загружаем видео шага ${index + 1}… ${percentage}%`));
+            tasksWithFiles[taskIndex] = { ...tasksWithFiles[taskIndex], video: { status: "processing", playable: false } };
+          } catch { uploadErrors.push(`видео шага ${index + 1}`); }
+        }
       }
+      const hasVideo = draftTasks.some((task) => task.video);
       onCreated(created.program, tasksWithFiles);
       onClose();
-      onError(uploadErrors.length ? `Программа опубликована, но не загрузились PDF: ${uploadErrors.join(", ")}. Их можно добавить позже через редактирование соответствующих заданий.` : "Программа опубликована. Первый шаг уже доступен участникам.");
+      onError(uploadErrors.length ? `Программа опубликована, но не сохранились: ${uploadErrors.join(", ")}. Их можно добавить позже через «Изменить» у шага.`
+        : `Программа опубликована. Первый шаг уже доступен участникам.${hasVideo ? " Видео сжимаются и появятся через несколько минут." : ""}`);
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось создать программу."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setProgress(""); }
   }
   return <ModalSheet title="Создать программу" variant="immersive" onClose={() => { if (!busy) onClose(); }}>
     <form className={"admin-panel program-builder " + styles.modalBuilder} onSubmit={(event) => { event.preventDefault(); if (canPublish && !busy) { if (preview) void publish(); else setPreview(true); } }}>
@@ -83,8 +115,8 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
         <h3 ref={reviewTitle} tabIndex={-1}>Проверьте программу перед публикацией</h3>
         <p><strong>{title.trim()}</strong><br />Шагов: {draftTasks.length} · На каждый шаг: {deadlineHours} ч</p>
         {draftTasks.length === 1 && <p className="program-review-note">Сейчас в программе только один шаг. Если планировали несколько, вернитесь к редактированию и добавьте остальные.</p>}
-        <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {formatMiles(task.maxPoints)}{task.resourceUrl.trim() ? " · С материалом" : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
-        <div className="program-builder-actions"><button type="button" className="button button-edit" disabled={busy} onClick={() => setPreview(false)}>← К редактированию</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? "Публикуем..." : "Подтвердить и опубликовать"}</button></div>
+        <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {formatMiles(task.maxPoints)}{task.resourceUrl.trim() ? " · С материалом" : ""}{task.video ? " · Видео" : ""}{task.questions.length ? ` · Вопросы: ${task.questions.length}` : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
+        <div className="program-builder-actions"><button type="button" className="button button-edit" disabled={busy} onClick={() => setPreview(false)}>← К редактированию</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? progress || "Публикуем..." : "Подтвердить и опубликовать"}</button></div>
       </div> : <>
         <fieldset disabled={busy} className="program-fields">
           <div className="form-two-columns">
@@ -109,11 +141,13 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
                 if (task.files.length + valid.length > 10) { onError("К шагу можно прикрепить не больше 10 PDF."); event.target.value = ""; return; }
                 updateTask(task.id, "files", [...task.files, ...valid]); event.target.value = "";
               }} /></label>
+              <TaskVideoField file={task.video} removing={false} disabled={busy} onFile={(file) => updateTask(task.id, "video", file)} onRemove={() => undefined} onError={onError} />
+              <QuizEditor questions={task.questions} loading={false} disabled={busy} onChange={(questions) => updateTask(task.id, "questions", questions)} />
               {task.files.length > 0 && <ul className={styles.selectedFiles}>{task.files.map((file, fileIndex) => <li key={`${file.name}-${file.lastModified}-${fileIndex}`}><span>{file.name} · {(file.size / 1048576).toFixed(1)} МБ</span><button type="button" onClick={() => updateTask(task.id, "files", task.files.filter((_, itemIndex) => itemIndex !== fileIndex))}>Убрать</button></li>)}</ul>}
             </div>)}</div>}
           <button type="button" className="program-add-step" disabled={draftTasks.length >= 100} onClick={addStep}>＋ {draftTasks.length ? "Добавить следующий шаг" : "Добавить первый шаг"}</button>
         </fieldset>
-        <div className="program-builder-actions"><p className="program-publish-hint">{canPublish ? "Все шаги заполнены. Проверьте их перед публикацией." : "Заполните название, срок и каждый добавленный шаг."}</p><button type="submit" className="button button-primary" disabled={busy || !canPublish}>Далее: проверить программу →</button></div>
+        <div className="program-builder-actions"><p className="program-publish-hint">{canPublish ? "Все шаги заполнены. Проверьте их перед публикацией." : quizProblem || "Заполните название, срок и каждый добавленный шаг."}</p><button type="submit" className="button button-primary" disabled={busy || !canPublish}>Далее: проверить программу →</button></div>
       </>}
     </form>
   </ModalSheet>;
