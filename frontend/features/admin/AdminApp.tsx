@@ -39,6 +39,7 @@ import { reviewQueue } from "./review-queue";
 import { loadReviewTemplates, saveReviewTemplates } from "@/frontend/shared/api/review-templates-client";
 import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
 import { TaskResultsSheet } from "./TaskResultsSheet";
+import { removeTaskVideo, uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
 
 import type { AdminSection } from "./admin-sections";
 import { useAdminData } from "./use-admin-data";
@@ -78,6 +79,9 @@ export function AdminApp() {
   const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "" });
   const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([]);
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
+  const [taskVideoFile, setTaskVideoFile] = useState<File | null>(null);
+  const [taskVideoRemoving, setTaskVideoRemoving] = useState(false);
+  const [modalBusyLabel, setModalBusyLabel] = useState<string | undefined>(undefined);
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
@@ -221,6 +225,8 @@ export function AdminApp() {
     });
     setTaskAttachments(task?.attachments || []);
     setTaskFiles([]);
+    setTaskVideoFile(null);
+    setTaskVideoRemoving(false);
     setModal({ type: "task", task });
   }
 
@@ -382,7 +388,7 @@ export function AdminApp() {
       const taskRecord = modal.task
         ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt })
         : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt });
-      let saved: Task = { ...taskRecord, attachments: taskAttachments };
+      let saved: Task = { ...taskRecord, attachments: taskAttachments, video: modal.task?.video };
       for (let index = 0; index < taskFiles.length; index += 1) {
         try {
           const attachment = await uploadTaskAttachment(saved.id, taskFiles[index]);
@@ -391,20 +397,44 @@ export function AdminApp() {
         } catch (error) {
           const remaining = taskFiles.slice(index);
           setTaskFiles(remaining);
-          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks, saved] }));
+          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks.filter((item) => item.id !== saved.id), saved] }));
           setModal({ type: "task", task: saved });
           setToast(`Задание сохранено, но PDF «${taskFiles[index].name}» не загрузился. ${error instanceof Error ? error.message : "Повторите загрузку."}`);
           return;
         }
       }
-      setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks, saved] }));
+      // The task itself is saved first; a video problem never loses the text the mentor typed.
+      let videoNotice = "";
+      if (taskVideoRemoving && !taskVideoFile && saved.video) {
+        try { await removeTaskVideo(saved.id); saved = { ...saved, video: undefined }; }
+        catch { videoNotice = " Видео удалить не удалось, попробуйте ещё раз."; }
+      }
+      if (taskVideoFile) {
+        try {
+          setModalBusyLabel("Загружаем видео… 0%");
+          await uploadTaskVideo(saved.id, taskVideoFile, (percentage) => setModalBusyLabel(`Загружаем видео… ${percentage}%`));
+          saved = { ...saved, video: { status: "processing", playable: Boolean(saved.video?.playable), durationSeconds: saved.video?.durationSeconds } };
+          videoNotice = " Видео загружено и сжимается — у участников появится через несколько минут.";
+        } catch (error) {
+          setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks.filter((item) => item.id !== saved.id), saved] }));
+          setTaskFiles([]);
+          setModal({ type: "task", task: saved });
+          setToast(`Задание сохранено, но видео не загрузилось. ${error instanceof Error ? error.message : "Попробуйте ещё раз."}`);
+          return;
+        }
+      }
+      // While a long upload runs, a live update may already have brought the new task in: never list it twice.
+      setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks.filter((item) => item.id !== saved.id), saved] }));
       setTaskFiles([]);
+      setTaskVideoFile(null);
+      setTaskVideoRemoving(false);
       setModal(null);
-      setToast("Задание сохранено.");
+      setToast("Задание сохранено." + videoNotice);
     } catch {
       setToast("Не удалось сохранить задание.");
     } finally {
       setModalBusy(false);
+      setModalBusyLabel(undefined);
     }
   }
 
@@ -529,7 +559,7 @@ export function AdminApp() {
       canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast}
       onReview={openReviewModal} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} onClose={() => setResultsTaskId("")} />}
     {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
-    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
+    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}

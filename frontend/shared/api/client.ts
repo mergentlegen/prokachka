@@ -1,4 +1,5 @@
 import type { Announcement, AnnouncementPhoto, AuthUser, NetworkMember, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
+import type { TaskVideoSummary } from "@/shared/domain/task-video";
 import { isReadyProgramKey } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
 import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
@@ -97,9 +98,16 @@ export function recordTaskLinkOpen(taskId: string) {
 export function mapTaskAttachment(row: ApiRow): TaskAttachment {
   return { id: String(row.id), fileName: String(row.file_name || "document.pdf"), contentType: "application/pdf", sizeBytes: Number(row.size_bytes || 0), createdAt: String(row.created_at || new Date().toISOString()) };
 }
+function mapTaskVideo(value: unknown): TaskVideoSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as Record<string, unknown>;
+  if (row.status !== "processing" && row.status !== "ready" && row.status !== "failed") return undefined;
+  return { status: row.status, playable: row.playable === true, durationSeconds: typeof row.duration_seconds === "number" ? row.duration_seconds : typeof row.durationSeconds === "number" ? row.durationSeconds : undefined, error: typeof row.error === "string" ? row.error : undefined };
+}
 export function mapTask(row: ApiRow): Task {
   return { id: String(row.id), title: String(row.title || ""), description: String(row.description || ""), maxPoints: Number(row.max_points || 0),
     feedOrder: typeof row.feed_order === "number" && Number.isFinite(row.feed_order) ? row.feed_order : undefined,
+    video: mapTaskVideo(row.video),
     deadlineAt: row.deadline_at ? String(row.deadline_at) : undefined, isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, teamId: row.team_id ? String(row.team_id) : undefined,
     publicationType: row.publication_type === "sequential" || row.publication_type === "evergreen" ? row.publication_type : "fixed",
     programId: row.program_id ? String(row.program_id) : undefined, position: row.position ? Number(row.position) : undefined,

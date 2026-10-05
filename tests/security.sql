@@ -12,7 +12,7 @@ begin
       then raise exception 'Public table access on %', row.relname; end if;
   end loop;
   for row in select p.oid, p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname='public' and p.prosecdef and p.proname <> 'welcome_video_upload_path_allowed'
+    where n.nspname='public' and p.prosecdef and p.proname not in ('welcome_video_upload_path_allowed', 'task_video_upload_path_allowed')
   loop
     if has_function_privilege('anon',row.oid,'execute') or has_function_privilege('authenticated',row.oid,'execute')
       then raise exception 'Privileged function exposed: %', row.proname; end if;

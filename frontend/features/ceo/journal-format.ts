@@ -9,7 +9,7 @@ const titles: Record<string, string> = {
   "user.access": "Изменён доступ", "user.delete": "Удалён пользователь", "user.network": "Изменены права в сети",
   "team.create": "Создана команда", "team.update": "Изменена команда", "team.disable": "Команда отключена", "team.enable": "Команда включена", "team.delete": "Удалена команда",
   "request.approve": "Заявка одобрена", "request.reject": "Заявка отклонена",
-  "task.create": "Опубликовано задание", "task.delete": "Удалено задание", "task.nudge": "Напоминание по заданию",
+  "task.create": "Опубликовано задание", "task.delete": "Удалено задание", "task.nudge": "Напоминание по заданию", "task.video": "Загружено видео к заданию",
   "program.create": "Опубликована программа", "program.delete": "Удалена программа",
   "announcement.create": "Опубликовано объявление", "announcement.delete": "Удалено объявление",
   "star.award": "Выданы звёзды", "star.revoke": "Отменена выдача звёзд",

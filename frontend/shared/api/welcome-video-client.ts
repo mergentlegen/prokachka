@@ -9,7 +9,7 @@ export type { WelcomeVideo } from "@/shared/domain/welcome-video";
 export type VideoMetadata = WelcomeVideoMetadata;
 type Api<T> = { ok: boolean; message?: string } & T;
 
-function describeTusError(cause: unknown): Error {
+export function describeTusError(cause: unknown): Error {
   if (!(cause instanceof tus.DetailedError)) {
     return new Error("Не удалось связаться с Supabase Storage. Проверьте подключение и попробуйте ещё раз.");
   }

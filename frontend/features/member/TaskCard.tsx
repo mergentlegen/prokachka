@@ -16,9 +16,11 @@ import { CaptainCruiseGame } from "./CaptainCruiseGame";
 import { CountYourDreamGame } from "./CountYourDreamGame";
 import { DreamRouteGame } from "./DreamRouteGame";
 import { deadlineInfo } from "./member-progress";
+import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
+import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
 
-export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
+export function TaskCard({ task, submission, viewerName, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; viewerName?: string; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [linkOpened, setLinkOpened] = useState(false);
@@ -61,6 +63,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
       {step && <div className={styles.program}><span>{task.programTitle ? `«${task.programTitle}» · ` : "Программа · "}шаг {step}{task.programSteps ? ` из ${task.programSteps}` : ""}</span>{task.programSteps && <i style={{ "--progress": `${Math.max(4, Math.min(100, ((step - 1) / task.programSteps) * 100))}%` } as CSSProperties} />}</div>}
       <h3><button className={styles.title} onClick={() => setOpen(true)} aria-haspopup="dialog">{task.title}</button></h3>
       <p className={styles.preview}>{task.description}</p>
+      {task.video?.playable && <p className={styles.videoHint}><span aria-hidden="true">▶</span>Видео{task.video.durationSeconds ? ` · ${formatVideoTime(task.video.durationSeconds)}` : ""}</p>}
       {Boolean(task.attachments?.length) && <p className={styles.attachmentHint}>PDF-материалы · {task.attachments?.length} {task.attachments?.length === 1 ? "файл" : "файла"}</p>}
       {deadline && (countdown && canSubmit && !captainPending && !surveyInProgress
         ? <p className={`${styles.countdown} ${styles[countdown.tone]}`}><span>{countdown.text}</span><small>{countdown.tone === "expired" ? "можно отправить с опозданием" : `до ${formatDateTime(deadline)}`}</small></p>
@@ -79,6 +82,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "count-your-dream" && <CountYourDreamGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "dream-route" && <DreamRouteGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}
+        {task.video?.playable && <ProtectedVideo taskId={task.id} viewerName={viewerName} />}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} onOpen={openedResource} />}
         {linkOpened && canSubmit && <div className={styles.returnHint} role="status"><strong>Уже выполнили?</strong><p>Нажмите «{submitLabel}» ниже. Без этого наставник не увидит работу, не даст обратную связь и не начислит мили.</p></div>}

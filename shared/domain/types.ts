@@ -1,4 +1,5 @@
 import type { StarAwardKind } from "./star-awards";
+import type { TaskVideoSummary } from "./task-video";
 
 export type UserRole = "ceo" | "admin" | "member";
 export type SubmissionStatus = "pending" | "accepted" | "revision";
@@ -40,7 +41,7 @@ export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; pinnedAt?: string; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; programTitle?: string; programSteps?: number; createdAt: string; updatedAt: string;
-  attachments?: TaskAttachment[]; feedOrder?: number;
+  attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary;
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;

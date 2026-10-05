@@ -38,3 +38,4 @@
 \ir 20261019-mentor-completion.sql
 \ir 20261020-review-comment-templates.sql
 \ir 20261021-audit-and-reminders.sql
+\ir 20261022-task-videos.sql

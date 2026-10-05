@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { resumableUploadTarget } from "@/backend/infrastructure/supabase/resumable-upload";
 import type { AuthUser } from "@/shared/domain/types";
 import { WELCOME_VIDEO_MAX_BYTES, WELCOME_VIDEO_MAX_SECONDS, type WelcomeVideoMetadata } from "@/shared/domain/welcome-video";
 
@@ -89,23 +90,9 @@ export async function createWelcomeVideoUpload(user: AuthUser, metadata: unknown
     return { forbidden: true as const };
   }
   if (!isValidMetadata(metadata)) return { validationError: "Выберите MP4-видео длительностью до 3 минут и размером до 200 МБ. Любая ориентация." };
-  // Read at runtime: a clean CI build must not bake in a missing/different public key.
-  const runtimeEnv = process.env;
-  const apiKey = runtimeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const base = runtimeEnv.NEXT_PUBLIC_SUPABASE_URL;
-  if (!apiKey || !base) return { unavailable: true as const };
-  // Defence against accidental misconfiguration: never send a service-role/secret key.
-  if (apiKey.startsWith("sb_secret_")) return { unavailable: true as const };
-  if (!apiKey.startsWith("sb_publishable_")) {
-    try { if (JSON.parse(Buffer.from(apiKey.split(".")[1], "base64url").toString()).role !== "anon") return { unavailable: true as const }; }
-    catch { return { unavailable: true as const }; }
-  }
-  let endpoint: string;
-  try {
-    const url = new URL(base);
-    const match = url.hostname.match(/^([^.]+)\.supabase\.co$/);
-    endpoint = match ? `https://${match[1]}.storage.supabase.co/storage/v1/upload/resumable` : `${url.origin}/storage/v1/upload/resumable`;
-  } catch { return { unavailable: true as const }; }
+  const target = resumableUploadTarget();
+  if (!target) return { unavailable: true as const };
+  const { endpoint, apiKey } = target;
   const path = `${user.teamId}/${user.id}/${crypto.randomUUID()}.mp4`;
   const expiresAt = new Date(Date.now() + UPLOAD_INTENT_TTL_HOURS * 60 * 60 * 1000).toISOString();
   const uploadIntent = await supabase.from("welcome_video_upload_intents").insert({

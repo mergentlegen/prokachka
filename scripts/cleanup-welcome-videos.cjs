@@ -31,9 +31,9 @@ async function cleanup({ env = process.env, request = fetch } = {}) {
   return { removed, deferred };
 }
 module.exports = { cleanup };
-if (require.main === module) Promise.all([cleanup(), require('./cleanup-profile-avatars.cjs').cleanupAvatars(), require('./cleanup-deleted-users.cjs').cleanupDeletedUsers(), require('./cleanup-announcement-photos.cjs').cleanupAnnouncementPhotos()]).then(results => {
+if (require.main === module) Promise.all([cleanup(), require('./cleanup-profile-avatars.cjs').cleanupAvatars(), require('./cleanup-deleted-users.cjs').cleanupDeletedUsers(), require('./cleanup-announcement-photos.cjs').cleanupAnnouncementPhotos(), require('./cleanup-task-videos.cjs').cleanupTaskVideos()]).then(results => {
   for (const [index, { removed, deferred }] of results.entries()) {
-    console.log(`${['Welcome video', 'Avatar', 'Deleted account', 'Announcement photo'][index]} cleanup: ${removed} removed, ${deferred} deferred`);
+    console.log(`${['Welcome video', 'Avatar', 'Deleted account', 'Announcement photo', 'Task video'][index]} cleanup: ${removed} removed, ${deferred} deferred`);
     if (deferred) process.exitCode = 1;
   }
 }).catch(error => { console.error(error.message); process.exitCode = 1; });
