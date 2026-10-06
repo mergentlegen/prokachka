@@ -17,6 +17,8 @@ import { latestSubmissions, plural, taskState, type TaskState } from "./member-p
 import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
 import { CountUp } from "@/frontend/shared/hooks/use-count-up";
 import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
+import { useRestoreScroll } from "@/frontend/shared/hooks/use-restore-scroll";
+import { readPageParam, writePageParam } from "@/frontend/shared/lib/page-state";
 import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { userScope } from "@/shared/domain/live-updates";
 import { useMemberData, type MemberTab } from "./use-member-data";
@@ -55,6 +57,9 @@ function MemberSidebar({ tab, onChange, feedbackUnread }: { tab: MemberTab; onCh
   return <aside className="member-sidebar"><p className="eyebrow">Навигация</p><nav className="member-sidebar-nav">{items.map(([id, label]) => <button type="button" key={id} className={tab === id ? "active" : ""} onClick={() => onChange(id)} aria-current={tab === id ? "page" : undefined}><span>{memberNavIcons[id]}</span>{label}{id === "feedback" && feedbackUnread > 0 && <b className="feedback-unread-badge">{feedbackUnread}</b>}</button>)}<button type="button" className={tab === "profile" ? "active" : ""} onClick={() => onChange("profile")} aria-current={tab === "profile" ? "page" : undefined}><span>◌</span>Профиль</button></nav></aside>;
 }
 
+const pageTabs: MemberTab[] = ["home", "tasks", "feedback", "ranking", "network"];
+function pageTab(value: string | null) { return pageTabs.find((item) => item === value) ?? null; }
+
 export function MemberApp() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -73,12 +78,18 @@ export function MemberApp() {
   }
   async function refreshAll() { setFeedbackVersion((value) => value + 1); await refreshData(); }
   function openFeedback(taskId: string) { setFeedbackTaskId(taskId); navigate("feedback"); }
+  // The open section lives in the address (?tab=ranking, ?view=programs), so a reload or a Telegram link
+  // (?feedback=<thread>, ?tab=tasks) opens exactly that screen.
+  const [taskView, setTaskView] = useState<"regular" | "programs">("regular");
+  const [placeRead, setPlaceRead] = useState(false);
   useEffect(() => {
-    // Telegram links: ?feedback=<thread> opens a conversation, ?tab=tasks the task list.
-    const params = new URLSearchParams(window.location?.search || "");
-    const target: MemberTab | null = params.has("feedback") ? "feedback" : params.get("tab") === "tasks" ? "tasks" : null;
-    if (!user?.id || !target) return;
-    const timer = window.setTimeout(() => setTab(target), 0);
+    if (!user?.id) return;
+    const timer = window.setTimeout(() => {
+      const target = readPageParam("feedback") ? "feedback" : pageTab(readPageParam("tab"));
+      if (target) setTab(target);
+      if (readPageParam("view") === "programs") setTaskView("programs");
+      setPlaceRead(true);
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [user?.id]);
 
@@ -91,8 +102,15 @@ export function MemberApp() {
     return () => { active = false; };
   }, [user?.id, user?.teamId, feedbackVersion]);
   const [ratingType, setRatingType] = useState<"points" | "stars">("points");
-  const [taskView, setTaskView] = useState<"regular" | "programs">("regular");
   const [taskFilter, setTaskFilter] = useState<"all" | TaskState>("all");
+  useEffect(() => {
+    // The profile opens over a section, so the address keeps that section.
+    if (!placeRead || tab === "profile") return;
+    writePageParam("tab", tab === "home" ? null : tab);
+    writePageParam("view", tab === "tasks" && taskView === "programs" ? "programs" : null);
+    if (tab !== "feedback") writePageParam("feedback", null);
+  }, [placeRead, tab, taskView]);
+  useRestoreScroll(placeRead && !dataLoading);
   const [toast, setToast] = useState("");
   const [showLogin, setShowLogin] = useState(false);
   const [now, setClock] = useState(() => Date.now());

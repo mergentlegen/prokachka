@@ -74,7 +74,7 @@ function nodes(tree, predicate) {
 
 test("member Tasks view contains games and ordinary tasks, while Programs only contains sequential steps", async () => {
   const harness = hookHarness(), previousWindow = global.window;
-  global.window = { setInterval: () => 0, clearInterval() {}, setTimeout: () => 0, clearTimeout() {} };
+  global.window = { setInterval: () => 0, clearInterval() {}, setTimeout: () => 0, clearTimeout() {}, addEventListener() {}, removeEventListener() {} };
   const tasks = [
     { id: "game", title: "Мечта с планом", isActive: true, publicationType: "evergreen", interactiveKind: "dream-plan", createdAt: "2026-09-25" },
     { id: "ordinary", title: "Задание", isActive: true, publicationType: "evergreen", createdAt: "2026-09-25" },

@@ -7,6 +7,8 @@ import { FormEvent, useEffect, useMemo, useRef, useState, type Dispatch, type Se
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, refreshAuthSession } from "@/frontend/shared/api/client";
 import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
+import { useRestoreScroll } from "@/frontend/shared/hooks/use-restore-scroll";
+import { readPageParam, writePageParam } from "@/frontend/shared/lib/page-state";
 import { dataCache } from "@/frontend/shared/api/data-cache";
 import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { createCeoTeam, deleteCeoTeam, deleteCeoUser, loadCeoData, loadCeoJournal, loadCeoStats, previewCeoUserDeletion, reviewCeoRequest, updateCeoTeam, updateCeoUser, type CeoJournalEntry, type CeoStats, type UserDeletionImpact } from "@/frontend/shared/api/ceo-client";
@@ -114,6 +116,21 @@ export function CEOApp() {
     const timer = window.setTimeout(() => setToast(""), 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  // The open section lives in the address (?section=users), so a reload opens the same screen.
+  const [placeRead, setPlaceRead] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const target = (Object.keys(sectionLabels) as CeoSection[]).find((item) => item === readPageParam("section"));
+      if (target) setSection(target);
+      setPlaceRead(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (placeRead) writePageParam("section", section === "overview" ? null : section);
+  }, [placeRead, section]);
+  useRestoreScroll(placeRead && hasLoaded && !dataLoading && !journal.loading);
 
   useEffect(() => {
     if (deleteTarget?.type !== "user") return;

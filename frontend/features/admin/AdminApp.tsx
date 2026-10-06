@@ -43,7 +43,9 @@ import { removeTaskVideo, uploadTaskVideo } from "@/frontend/shared/api/task-vid
 import { loadQuizForEditing, saveTaskQuiz } from "@/frontend/shared/api/task-quiz-client";
 import { validateQuiz, type QuizQuestion } from "@/shared/domain/task-quiz";
 
-import type { AdminSection } from "./admin-sections";
+import { adminSectionAllowed, adminSectionFromPage, type AdminSection } from "./admin-sections";
+import { useRestoreScroll } from "@/frontend/shared/hooks/use-restore-scroll";
+import { readPageParam, writePageParam } from "@/frontend/shared/lib/page-state";
 import { useAdminData } from "./use-admin-data";
 type AdminModal =
   | { type: "task"; task?: Task }
@@ -103,11 +105,27 @@ export function AdminApp() {
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [section]);
 
+  // The open section lives in the address (?section=programs), so a reload or a Telegram link
+  // (?feedback=<thread>) opens exactly that screen.
+  const [placeRead, setPlaceRead] = useState(false);
+  const viewerKey = authUser ? `${authUser.id}:${authUser.role}:${Boolean(authUser.canPublishTasks)}:${Boolean(authUser.canReview)}` : "";
   useEffect(() => {
-    if (!authUser || !(authUser.role === "admin" || authUser.canReview) || !new URLSearchParams(window.location?.search || "").has("feedback")) return;
-    const timer = window.setTimeout(() => setSection("feedback"), 0);
+    if (!authUser || !hasMentorAccess(authUser)) return;
+    const timer = window.setTimeout(() => {
+      const target = readPageParam("feedback") && adminSectionAllowed("feedback", authUser) ? "feedback" : adminSectionFromPage(readPageParam("section"), authUser);
+      if (target) setSection(target);
+      setPlaceRead(true);
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [authUser]);
+    // Only a new person or new rights re-read the address, not every session refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerKey]);
+  useEffect(() => {
+    if (!placeRead) return;
+    writePageParam("section", section === "dashboard" ? null : section);
+    if (section !== "feedback") writePageParam("feedback", null);
+  }, [placeRead, section]);
+  useRestoreScroll(placeRead && !dataLoading);
 
   useEffect(() => {
     if (!authUser || !(authUser.role === "admin" || authUser.canReview)) return;
@@ -281,6 +299,8 @@ export function AdminApp() {
     setSection("review");
     if (submission.status === "pending") setReviewFlow({ startId: submission.id });
     else openReviewModal(submission, "accepted");
+    // A reload must not open the same work again.
+    writePageParam("submission", null);
     setDeepLinkHandled(true);
   }, [authUser, dataLoading, deepLinkHandled, store.submissions, openReviewModal]);
    function openDeleteModal(task: Task) {
@@ -534,7 +554,7 @@ export function AdminApp() {
   const queue = reviewQueue(store.submissions);
   const sectionCount = (id: AdminSection) => id === "review" ? counts.pending : id === "feedback" ? feedbackNeedsReply : id === "requests" ? counts.requests : 0;
   const menuBadge = canReview ? counts.pending + feedbackNeedsReply + counts.requests : 0;
-  const visibleSections = sections.filter(([id]) => (id === "tasks" || id === "programs" || id === "announcements" || id === "welcome-video") ? canPublishContent : id === "review" || id === "feedback" || id === "history" || id === "stars" ? canReview : true);
+  const visibleSections = sections.filter(([id]) => adminSectionAllowed(id, authUser));
 
   return <><main className="admin-shell" ref={shellRef}>
     <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label={menuBadge ? `Открыть меню, ждут внимания: ${menuBadge}` : "Открыть меню"} aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span />{menuBadge > 0 && <b className="admin-menu-badge">{menuBadge > 99 ? "99+" : menuBadge}</b>}</button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><button type="button" className="avatar-button" aria-label="Открыть профиль" onClick={() => setProfileOpen(true)}><Avatar name={authUser.name} src={authUser.avatarUrl} className="header-avatar" eager /></button></div></header>
