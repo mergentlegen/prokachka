@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { deleteAdminProgram, updateAdminProgram } from "@/frontend/shared/api/admin-client";
+import { addProgramGame, deleteAdminProgram, reorderProgramSteps, updateAdminProgram } from "@/frontend/shared/api/admin-client";
+import { ModalSheet } from "@/frontend/shared/ModalSheet";
+import { FIRST_YEAR_DESCRIPTION, FIRST_YEAR_KIND, FIRST_YEAR_REWARD, FIRST_YEAR_TITLE } from "@/shared/domain/first-year";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { actionIcons } from "./AdminIcons";
 import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
@@ -25,6 +27,34 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   const [busyId, setBusyId] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProgram | null>(null);
+  const [gamePicker, setGamePicker] = useState<TaskProgram | null>(null);
+
+  async function addGame(program: TaskProgram) {
+    if (busyId) return;
+    setBusyId(program.id);
+    try {
+      const task = await addProgramGame(program.id, FIRST_YEAR_KIND);
+      onChange(programs, [...tasks.filter((item) => item.id !== task.id), task]);
+      setGamePicker(null);
+      onError(`Игра «${FIRST_YEAR_TITLE}» добавлена последним шагом. Стрелками ↑ ↓ её можно переставить.`);
+    } catch (error) { onError(error instanceof Error ? error.message : "Не удалось добавить игру."); }
+    finally { setBusyId(""); }
+  }
+
+  // Shows the new order at once and saves it; on a failure the previous order comes back.
+  async function move(program: TaskProgram, steps: Task[], task: Task, step: -1 | 1) {
+    const from = steps.findIndex((item) => item.id === task.id), to = from + step;
+    if (busyId || from < 0 || to < 0 || to >= steps.length) return;
+    const ordered = [...steps];
+    [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
+    const positions = new Map(ordered.map((item, index) => [item.id, index + 1]));
+    const previous = tasks;
+    onChange(programs, tasks.map((item) => positions.has(item.id) ? { ...item, position: positions.get(item.id) } : item));
+    setBusyId(program.id);
+    try { await reorderProgramSteps(program.id, ordered.map((item) => item.id)); }
+    catch (error) { onChange(programs, previous); onError(error instanceof Error ? error.message : "Не удалось сохранить порядок."); }
+    finally { setBusyId(""); }
+  }
 
   async function update(program: TaskProgram, patch: { isActive?: boolean; isPinned?: boolean }) {
     if (busyId) return;
@@ -76,11 +106,26 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
           {isExpanded && <div id={"program-steps-" + program.id} className={styles.steps}>
             <ProgramFunnel progress={history.find((item) => item.id === program.id)} steps={steps} />
             <div className={styles.stepsHeading}>Задания программы <span>По порядку прохождения</span></div>
-            <TaskRows tasks={steps} actorId={actorId} canManageAll={canManageAll} busyId={taskBusyId} onEdit={onEditTask} onToggle={onToggleTask} onRemove={onRemoveTask} />
+            <TaskRows tasks={steps} actorId={actorId} canManageAll={canManageAll} busyId={taskBusyId || busyId} onEdit={onEditTask} onToggle={onToggleTask} onRemove={onRemoveTask}
+              onMove={canManage ? (task, step) => void move(program, steps, task, step) : undefined} />
+            {canManage && <button type="button" className={styles.addGame} disabled={Boolean(busyId)} onClick={() => setGamePicker(program)}>＋ Добавить готовую игру</button>}
           </div>}
         </section>;
       })}
     </div>
+    {gamePicker && <ModalSheet title="Готовая игра в программу" onClose={() => { if (!busyId) setGamePicker(null); }}>
+      <div className={styles.gameCatalog}>
+        <p>Игра встанет последним шагом программы «{gamePicker.title}». Срока у неё нет, мили начисляются сразу после прохождения, и участнику открывается следующий шаг.</p>
+        {(() => {
+          const added = tasks.some((task) => task.programId === gamePicker.id && task.interactiveKind === FIRST_YEAR_KIND);
+          return <article className={styles.gameCard}>
+            <span aria-hidden="true">⚓</span>
+            <div><strong>{FIRST_YEAR_TITLE}</strong><p>{FIRST_YEAR_DESCRIPTION}</p><small>{FIRST_YEAR_REWARD} мили за прохождение · без срока · около 7 минут</small></div>
+            <button type="button" className="button button-primary" disabled={Boolean(busyId) || added} onClick={() => void addGame(gamePicker)}>{added ? "Уже в программе" : busyId ? "Добавляем…" : "Добавить"}</button>
+          </article>;
+        })()}
+      </div>
+    </ModalSheet>}
     {deleteTarget && <ConfirmModal title="Удалить программу?" description={<>«{deleteTarget.title}», все её шаги и отправленные работы будут удалены без возможности восстановления.</>} confirmLabel="Удалить программу" busy={Boolean(busyId)} onClose={() => { if (!busyId) setDeleteTarget(null); }} onConfirm={() => void remove()} />}
   </>;
 }

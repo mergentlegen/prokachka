@@ -82,6 +82,13 @@ export async function createAdminProgram(input: ProgramCreateInput): Promise<{ p
 export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean }): Promise<TaskProgram> {
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
+export async function addProgramGame(programId: string, kind: string): Promise<Task> {
+  const response = await request<ApiResponse<{ task: ApiRow }>>(`/api/programs/${encodeURIComponent(programId)}/games`, { method: "POST", body: JSON.stringify({ kind }) });
+  return mapTask(response.task);
+}
+export async function reorderProgramSteps(programId: string, taskIds: string[]) {
+  await request<ApiResponse<{ saved: boolean }>>(`/api/programs/${encodeURIComponent(programId)}/order`, { method: "PUT", body: JSON.stringify({ taskIds }) });
+}
 export async function deleteAdminProgram(id: string): Promise<boolean> { const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>("/api/programs/" + id, { method: "DELETE" }); return Boolean(response.storageCleanupWarning); }
 export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; publishedPinned?: boolean; publishedPinnedAt?: string; publishedCreatedAt?: string; canManage?: boolean };
 export async function loadReadyPrograms(): Promise<ReadyProgramStatus[]> {

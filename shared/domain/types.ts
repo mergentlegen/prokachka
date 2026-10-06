@@ -9,7 +9,13 @@ export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
 export type ProgramStatus = "active" | "completed";
 export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules", "heart-survey", "company-voyage", "captain-cruise", "count-your-dream", "dream-route"] as const;
 export type ReadyProgramKey = typeof READY_PROGRAM_KEYS[number];
-export type TaskInteractiveKind = ReadyProgramKey;
+// Games placed as steps inside a program (not in the ready-games catalog).
+export const PROGRAM_GAME_KEYS = ["first-year"] as const;
+export type ProgramGameKey = typeof PROGRAM_GAME_KEYS[number];
+export type TaskInteractiveKind = ReadyProgramKey | ProgramGameKey;
+export function isTaskInteractiveKind(value: unknown): value is TaskInteractiveKind {
+  return isReadyProgramKey(value) || (typeof value === "string" && (PROGRAM_GAME_KEYS as readonly string[]).includes(value));
+}
 export function isReadyProgramKey(value: unknown): value is ReadyProgramKey {
   return typeof value === "string" && (READY_PROGRAM_KEYS as readonly string[]).includes(value);
 }

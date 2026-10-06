@@ -151,7 +151,7 @@ export function MemberApp() {
   const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort(compareTaskFeed);
-  const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" && !task.interactiveKind : task.publicationType !== "sequential" || Boolean(task.interactiveKind));
+  const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential");
   const latestByTask = latestSubmissions(store.submissions, user?.id || "");
   const taskCounts = { todo: 0, review: 0, done: 0, closed: 0 };
   visibleTasks.forEach((task) => { taskCounts[taskState(task, latestByTask.get(task.id), now)]++; });

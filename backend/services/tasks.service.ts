@@ -57,11 +57,13 @@ export async function insertTask(input: Required<Pick<TaskInput, "title" | "desc
 export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const current = await supabase.from("tasks").select("id,team_id,publisher_id,program_id,interactive_kind").eq("id", id).maybeSingle();
+  const current = await supabase.from("tasks").select("id,team_id,publisher_id,program_id,interactive_kind,publication_type").eq("id", id).maybeSingle();
   if (current.error || !current.data) return { forbidden: true as const };
   const canEdit = actor?.role === "ceo" || (Boolean(actor?.teamId) && current.data.team_id === actor?.teamId && (actor?.role === "admin" || (actor?.canPublishTasks === true && current.data.publisher_id === actor.id)));
   if (!canEdit) return { forbidden: true as const };
-  if (current.data.interactive_kind) return { validationError: "Готовую игру нельзя изменять как обычное задание. Используйте каталог готовых заданий." };
+  const gameStep = Boolean(current.data.interactive_kind && current.data.publication_type === "sequential");
+  if (gameStep && Object.keys(input).some((key) => key !== "isActive")) return { validationError: "Игру в программе можно только скрыть, переставить или удалить." };
+  if (current.data.interactive_kind && !gameStep) return { validationError: "Готовую игру нельзя изменять как обычное задание. Используйте каталог готовых заданий." };
   if (input.isPinned !== undefined && current.data.program_id) return { validationError: "Закрепляйте программу целиком." };
   const patch: Record<string, unknown> = {};
   if (typeof input.title === "string") patch.title = input.title.trim();
@@ -84,11 +86,11 @@ export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer
 export async function deleteTask(id: string, actor?: TaskViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const current = await supabase.from("tasks").select("id,team_id,publisher_id,interactive_kind").eq("id", id).maybeSingle();
+  const current = await supabase.from("tasks").select("id,team_id,publisher_id,interactive_kind,publication_type").eq("id", id).maybeSingle();
   if (current.error || !current.data) return { forbidden: true as const };
   const canDelete = actor?.role === "ceo" || (Boolean(actor?.teamId) && current.data.team_id === actor?.teamId && (actor?.role === "admin" || (actor?.canPublishTasks === true && current.data.publisher_id === actor.id)));
   if (!canDelete) return { forbidden: true as const };
-  if (current.data.interactive_kind) return { validationError: "Используйте «Убрать из заданий» в каталоге: это сохраняет игру, результаты и мили." };
+  if (current.data.interactive_kind && current.data.publication_type !== "sequential") return { validationError: "Используйте «Убрать из заданий» в каталоге: это сохраняет игру, результаты и мили." };
   const attachments = await supabase.from("task_attachments").select("storage_path").eq("task_id", id);
   if (attachments.error) return { error: attachments.error };
   let query = supabase.from("tasks").delete().eq("id", id);

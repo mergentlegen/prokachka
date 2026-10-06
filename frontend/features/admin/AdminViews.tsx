@@ -20,6 +20,8 @@ function HistoryKindSwitch({ value, onChange }: { value: "regular" | "programs" 
 type TaskRowsProps = {
   tasks: Task[]; submissions?: Submission[]; users?: User[]; onOpenResults?: (task: Task) => void; actorId: string; canManageAll: boolean; busyId?: string;
   onToggle: (id: string) => void; onEdit: (task: Task) => void; onRemove: (task: Task) => void; onPin?: (task: Task) => void;
+  /** Program steps only: move a step one place up (-1) or down (1). */
+  onMove?: (task: Task, step: -1 | 1) => void;
 };
 
 type TaskFilter = "all" | "active" | "hidden" | "expired";
@@ -43,10 +45,10 @@ export function TasksView({ store, ...props }: Omit<TaskRowsProps, "tasks" | "su
   </div>;
 }
 
-export function TaskRows({ tasks, submissions = [], users, onOpenResults, actorId, canManageAll, onToggle, onEdit, onRemove, onPin, busyId }: TaskRowsProps) {
-  return <>{tasks.length === 0 ? <EmptyAdmin text="Заданий пока нет." /> : tasks.map((task) => {
+export function TaskRows({ tasks, submissions = [], users, onOpenResults, actorId, canManageAll, onToggle, onEdit, onRemove, onPin, onMove, busyId }: TaskRowsProps) {
+  return <>{tasks.length === 0 ? <EmptyAdmin text="Заданий пока нет." /> : tasks.map((task, index) => {
     const status = !task.isActive ? "inactive" : isTaskExpired(task) ? "expired" : "active";
-    const taskMeta = task.publicationType === "sequential" ? "Шаг " + (task.position || "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";
+    const taskMeta = task.publicationType === "sequential" ? "Шаг " + (index + 1) + (task.interactiveKind ? " · игра без срока" : "") : task.deadlineAt ? "Дедлайн " + formatDateTime(task.deadlineAt) : "Без дедлайна";
     const canManage = canManageAll || task.publisherId === actorId;
     return <div className="task-admin-row" key={task.id}>
       <div className="task-admin-main"><span className={"status-dot " + (status === "active" ? "active-dot" : status === "expired" ? "expired-dot" : "")} /><div>
@@ -57,7 +59,11 @@ export function TaskRows({ tasks, submissions = [], users, onOpenResults, actorI
       <span className="task-max">до {formatMiles(task.maxPoints)}</span>
       {canManage && <div className="row-actions">
         {onPin && <PinButton pinned={task.isPinned} title={task.title} disabled={Boolean(busyId)} onClick={() => onPin(task)} />}
-        <button type="button" className="button button-edit" disabled={Boolean(busyId)} onClick={() => onEdit(task)}>{actionIcons.edit}Изменить</button>
+        {onMove && <span className="step-move">
+          <button type="button" className="button button-edit" disabled={Boolean(busyId) || index === 0} onClick={() => onMove(task, -1)} aria-label={`Поднять «${task.title}» выше`}>↑</button>
+          <button type="button" className="button button-edit" disabled={Boolean(busyId) || index === tasks.length - 1} onClick={() => onMove(task, 1)} aria-label={`Опустить «${task.title}» ниже`}>↓</button>
+        </span>}
+        {!task.interactiveKind && <button type="button" className="button button-edit" disabled={Boolean(busyId)} onClick={() => onEdit(task)}>{actionIcons.edit}Изменить</button>}
         <button type="button" className={"button " + (task.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => onToggle(task.id)}>{task.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
         <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => onRemove(task)}>{actionIcons.remove}Удалить</button>
       </div>}

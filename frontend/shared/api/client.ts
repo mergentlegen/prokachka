@@ -1,6 +1,6 @@
 import type { Announcement, AnnouncementPhoto, AuthUser, NetworkMember, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
 import type { TaskVideoSummary } from "@/shared/domain/task-video";
-import { isReadyProgramKey } from "@/shared/domain/types";
+import { isReadyProgramKey, isTaskInteractiveKind } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
 import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
 import { ScopeChangedError } from "@/frontend/shared/lib/query-cache";
@@ -117,7 +117,7 @@ export function mapTask(row: ApiRow): Task {
     resourceUrl: row.resource_url ? String(row.resource_url) : undefined,
     dueAt: row.due_at ? String(row.due_at) : undefined, createdAt: String(row.created_at || new Date().toISOString()),
     publisherId: row.publisher_id ? String(row.publisher_id) : undefined,
-    interactiveKind: isReadyProgramKey(row.interactive_kind) ? row.interactive_kind : undefined,
+    interactiveKind: isTaskInteractiveKind(row.interactive_kind) ? row.interactive_kind : undefined,
     updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()),
     attachments: Array.isArray(row.attachments) ? row.attachments.filter((item): item is ApiRow => Boolean(item && typeof item === "object")).map(mapTaskAttachment) : [] };
 }

@@ -15,6 +15,7 @@ import { CompanyVoyageGame } from "./CompanyVoyageGame";
 import { CaptainCruiseGame } from "./CaptainCruiseGame";
 import { CountYourDreamGame } from "./CountYourDreamGame";
 import { DreamRouteGame } from "./DreamRouteGame";
+import { FirstYearGame } from "./FirstYearGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
 import { QuizSentNotice, TaskQuiz } from "./TaskQuiz";
@@ -83,6 +84,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div></>}
         {task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {task.interactiveKind === "first-year" && <FirstYearGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "company-voyage" && <CompanyVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "captain-cruise" && <CaptainCruiseGame taskId={task.id} onCompleted={onInteractiveComplete} />}

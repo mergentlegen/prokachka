@@ -53,7 +53,8 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
   // Show one card, keeping the participant's saved attempt whenever possible.
   const games = new Map<string, typeof eligible>();
   for (const task of eligible) {
-    if (!task.interactive_kind) continue;
+    // Only stand-alone ready games are merged; a game step belongs to its own program.
+    if (!task.interactive_kind || task.publication_type === "sequential") continue;
     const group = games.get(String(task.interactive_kind)) || [];
     group.push(task); games.set(String(task.interactive_kind), group);
   }
@@ -79,6 +80,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;
     const progress = existing.get(String(task.program_id));
-    return { ...publication, unlocked_at: progress?.unlocked_at, due_at: progress?.due_at, program_title: program?.title, program_steps: programSteps.get(String(task.program_id)) };
+    // A game step has no deadline.
+    return { ...publication, unlocked_at: progress?.unlocked_at, due_at: task.interactive_kind ? undefined : progress?.due_at, program_title: program?.title, program_steps: programSteps.get(String(task.program_id)) };
   }) };
 }

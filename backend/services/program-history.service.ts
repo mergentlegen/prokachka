@@ -30,7 +30,7 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
 
   const [programsResult, tasksResult, usersResult] = await Promise.all([
     readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).is("template_key", null).order("created_at", { ascending: false }).order("id")),
-    readPages(supabase.from("tasks").select("id,title,max_points,program_id,position,deadline_hours").eq("team_id", teamId).eq("publication_type", "sequential").order("position", { ascending: true }).order("id")),
+    readPages(supabase.from("tasks").select("id,title,max_points,program_id,position,deadline_hours,interactive_kind").eq("team_id", teamId).eq("publication_type", "sequential").order("position", { ascending: true }).order("id")),
     readPages(supabase.from("users").select("id,name,avatar_path,role,team_id,team_joined_at").eq("team_id", teamId).eq("role", "member").order("created_at", { ascending: true }).order("id")),
   ]);
   if (programsResult.error || tasksResult.error || usersResult.error) return { error: programsResult.error || tasksResult.error || usersResult.error };
@@ -87,12 +87,14 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
         const unlockedAt = stepIndex === 0 ? start : previousAccepted ? String(previousAccepted.reviewed_at || previousAccepted.submitted_at) : undefined;
         if (!unlockedAt) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "locked" };
 
-        const dueAt = addHours(unlockedAt, Number(step.deadlineHours || deadlineHours));
+        const game = Boolean(programTasks[stepIndex]?.interactive_kind);
+        // A game step has no deadline: it is either done or still in progress, never late or missed.
+        const dueAt = game ? undefined : addHours(unlockedAt, Number(step.deadlineHours || deadlineHours));
         const submission = latest.get(userId + ":" + String(step.id));
         const submittedAt = submission ? String(submission.submitted_at) : undefined;
         const status: Exclude<ProgramHistoryStatus, "completed"> = submission
-          ? new Date(submittedAt as string).getTime() <= new Date(dueAt).getTime() ? "on_time" : "late"
-          : new Date(dueAt).getTime() > Date.now() ? "active" : "missed";
+          ? !dueAt || new Date(submittedAt as string).getTime() <= new Date(dueAt).getTime() ? "on_time" : "late"
+          : !dueAt || new Date(dueAt).getTime() > Date.now() ? "active" : "missed";
         return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status, dueAt, submittedAt, points: Number(submission?.points || 0) };
       }));
       steps.forEach((step, index) => { step.members = stepMembers[index]; });

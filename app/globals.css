@@ -1565,3 +1565,6 @@ button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 
 .ceo-journal-link svg { width:20px; height:20px; }
 .ceo-top-actions .ceo-journal-link.active { border-color:var(--blue); background:#eef3ff; color:var(--blue); }
 @media (max-width:620px) { .ceo-top-actions .ceo-journal-link { display:grid; } }
+/* Program steps: compact up/down buttons next to the other row actions. */
+.step-move { display:inline-flex; gap:4px; }
+.step-move .button { min-width:36px; padding-inline:10px; font-size:14px; }

@@ -27,3 +27,13 @@
 .funnelDone .funnelBar i { background:var(--green); }
 .funnelEmpty { margin:0 0 12px; color:var(--muted); font-size:13px; }
 @media (max-width:560px) { .funnelRow { grid-template-columns:minmax(0,1fr) 32px; row-gap:4px; padding:4px 0; } .funnelLabel { grid-column:1 / -1; white-space:normal; } }
+.addGame { justify-self: start; min-height: 44px; margin-top: 8px; padding: 9px 16px; border: 1px dashed #b9c8e6; border-radius: 12px; background: #f6f9ff; color: var(--blue); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.gameCatalog { display: grid; gap: 14px; }
+.gameCatalog > p { margin: 0; color: #5b6b85; font-size: 14px; line-height: 1.5; }
+.gameCard { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e3e8f1; border-radius: 16px; background: linear-gradient(135deg, #f2f8ff, #fff8e8); }
+.gameCard > span { display: grid; flex: 0 0 46px; place-items: center; height: 46px; border-radius: 14px; background: #0b2e4f; color: #ffc24b; font-size: 22px; }
+.gameCard > div { display: grid; flex: 1 1 200px; gap: 4px; min-width: 0; }
+.gameCard strong { color: var(--navy); font-size: 16px; }
+.gameCard p { margin: 0; color: #4d5c74; font-size: 13px; line-height: 1.45; }
+.gameCard small { color: var(--muted); font-size: 12px; }
+.gameCard :global(.button) { min-height: 44px; padding: 9px 18px; border-radius: 12px; font-size: 14px; }

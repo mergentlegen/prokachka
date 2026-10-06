@@ -40,3 +40,4 @@
 \ir 20261021-audit-and-reminders.sql
 \ir 20261022-task-videos.sql
 \ir 20261023-task-quizzes.sql
+\ir 20261024-program-games.sql
