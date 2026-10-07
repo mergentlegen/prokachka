@@ -6,13 +6,11 @@ import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { FIRST_YEAR_DESCRIPTION, FIRST_YEAR_KIND, FIRST_YEAR_REWARD, FIRST_YEAR_TITLE } from "@/shared/domain/first-year";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { actionIcons } from "./AdminIcons";
-import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import { comparePublications } from "@/shared/domain/publication-order";
-import { formatDate, formatMiles } from "@/frontend/shared/lib/format";
+import { formatMiles } from "@/frontend/shared/lib/format";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import type { ProgramHistory } from "@/shared/domain/history";
 import { plural } from "@/frontend/shared/lib/plural";
-import { TaskRows } from "./AdminViews";
 import styles from "./ProgramsPanel.module.css";
 
 type Props = {
@@ -20,9 +18,16 @@ type Props = {
   taskBusyId?: string;
   onChange: (programs: TaskProgram[], tasks: Task[]) => void; onError: (message: string) => void;
   onEditTask: (task: Task) => void; onToggleTask: (id: string) => void; onRemoveTask: (task: Task) => void;
+  /** Opens the task form for a new step at the end of this program. */
+  onAddStep?: (program: TaskProgram) => void;
 };
 
-export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history = [], taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask }: Props) {
+/** "It also opened for 3 participants who had finished the program." */
+export function reopenedNotice(count: number) {
+  return count > 0 ? ` Он открылся и ${count} ${plural(count, "участнику", "участникам", "участникам")}, ${count === 1 ? "который уже прошёл" : "которые уже прошли"} программу.` : "";
+}
+
+export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history = [], taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask, onAddStep }: Props) {
   const customPrograms = programs.filter((program) => !program.templateKey).sort(comparePublications);
   const [busyId, setBusyId] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -33,10 +38,10 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     if (busyId) return;
     setBusyId(program.id);
     try {
-      const task = await addProgramGame(program.id, FIRST_YEAR_KIND);
+      const { task, reopened } = await addProgramGame(program.id, FIRST_YEAR_KIND);
       onChange(programs, [...tasks.filter((item) => item.id !== task.id), task]);
       setGamePicker(null);
-      onError(`Игра «${FIRST_YEAR_TITLE}» добавлена последним шагом. Стрелками ↑ ↓ её можно переставить.`);
+      onError(`Игра «${FIRST_YEAR_TITLE}» добавлена последним шагом. Стрелками ↑ ↓ её можно переставить.${reopenedNotice(reopened)}`);
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось добавить игру."); }
     finally { setBusyId(""); }
   }
@@ -80,42 +85,95 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   }
 
   return <>
-    <p className="admin-muted">Участники проходят шаги последовательно. Откройте программу, чтобы посмотреть или изменить её задания.</p>
-    <div className="admin-panel table-panel">
-      {customPrograms.length === 0 ? <div className="empty-admin"><p>Программ пока нет. Создайте первую программу.</p></div> : customPrograms.map((program) => {
+    <p className="admin-muted">Участник проходит шаги по порядку: следующий открывается, когда предыдущий принят. Нажмите на программу, чтобы увидеть шаги и кто на каком шаге.</p>
+    {customPrograms.length === 0 ? <div className="admin-panel"><div className="empty-admin"><p>Программ пока нет. Создайте первую программу.</p></div></div> : <div className={styles.list}>
+      {customPrograms.map((program) => {
         const canManage = canManageAll || program.publisherId === actorId;
         const steps = tasks.filter((task) => task.programId === program.id).sort((a, b) => (a.position || 0) - (b.position || 0) || a.id.localeCompare(b.id));
         const isExpanded = expanded === program.id;
-        return <section key={program.id} className={styles.program}>
-          <div className="task-admin-row">
-            <div className="task-admin-main">
-              <span className={"status-dot " + (program.isActive ? "active-dot" : "")} />
-              <div>{program.isPinned && <PinBadge />}
-                <button type="button" className={styles.programTitle} aria-expanded={isExpanded} aria-controls={"program-steps-" + program.id} onClick={() => setExpanded(isExpanded ? null : program.id)}>{program.title}<span aria-hidden="true">{isExpanded ? "⌃" : "⌄"}</span></button>
-                <span>{formatDate(program.createdAt)} · {steps.length} шагов · {program.deadlineHours} ч на шаг</span>
-              </div>
-            </div>
-            <span className={"admin-status " + (program.isActive ? "active" : "inactive")}>{program.isActive ? "Активна" : "Скрыта"}</span>
-            <span className="task-max">до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>
-            {canManage && <div className="row-actions">
-              <PinButton pinned={program.isPinned} title={program.title} disabled={Boolean(busyId)} onClick={() => void update(program, { isPinned: !program.isPinned })} />
-              <button type="button" className={"button " + (program.isActive ? "button-warning" : "button-success")} disabled={Boolean(busyId)} onClick={() => void update(program, { isActive: !program.isActive })}>{program.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
-              <button type="button" className="button button-danger" disabled={Boolean(busyId)} onClick={() => setDeleteTarget(program)}>{actionIcons.remove}Удалить</button>
+        const progress = history.find((item) => item.id === program.id);
+        const funnel = programFunnel(progress, steps);
+        const busy = Boolean(taskBusyId || busyId);
+        return <section key={program.id} className={[styles.card, program.isActive ? "" : styles.cardHidden, isExpanded ? styles.cardOpen : ""].join(" ")}>
+          <button type="button" className={styles.cardHead} aria-expanded={isExpanded} aria-controls={"program-steps-" + program.id} onClick={() => setExpanded(isExpanded ? null : program.id)}>
+            <span className={styles.headMain}>
+              <span className={styles.badges}>
+                <span className={program.isActive ? styles.badgeOn : styles.badgeOff}>{program.isActive ? "Активна" : "Скрыта"}</span>
+                {program.isPinned && <span className={styles.badgePin}>Закреплена</span>}
+              </span>
+              <strong className={styles.cardTitle}>{program.title}</strong>
+              <span className={styles.facts}>{steps.length} {plural(steps.length, "шаг", "шага", "шагов")} · {program.deadlineHours} ч на шаг · до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>
+              {progress && <span className={styles.people}>{funnel.total ? `${funnel.total} ${plural(funnel.total, "участник", "участника", "участников")} в программе · ${funnel.completed} ${plural(funnel.completed, "прошёл", "прошли", "прошли")} до конца` : "Пока никто не начал"}</span>}
+            </span>
+            <span className={styles.chevron} aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></span>
+          </button>
+          {isExpanded && <div id={"program-steps-" + program.id} className={styles.body}>
+            <div className={styles.bodyHead}><strong>Шаги по порядку</strong>{progress && funnel.total > 0 && <span>полоска — сколько участников сейчас на шаге</span>}</div>
+            {steps.length === 0 ? <p className={styles.emptySteps}>В программе пока нет шагов.</p> : <ol className={styles.timeline}>
+              {steps.map((task, index) => {
+                const count = funnel.rows[index]?.count || 0;
+                const max = Math.max(1, funnel.completed, ...funnel.rows.map((row) => row.count));
+                const canEditStep = canManageAll || task.publisherId === actorId;
+                return <li key={task.id} className={[styles.step, task.isActive ? "" : styles.stepHidden].join(" ")}>
+                  <span className={styles.stepNum} aria-hidden="true">{index + 1}</span>
+                  <div className={styles.stepBody}>
+                    <strong>{task.title}</strong>
+                    <span className={styles.stepMeta}>
+                      <span>до {formatMiles(task.maxPoints)}</span>
+                      {task.interactiveKind && <span className={styles.tagGame}>игра · без срока</span>}
+                      {task.video && <span className={styles.tag}>видео</span>}
+                      {task.quiz && <span className={styles.tag}>вопросы</span>}
+                      {Boolean(task.attachments?.length) && <span className={styles.tag}>PDF</span>}
+                      {!task.isActive && <span className={styles.tagHidden}>скрыт от участников</span>}
+                    </span>
+                    {progress && funnel.total > 0 && <span className={styles.stepNow}>
+                      <i className={styles.bar} aria-hidden="true"><i style={{ width: `${(count / max) * 100}%` }} /></i>
+                      <span>{count ? `сейчас здесь ${count}` : "сейчас никого"}</span>
+                    </span>}
+                  </div>
+                  {canEditStep && <div className={styles.tools}>
+                    {canManage && <span className={styles.moveGroup}>
+                      <button type="button" className={styles.tool} disabled={busy || index === 0} onClick={() => void move(program, steps, task, -1)} aria-label={`Поднять «${task.title}» выше`} title="Выше">↑</button>
+                      <button type="button" className={styles.tool} disabled={busy || index === steps.length - 1} onClick={() => void move(program, steps, task, 1)} aria-label={`Опустить «${task.title}» ниже`} title="Ниже">↓</button>
+                    </span>}
+                    <span className={styles.actionGroup}>
+                      {!task.interactiveKind && <button type="button" className={`${styles.tool} ${styles.toolEdit}`} disabled={busy} onClick={() => onEditTask(task)} aria-label={`Изменить «${task.title}»`}>{actionIcons.edit}<span>Изменить</span></button>}
+                      <button type="button" className={`${styles.tool} ${styles.toolLabel}`} disabled={busy} onClick={() => onToggleTask(task.id)} aria-label={`${task.isActive ? "Скрыть" : "Показать"} «${task.title}»`} title={task.isActive ? "Скрыть от участников" : "Показать участникам"}>{task.isActive ? actionIcons.hide : actionIcons.show}<span>{task.isActive ? "Скрыть" : "Показать"}</span></button>
+                      <button type="button" className={`${styles.tool} ${styles.toolLabel} ${styles.toolDanger}`} disabled={busy} onClick={() => onRemoveTask(task)} aria-label={`Удалить «${task.title}»`} title="Удалить шаг">{actionIcons.remove}<span>Удалить</span></button>
+                    </span>
+                  </div>}
+                </li>;
+              })}
+              {progress && funnel.total > 0 && <li className={`${styles.step} ${styles.stepDone}`}>
+                <span className={styles.stepNum} aria-hidden="true">✓</span>
+                <div className={styles.stepBody}>
+                  <strong>Прошли программу</strong>
+                  <span className={styles.stepNow}>
+                    <i className={styles.bar} aria-hidden="true"><i style={{ width: `${(funnel.completed / Math.max(1, funnel.completed, ...funnel.rows.map((row) => row.count))) * 100}%` }} /></i>
+                    <span>{funnel.completed} из {funnel.total}</span>
+                  </span>
+                </div>
+              </li>}
+            </ol>}
+            {canManage && <div className={styles.addRow}>
+              {onAddStep && <button type="button" className={styles.addStep} disabled={busy} onClick={() => onAddStep(program)}>＋ Добавить шаг</button>}
+              <button type="button" className={styles.addGame} disabled={busy} onClick={() => setGamePicker(program)}>＋ Добавить готовую игру</button>
             </div>}
-          </div>
-          {isExpanded && <div id={"program-steps-" + program.id} className={styles.steps}>
-            <ProgramFunnel progress={history.find((item) => item.id === program.id)} steps={steps} />
-            <div className={styles.stepsHeading}>Задания программы <span>По порядку прохождения</span></div>
-            <TaskRows tasks={steps} actorId={actorId} canManageAll={canManageAll} busyId={taskBusyId || busyId} onEdit={onEditTask} onToggle={onToggleTask} onRemove={onRemoveTask}
-              onMove={canManage ? (task, step) => void move(program, steps, task, step) : undefined} />
-            {canManage && <button type="button" className={styles.addGame} disabled={Boolean(busyId)} onClick={() => setGamePicker(program)}>＋ Добавить готовую игру</button>}
+            {canManage && <div className={styles.programActions}>
+              <span>Вся программа</span>
+              <div>
+                <button type="button" className={styles.programAction} disabled={busy} onClick={() => void update(program, { isPinned: !program.isPinned })} aria-pressed={Boolean(program.isPinned)}>{program.isPinned ? "Открепить" : "Закрепить сверху"}</button>
+                <button type="button" className={styles.programAction} disabled={busy} onClick={() => void update(program, { isActive: !program.isActive })}>{program.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
+                <button type="button" className={`${styles.programAction} ${styles.toolDanger}`} disabled={busy} onClick={() => setDeleteTarget(program)}>{actionIcons.remove}Удалить</button>
+              </div>
+            </div>}
           </div>}
         </section>;
       })}
-    </div>
+    </div>}
     {gamePicker && <ModalSheet title="Готовая игра в программу" onClose={() => { if (!busyId) setGamePicker(null); }}>
       <div className={styles.gameCatalog}>
-        <p>Игра встанет последним шагом программы «{gamePicker.title}». Срока у неё нет, мили начисляются сразу после прохождения, и участнику открывается следующий шаг.</p>
+        <p>Игра встанет последним шагом программы «{gamePicker.title}». Срока у неё нет, мили начисляются сразу после прохождения, и участнику открывается следующий шаг. Тем, кто уже прошёл программу, игра тоже откроется.</p>
         {(() => {
           const added = tasks.some((task) => task.programId === gamePicker.id && task.interactiveKind === FIRST_YEAR_KIND);
           return <article className={styles.gameCard}>
@@ -139,23 +197,4 @@ export function programFunnel(progress: ProgramHistory | undefined, steps: Task[
     else if (member.currentStep) atStep.set(member.currentStep, (atStep.get(member.currentStep) || 0) + 1);
   }
   return { total: progress?.members.length || 0, completed, rows: steps.map((step, index) => ({ id: step.id, title: step.title, position: step.position || index + 1, count: atStep.get(step.position || index + 1) || 0 })) };
-}
-
-function ProgramFunnel({ progress, steps }: { progress?: ProgramHistory; steps: Task[] }) {
-  const funnel = programFunnel(progress, steps);
-  if (!progress || funnel.total === 0) return <p className={styles.funnelEmpty}>{progress ? "Программу пока никто не начал." : "Загружаем, кто на каком шаге…"}</p>;
-  const max = Math.max(1, funnel.completed, ...funnel.rows.map((row) => row.count));
-  return <section className={styles.funnel} aria-label="Кто на каком шаге">
-    <div className={styles.funnelHead}><strong>Кто на каком шаге</strong><span>{funnel.total} {plural(funnel.total, "участник", "участника", "участников")} в программе</span></div>
-    {funnel.rows.map((row) => <div className={styles.funnelRow} key={row.id}>
-      <span className={styles.funnelLabel}><b>{row.position}</b>{row.title}</span>
-      <span className={styles.funnelBar}><i style={{ width: `${(row.count / max) * 100}%` }} /></span>
-      <strong>{row.count}</strong>
-    </div>)}
-    <div className={`${styles.funnelRow} ${styles.funnelDone}`}>
-      <span className={styles.funnelLabel}><b>✓</b>Завершили программу</span>
-      <span className={styles.funnelBar}><i style={{ width: `${(funnel.completed / max) * 100}%` }} /></span>
-      <strong>{funnel.completed}</strong>
-    </div>
-  </section>;
 }

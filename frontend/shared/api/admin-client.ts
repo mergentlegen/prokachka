@@ -82,9 +82,14 @@ export async function createAdminProgram(input: ProgramCreateInput): Promise<{ p
 export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean }): Promise<TaskProgram> {
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
-export async function addProgramGame(programId: string, kind: string): Promise<Task> {
-  const response = await request<ApiResponse<{ task: ApiRow }>>(`/api/programs/${encodeURIComponent(programId)}/games`, { method: "POST", body: JSON.stringify({ kind }) });
-  return mapTask(response.task);
+export async function addProgramGame(programId: string, kind: string): Promise<{ task: Task; reopened: number }> {
+  const response = await request<ApiResponse<{ task: ApiRow; reopened?: number }>>(`/api/programs/${encodeURIComponent(programId)}/games`, { method: "POST", body: JSON.stringify({ kind }) });
+  return { task: mapTask(response.task), reopened: Number(response.reopened || 0) };
+}
+/** A new normal step at the end of a running program; `reopened` counts participants who get it after finishing. */
+export async function addProgramStep(programId: string, input: { title: string; description: string; resourceUrl: string | null; maxPoints: number }): Promise<{ task: Task; reopened: number }> {
+  const response = await request<ApiResponse<{ task: ApiRow; reopened?: number }>>(`/api/programs/${encodeURIComponent(programId)}/steps`, { method: "POST", body: JSON.stringify(input) });
+  return { task: mapTask(response.task), reopened: Number(response.reopened || 0) };
 }
 export async function reorderProgramSteps(programId: string, taskIds: string[]) {
   await request<ApiResponse<{ saved: boolean }>>(`/api/programs/${encodeURIComponent(programId)}/order`, { method: "PUT", body: JSON.stringify({ taskIds }) });

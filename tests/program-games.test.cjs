@@ -76,3 +76,51 @@ test('a game step can be hidden or removed, but not edited like a normal task', 
   row.publication_type = 'evergreen';
   assert.match((await service.deleteTask(task, admin)).validationError, /каталоге/, 'catalog games still go through the catalog');
 });
+
+test('a new step goes through checks before the database adds it to the program', async () => {
+  const rpc = [];
+  const controller = loadTs('backend/controllers/program-steps.controller.ts', {
+    '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'a', role: 'admin', teamId: 'team', name: 'Асель' }) },
+    '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => ({ rpc: async (name, args) => { rpc.push([name, args]); return { data: { data: { id: task }, reopened: 3 }, error: null }; } }) },
+    '@/backend/services/audit-log.service': { auditRecord: async () => ({ teamId: 'team' }), recordAudit: async () => undefined },
+  });
+  const post = (body) => controller.addProgramStep(new Request('http://localhost/api/programs/' + program + '/steps', { method: 'POST', body: JSON.stringify(body) }), program);
+  assert.equal((await post({ title: 'Ш', description: 'Описание', maxPoints: 5 })).status, 400, 'too short title');
+  assert.equal((await post({ title: 'Шаг', description: 'Описание', maxPoints: -1 })).status, 400, 'negative miles');
+  assert.equal((await post({ title: 'Шаг', description: 'Описание', maxPoints: 5, resourceUrl: 'javascript:alert(1)' })).status, 400, 'unsafe link');
+  assert.equal(rpc.length, 0, 'nothing invalid reached the database');
+  const response = await post({ title: ' Новый шаг ', description: ' Что сделать ', maxPoints: 5, resourceUrl: '' });
+  assert.equal(response.status, 201);
+  assert.equal((await response.json()).reopened, 3, 'the mentor learns how many finished participants got the step');
+  assert.deepEqual(rpc[0], ['app_program_add_step', { p_actor: 'a', p_program: program, p_title: 'Новый шаг', p_description: 'Что сделать', p_resource_url: null, p_max_points: 5 }]);
+});
+
+test('a step added after a participant finished is shown as open, not missed', async () => {
+  const dbKey = '@/backend/infrastructure/supabase/admin-client';
+  const now = Date.now(), iso = (offset) => new Date(now + offset).toISOString();
+  const members = [{ id: 'm', name: 'Member', role: 'member', team_id: 'team', team_joined_at: '2026-01-01T00:00:00Z' }];
+  const tables = {
+    users: members,
+    task_programs: [{ id: 'program', team_id: 'team', title: 'Program', created_at: '2026-01-01T00:00:00Z', deadline_hours: 24 }],
+    tasks: [{ id: 'one', program_id: 'program', position: 1, title: 'One', max_points: 5 }, { id: 'two', program_id: 'program', position: 2, title: 'Two', max_points: 5 }],
+    member_program_progress: [{ user_id: 'm', program_id: 'program', current_task_id: 'two', status: 'active', unlocked_at: iso(-3_600_000), due_at: iso(23 * 3_600_000) }],
+    submissions: [{ id: 's', user_id: 'm', task_id: 'one', status: 'accepted', points: 5, submitted_at: '2026-02-01T00:00:00Z', reviewed_at: '2026-02-01T01:00:00Z' }],
+  };
+  const db = { from(table) {
+    let nullColumn;
+    const query = new Proxy({}, { get: (_, key) => key === 'range'
+      ? async () => ({ data: nullColumn ? tables[table].filter((row) => row[nullColumn] == null) : tables[table], error: null })
+      : key === 'is' ? (column, value) => { if (value === null) nullColumn = column; return query; } : () => query });
+    return query;
+  } };
+  const network = loadTs('backend/services/network.service.ts', { [dbKey]: { getSupabaseAdmin: () => db } });
+  const history = loadTs('backend/services/program-history.service.ts', {
+    [dbKey]: { getSupabaseAdmin: () => db },
+    '@/backend/services/network.service': { ...network, findTeamNetwork: async () => ({ data: members }) },
+  });
+  const result = await history.findProgramHistory('team', { id: 'root', role: 'admin' });
+  const added = result.data[0].steps[1].members[0];
+  assert.equal(added.status, 'active', 'the new step is open, its time has not run out');
+  assert.equal(added.dueAt, tables.member_program_progress[0].due_at, 'the deadline counts from the day the step opened');
+  assert.equal(result.data[0].members[0].status, 'active');
+});

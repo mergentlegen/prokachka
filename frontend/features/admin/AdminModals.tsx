@@ -1,6 +1,6 @@
 "use client";
 import type { FormEvent } from "react";
-import type { Task, TaskAttachment } from "@/shared/domain/types";
+import type { Task, TaskAttachment, TaskProgram } from "@/shared/domain/types";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { FormSheet } from "@/frontend/shared/FormSheet";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
@@ -13,11 +13,15 @@ import { MAX_MILES } from "@/shared/domain/miles";
 export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
 export type ReviewDraft = { points: string; comment: string };
 
-export function TaskEditorModal({ taskId, task, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, quiz, onChange, onClose, onSubmit }: { taskId?: string; task?: Task; draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
+export function TaskEditorModal({ taskId, task, program, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, quiz, onChange, onClose, onSubmit }: { taskId?: string; task?: Task; program?: TaskProgram; draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
   video: { file: File | null; removing: boolean; onFile: (file: File | null) => void; onRemove: (removing: boolean) => void; onError: (message: string) => void };
   quiz: { questions: QuizQuestion[]; loading: boolean; onChange: (questions: QuizQuestion[]) => void };
   onChange: (key: keyof TaskDraft, value: string | boolean) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <FormSheet title={editing ? "Изменить задание" : "Новое задание"} busy={busy} busyLabel={busyLabel} submitLabel={editing ? "Сохранить" : "Создать задание"} onClose={onClose} onSubmit={onSubmit}>
+  // A program step takes its time from the program, so it has no date of its own.
+  const programStep = Boolean(program) || task?.publicationType === "sequential";
+  return <FormSheet title={editing ? "Изменить задание" : program ? "Новый шаг программы" : "Новое задание"} busy={busy} busyLabel={busyLabel}
+    submitLabel={editing ? "Сохранить" : program ? "Добавить шаг" : "Создать задание"} onClose={onClose} onSubmit={onSubmit}
+    intro={program && !editing ? <>Шаг встанет последним в программе «{program.title}», на него будет {program.deadlineHours} ч, как и на остальные шаги. Порядок можно поменять стрелками ↑ ↓. Тем, кто уже прошёл программу, новый шаг тоже откроется.</> : undefined}>
     <label>Название задания<input value={draft.title} onChange={(event) => onChange("title", event.target.value)} placeholder="Например, записать короткое видео" autoFocus /></label>
     <label>Описание<textarea value={draft.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Что нужно сделать участнику и как отправить ответ" rows={5} /></label>
     <label><span className="field-label">Ссылка на материал <span className="field-hint">необязательно</span></span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>
@@ -26,9 +30,9 @@ export function TaskEditorModal({ taskId, task, draft, editing, busy, busyLabel,
     <QuizEditor questions={quiz.questions} loading={quiz.loading} disabled={busy} onChange={quiz.onChange} />
     <TaskFilePicker taskId={taskId} attachments={attachments} files={files} disabled={busy} onFilesChange={onFilesChange} onRemove={onRemoveAttachment} />
     <label>Максимум миль<input type="number" inputMode="numeric" min="0" max={MAX_MILES} step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
-    <label className="toggle-row"><span><strong>Срок сдачи</strong><small>{draft.hasDeadline ? "Участники должны отправить ответ до даты ниже" : "Без срока — можно отправить в любое время"}</small></span>
+    {!programStep && <><label className="toggle-row"><span><strong>Срок сдачи</strong><small>{draft.hasDeadline ? "Участники должны отправить ответ до даты ниже" : "Без срока — можно отправить в любое время"}</small></span>
       <input type="checkbox" role="switch" className="toggle-switch" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /></label>
-    {draft.hasDeadline && <label>Дата и время<input type="datetime-local" value={draft.deadline} onChange={(event) => onChange("deadline", event.target.value)} /></label>}
+    {draft.hasDeadline && <label>Дата и время<input type="datetime-local" value={draft.deadline} onChange={(event) => onChange("deadline", event.target.value)} /></label>}</>}
   </FormSheet>;
 }
 

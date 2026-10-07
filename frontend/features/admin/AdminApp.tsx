@@ -7,7 +7,7 @@ import { userScope } from "@/shared/domain/live-updates";
 import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, request, uploadTaskAttachment } from "@/frontend/shared/api/client";
-import { createAdminTask, deleteAdminTask, recordMentorCompletion, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
+import { addProgramStep, createAdminTask, deleteAdminTask, recordMentorCompletion, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ProfileDialog } from "@/frontend/features/profile/ProfileDialog";
@@ -15,7 +15,7 @@ import { Toast } from "@/frontend/shared/Toast";
 import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
-import { ProgramsPanel } from "@/frontend/features/admin/ProgramsPanel";
+import { ProgramsPanel, reopenedNotice } from "@/frontend/features/admin/ProgramsPanel";
 import { ProgramEditorModal } from "./ProgramEditorModal";
 import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
 import { TaskOrderDialog } from "./TaskOrderDialog";
@@ -25,7 +25,7 @@ import { FeedbackPanel } from "@/frontend/features/feedback/FeedbackPanel";
 import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
 import { MobileDrawer } from "@/frontend/shared/MobileDrawer";
 import { useMenuSwipe } from "@/frontend/shared/hooks/use-menu-swipe";
-import type { AuthUser, Submission, Task, TaskAttachment, TeamJoinRequest, User } from "@/shared/domain/types";
+import type { AuthUser, Submission, Task, TaskAttachment, TaskProgram, TeamJoinRequest, User } from "@/shared/domain/types";
 import { validMiles } from "@/shared/domain/miles";
 import { TaskEditorModal, ReviewModal, DeleteModal, CompletionModal } from "./AdminModals";
 import type { TaskDraft, ReviewDraft } from "./AdminModals";
@@ -48,7 +48,7 @@ import { useRestoreScroll } from "@/frontend/shared/hooks/use-restore-scroll";
 import { readPageParam, writePageParam } from "@/frontend/shared/lib/page-state";
 import { useAdminData } from "./use-admin-data";
 type AdminModal =
-  | { type: "task"; task?: Task }
+  | { type: "task"; task?: Task; program?: TaskProgram }
   | { type: "review"; submission: Submission; status: "accepted" | "revision" }
   | { type: "delete"; task: Task }
   | { type: "complete"; task: Task; member: User }
@@ -236,7 +236,8 @@ export function AdminApp() {
     }
   }
 
-  function openTaskModal(task?: Task) {
+  /** With `program` (and no task) the form adds a new step to the end of that program. */
+  function openTaskModal(task?: Task, program?: TaskProgram) {
     setTaskDraft({
       title: task?.title || "",
       description: task?.description || "",
@@ -252,7 +253,7 @@ export function AdminApp() {
     setQuizEdit({ questions: [], loading: Boolean(task?.quiz), dirty: false });
     if (task?.quiz) loadQuizForEditing(task.id).then((questions) => setQuizEdit((current) => current.dirty ? current : { questions, loading: false, dirty: false }))
       .catch(() => { setQuizEdit({ questions: [], loading: false, dirty: false }); setToast("Не удалось загрузить вопросы задания."); });
-    setModal({ type: "task", task });
+    setModal({ type: "task", task, program });
   }
 
   const openCompletionModal = useCallback((task: Task, member: User) => {
@@ -419,9 +420,13 @@ export function AdminApp() {
     }
     setModalBusy(true);
     try {
+      const newStep = !modal.task && modal.program ? modal.program : null;
+      let reopened = 0;
       const taskRecord = modal.task
         ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt })
-        : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt });
+        : newStep
+          ? await addProgramStep(newStep.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints }).then((added) => { reopened = added.reopened; return added.task; })
+          : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt });
       let saved: Task = { ...taskRecord, attachments: taskAttachments, video: modal.task?.video };
       for (let index = 0; index < taskFiles.length; index += 1) {
         try {
@@ -475,9 +480,9 @@ export function AdminApp() {
       setTaskVideoFile(null);
       setTaskVideoRemoving(false);
       setModal(null);
-      setToast("Задание сохранено." + videoNotice);
-    } catch {
-      setToast("Не удалось сохранить задание.");
+      setToast((newStep ? `Шаг добавлен в конец программы «${newStep.title}».${reopenedNotice(reopened)}` : "Задание сохранено.") + videoNotice);
+    } catch (error) {
+      setToast(modal.program && !modal.task && error instanceof Error ? error.message : "Не удалось сохранить задание.");
     } finally {
       setModalBusy(false);
       setModalBusyLabel(undefined);
@@ -574,7 +579,7 @@ export function AdminApp() {
         </div>}
         {section === "review" && <ReviewView store={store} submissions={queue} onReview={(submission, intent) => setReviewFlow({ startId: submission.id, intent })} onStart={() => { if (queue[0]) setReviewFlow({ startId: queue[0].id }); }} onEditTemplates={templates.canEdit ? () => setTemplatesEditorOpen(true) : undefined} />}
 {section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} templates={templates.list.length ? templates.list : DEFAULT_REVIEW_TEMPLATES} onOpenSubmission={openSubmission} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel history={programHistory} taskBusyId={taskActionBusy} onEditTask={openTaskModal} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} onNotice={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel history={programHistory} taskBusyId={taskActionBusy} onEditTask={(task) => openTaskModal(task)} onAddStep={(program) => openTaskModal(undefined, program)} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} onNotice={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsPanel requests={pendingRequests} users={store.users} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
         {section === "welcome-video" && canPublishContent && <WelcomeVideoSettingsPanel user={authUser} />}
@@ -605,7 +610,7 @@ export function AdminApp() {
       canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast}
       onReview={openReviewModal} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} onClose={() => setResultsTaskId("")} />}
     {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
-    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit({ questions, loading: false, dirty: true }) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
+    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} program={modal.program} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit({ questions, loading: false, dirty: true }) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}

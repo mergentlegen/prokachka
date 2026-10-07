@@ -41,3 +41,4 @@
 \ir 20261022-task-videos.sql
 \ir 20261023-task-quizzes.sql
 \ir 20261024-program-games.sql
+\ir 20261025-program-steps.sql

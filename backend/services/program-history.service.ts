@@ -84,12 +84,15 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
         const start = maxDate(String(user.team_joined_at || program.created_at), String(program.created_at));
         const previousTask = programTasks[stepIndex - 1];
         const previousAccepted = previousTask ? accepted.get(userId + ":" + String(previousTask.id)) : undefined;
-        const unlockedAt = stepIndex === 0 ? start : previousAccepted ? String(previousAccepted.reviewed_at || previousAccepted.submitted_at) : undefined;
+        // The step the participant is on now is dated by their progress (it may have been added after they finished).
+        const live = progressByMember.get(userId + ":" + programId);
+        const current = live?.status === "active" && String(live.current_task_id) === step.id ? live : undefined;
+        const unlockedAt = current?.unlocked_at ? String(current.unlocked_at) : stepIndex === 0 ? start : previousAccepted ? String(previousAccepted.reviewed_at || previousAccepted.submitted_at) : undefined;
         if (!unlockedAt) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "locked" };
 
         const game = Boolean(programTasks[stepIndex]?.interactive_kind);
         // A game step has no deadline: it is either done or still in progress, never late or missed.
-        const dueAt = game ? undefined : addHours(unlockedAt, Number(step.deadlineHours || deadlineHours));
+        const dueAt = game ? undefined : current?.due_at ? String(current.due_at) : addHours(unlockedAt, Number(step.deadlineHours || deadlineHours));
         const submission = latest.get(userId + ":" + String(step.id));
         const submittedAt = submission ? String(submission.submitted_at) : undefined;
         const status: Exclude<ProgramHistoryStatus, "completed"> = submission
