@@ -19,6 +19,8 @@ begin
   insert into public.member_program_progress(user_id, program_id, current_task_id, unlocked_at, due_at, status, completed_at) values
     (finished, program, null, now() - interval '9 days', now() - interval '7 days', 'completed', now() - interval '8 days'),
     (walking, program, step_a, now() - interval '1 day', now() + interval '1 day', 'active', null);
+  insert into public.submissions(user_id, task_id, status, media_type, answer_text, points, reviewed_at)
+    select finished, t, 'accepted'::public.submission_status, 'text', 'done', 10, now() from unnest(array[step_a, step_b]) t;
 
   -- Only the program's managers may add steps, and the text is checked.
   assert public.app_program_add_step(author, program, 'Новый шаг', 'Описание', null, 5) ? 'forbidden', 'another author added a step';
@@ -41,6 +43,7 @@ begin
   assert (select current_task_id = step_a and status = 'active' from public.member_program_progress where user_id = walking and program_id = program), 'participant on the way was moved';
 
   -- A ready game added later reopens the program too, without a deadline.
+  insert into public.submissions(user_id, task_id, status, media_type, answer_text, points, reviewed_at) values (finished, added, 'accepted', 'text', 'done', 5, now());
   update public.member_program_progress set status = 'completed', current_task_id = null, completed_at = now() where user_id = finished and program_id = program;
   result := public.app_program_add_game(leader, program, 'first-year');
   game := (result->'data'->>'id')::uuid;

@@ -16,6 +16,8 @@ begin
     (step_a,'A','A',team,10,'sequential',program,1,leader), (step_b,'B','B',team,10,'sequential',program,2,leader);
   insert into public.member_program_progress(user_id, program_id, current_task_id, unlocked_at, due_at, status, completed_at) values
     (finished, program, null, now(), now(), 'completed', now());
+  insert into public.submissions(user_id, task_id, status, media_type, answer_text, points, reviewed_at)
+    select finished, t, 'accepted'::public.submission_status, 'text', 'done', 10, now() from unnest(array[step_a, step_b]) t;
 
   -- Added like the first game: last step, 2 miles, reopened for those who had finished.
   assert public.app_program_add_game(member_id, program, 'safety-watch') ? 'forbidden', 'a participant added a game';
