@@ -4,7 +4,7 @@ const load = require('./helpers/load-ts.cjs');
 const hookHarness = require('./helpers/hook-harness.cjs');
 const nodes = (tree, predicate) => Array.isArray(tree) ? tree.flatMap(item => nodes(item, predicate)) : !tree || typeof tree !== 'object' ? [] : [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
 
-test('company catalog and publication use a separate evergreen task with ten-mile reward and branch scope', async () => {
+test('company catalog and publication use a separate evergreen task with a two-mile reward and branch scope', async () => {
   const { readyProgramByKey } = load('shared/domain/ready-programs.ts');
   const { COMPANY_CARDS, COMPANY_QUESTIONS, COMPANY_STORY_PARTS } = load('shared/domain/company-voyage.ts');
   const { mapTask, mapProgram } = load('frontend/shared/api/client.ts');
@@ -12,7 +12,12 @@ test('company catalog and publication use a separate evergreen task with ten-mil
   assert.equal(game.title, 'Корабль, на который ты поднялся');
   assert.equal(game.tasks[0].maxPoints, 2);
   assert.equal(game.tasks[0].publicationType, 'evergreen');
-  assert.equal(COMPANY_CARDS.length, 8); assert.equal(COMPANY_QUESTIONS.length, 17);
+  assert.equal(COMPANY_CARDS.length, 9); assert.equal(COMPANY_QUESTIONS.length, 18);
+  // The right answers in the game and in the database are the same.
+  const sql = require('node:fs').readFileSync(require('node:path').join(__dirname, '../supabase/20261029-company-voyage-v2.sql'), 'utf8');
+  const key = JSON.parse(sql.match(/when 'company-voyage' then '\{"steps":9,"reward":2,"answers":(\[[0-9,]+\])\}'/)[1]);
+  assert.deepEqual(COMPANY_QUESTIONS.map(question => question.answer), key);
+  assert.ok(COMPANY_QUESTIONS.every(question => question.card >= 1 && question.card <= COMPANY_CARDS.length));
   assert.deepEqual(COMPANY_STORY_PARTS.map(part => part.options.length), [3,5,3]);
   assert.equal(COMPANY_QUESTIONS.filter(question => question.trap).length, 3);
   assert.equal(mapTask({ interactive_kind: 'company-voyage' }).interactiveKind, 'company-voyage');
@@ -51,41 +56,50 @@ test('attempt API accepts question 17 and validates optional story input before 
   assert.deepEqual(calls[1].args, { p_user_id: 'member', p_task_id: id, p_choices: [2,4,1] });
 });
 
-test('company quiz retains red failure until explicit retry and finishes with ten miles after seventeen answers', async () => {
+test('company quiz: a wrong answer is answered again, and finishing gives no miles — the mentor gives them for the voice', async () => {
   const harness = hookHarness();
-  const react = { ...harness.react, useId: () => 'company-quiz' };
-  let state = { step: 8, completed: false, status: 'active', earnedPoints: 0, maxPoints: 10, answeredQuestions: 0, questionIndex: 0 };
-  let retries = 0, finishes = 0, received = 0;
-  const answers = [1,1,1,0,0,1,1,1,1,2,1,1,2,0,1,1,1];
+  let state = { step: 9, completed: false, status: 'active', earnedPoints: 0, maxPoints: 2, answeredQuestions: 0, questionIndex: 0, mistakes: 0, firstTry: 0 };
+  let finishes = 0, received = 0, tried = false;
+  const { COMPANY_QUESTIONS, COMPANY_ANSWER_OPTIONS } = load('shared/domain/company-voyage.ts');
+  const answers = COMPANY_QUESTIONS.map(question => question.answer);
   const api = {
     startReadyProgram: async () => state,
     answerReadyProgram: async (_id, answer, expected) => {
       assert.equal(expected, state.questionIndex);
       const correct = answer === answers[expected];
-      state = { ...state, failed: !correct, lastAnswer: answer, questionIndex: expected + Number(correct), answeredQuestions: expected + Number(correct), ready: correct && expected === 16 };
+      state = { ...state, wrong: !correct, lastAnswer: answer, mistakes: state.mistakes + Number(!correct), firstTry: state.firstTry + Number(correct && !tried),
+        questionIndex: expected + Number(correct), answeredQuestions: expected + Number(correct), ready: correct && expected === answers.length - 1 };
+      tried = !correct;
       return state;
     },
-    restartReadyProgramQuiz: async () => { retries++; state = { ...state, failed: false, lastAnswer: null, questionIndex: 0, answeredQuestions: 0, ready: false }; return state; },
-    completeReadyProgram: async () => { finishes++; state = { ...state, completed: true, earnedPoints: 2, submission: { id: 'result', points: 2 } }; return state; },
+    completeReadyProgram: async () => { finishes++; state = { ...state, completed: true, earnedPoints: 0 }; return state; },
   };
-  const { CompanyVoyageGame } = load('frontend/features/member/CompanyVoyageGame.tsx', { react, '@/frontend/shared/api/ready-program-client': api,
+  const { CompanyVoyageGame } = load('frontend/features/member/CompanyVoyageGame.tsx', { react: harness.react, '@/frontend/shared/api/ready-program-client': api,
     './CompanyVoyageGame.module.css': { __esModule: true, default: new Proxy({}, { get: (_target, key) => key }) },
   });
-  harness.mount(CompanyVoyageGame, { taskId: 'company', onCompleted(result) { assert.equal(result.points, 2); received++; } });
+  harness.mount(CompanyVoyageGame, { taskId: 'company', onCompleted() { received++; } });
   let tree = await harness.settle();
-  const press = async predicate => { const button = nodes(tree, node => node.type === 'button' && predicate(node))[0]; assert.ok(button); assert.equal(Boolean(button.props.disabled), false); button.props.onClick(); tree = await harness.settle(); };
-  const select = index => press(node => node.props['aria-pressed'] !== undefined && node.props.children[1].props.children === ['Правда','Миф','Не совсем так'][index]);
+  const text = node => [].concat(node.props.children).join('');
+  const press = async predicate => { const button = nodes(tree, node => node.type === 'button' && predicate(node))[0]; assert.ok(button, 'button not found'); assert.equal(Boolean(button.props.disabled), false); button.props.onClick(); tree = await harness.settle(); };
+  const select = index => press(node => node.props.children === COMPANY_ANSWER_OPTIONS[index]);
   try {
-    await select(0);
-    assert.equal(retries, 0); assert.equal(finishes, 0);
-    assert.match(nodes(tree, node => node.props?.['aria-pressed'] === true)[0].props.className, /incorrect/);
-    assert.equal(nodes(tree, node => node.props?.role === 'alert').length, 1);
-    await press(node => node.props.children === 'Пройти заново'); assert.equal(retries, 1);
-    for (const answer of answers) { await select(answer); if (!state.ready) await press(node => node.props.children === 'Следующий вопрос →'); }
-    assert.equal(finishes, 0); assert.equal(state.earnedPoints, 0);
-    await press(node => node.props.children === 'Завершить и получить 2 мили');
-    assert.equal(finishes, 1); assert.equal(received, 1);
-    assert.equal(nodes(tree, node => node.type === 'button' && String(node.props.children).includes('Завершить')).length, 0);
+    // A wrong answer: a hint to the card, the card can be opened, and the same question is answered again.
+    await select((answers[0] + 1) % 3);
+    assert.match(nodes(tree, node => node.props?.role === 'alert')[0].props.children[1].props.children.join(''), /карточке 1/);
+    await press(node => text(node).includes('Открыть карточку 1'));
+    assert.equal(nodes(tree, node => node.props?.role === 'dialog').length, 1);
+    await press(node => node.props.children === 'Вернуться к вопросу');
+    await press(node => node.props.children === 'Ответить ещё раз');
+    for (const [index, answer] of answers.entries()) {
+      await select(answer);
+      await press(node => node.props.children === (index === answers.length - 1 ? 'Посмотреть результат' : 'Следующий вопрос'));
+    }
+    assert.equal(finishes, 1, 'the game is finished once');
+    assert.equal(received, 0, 'no miles from the game itself');
+    assert.ok(nodes(tree, node => typeof node.props?.children === 'object' && [].concat(node.props.children).join('') === '17 / 18').length, 'score with the first try');
+    assert.ok(JSON.stringify(tree).includes('ошибся(лась) 1 раз'), 'mistakes are shown');
+    await press(node => node.props.children === 'Дальше: мой рассказ');
+    assert.ok(JSON.stringify(tree).includes('Мой рассказ за 60 секунд'));
   } finally { harness.unmount(); }
 });
 

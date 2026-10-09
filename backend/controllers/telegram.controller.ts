@@ -86,7 +86,9 @@ export async function receiveTelegramUpdate(request: Request) {
           return NextResponse.json({ ok: true });
         }
         if (!selected.duplicate) await sendTelegramMessage(telegramId, selected.ready
-          ? selected.purpose === "company-voice"
+          ? selected.purpose === "company-voice" && selected.review
+            ? "Запишите здесь одно голосовое на 30–60 секунд: расскажите о компании своими словами по плану с сайта. Нажмите на микрофон и отправьте сообщение. Наставник послушает его и начислит мили."
+            : selected.purpose === "company-voice"
             ? "Запишите здесь одно голосовое на 30–60 секунд по заданию, которое выбрали на сайте. Нажмите на микрофон и отправьте сообщение. Бот передаст его наставникам вашей ветки. Мили за прохождение уже начислены — повторной оценки не будет."
             : "Задание выбрано. Отправьте ответ одним сообщением: текст, фото, видео или файл. Пояснение к файлу добавьте в подпись."
           : payload ? selected.validationError || "Откройте задание на сайте ещё раз."
@@ -115,7 +117,9 @@ export async function receiveTelegramUpdate(request: Request) {
       await sendTelegramMessage(telegramId, result.validationError);
     } else if (result.data) {
       scheduleTelegramDelivery();
-      if (!result.duplicate) await sendTelegramMessage(telegramId, result.purpose === "company-voice"
+      if (!result.duplicate) await sendTelegramMessage(telegramId, result.purpose === "company-voice" && result.review
+        ? "Голосовое отправлено наставнику на проверку. Когда он послушает, он ответит тебе и начислит мили."
+        : result.purpose === "company-voice"
         ? "Голосовое сохранено и поставлено в очередь доставки наставникам вашей ветки. Начисленные мили не изменились."
         : result.purpose === "captain-screenshot" ? "Скриншот сохранён и поставлен в очередь доставки наставникам вашей ветки вместе с сообщением о круизе. Начислена ещё 1 миля — всего 20."
         : "Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.");

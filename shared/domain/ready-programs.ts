@@ -62,7 +62,7 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
   },
   {
     key: "company-voyage", title: COMPANY_VOYAGE_TITLE, eyebrow: "О компании · правда или миф",
-    description: "Восемь карточек о компании, 17 вопросов и свой рассказ за 60 секунд. Узнай клуб и собери ответы на вопросы друзей.",
+    description: "Девять карточек о компании, 18 вопросов «Правда или миф» и свой рассказ за 60 секунд голосовым наставнику. Мили начисляет наставник, когда послушает.",
     badge: "Без дедлайна", taskCount: 1,
     tasks: [{ title: COMPANY_VOYAGE_TITLE, description: "Познакомься с компанией, пройди игру «Правда или миф» без ошибок и получи 2 мили автоматически. Затем собери свой рассказ для наставника.", maxPoints: COMPANY_VOYAGE_REWARD, publicationType: "evergreen", interactiveKind: "company-voyage" }],
   },

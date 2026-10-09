@@ -335,9 +335,9 @@ export async function deliverTelegramNotifications() {
             if (!delivery.ok) break;
           }
         }
-        if (!delivery.ok && answer.telegram_file_id && ["photo", "video", "document"].includes(String(answer.media_type))) {
+        if (!delivery.ok && answer.telegram_file_id && ["photo", "video", "document", "voice"].includes(String(answer.media_type))) {
           const type = String(answer.media_type);
-          const method = type === "photo" ? "sendPhoto" : type === "video" ? "sendVideo" : "sendDocument";
+          const method = type === "photo" ? "sendPhoto" : type === "video" ? "sendVideo" : type === "voice" ? "sendVoice" : "sendDocument";
           const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/${method}`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ chat_id: chatId, [type]: answer.telegram_file_id, caption: String(answer.answer_text || "").slice(0, 1024) }),

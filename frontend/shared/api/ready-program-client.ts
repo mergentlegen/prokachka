@@ -18,6 +18,14 @@ export type ReadyAttempt = {
   message?: string;
   submission?: Submission;
   storyChoices?: number[];
+  /** Company game: the current question was answered wrong and is answered again. */
+  wrong?: boolean;
+  mistakes?: number;
+  firstTry?: number;
+  /** Company game: finished in the old version (miles were given by the site). */
+  legacy?: boolean;
+  /** Company game: the latest voice sent to the mentor. */
+  voice?: { status: "pending" | "accepted" | "revision"; points: number; comment: string } | null;
 };
 
 type ApiRow = Record<string, unknown>;
@@ -41,7 +49,16 @@ function mapAttempt(row: ApiRow): ReadyAttempt {
     message: typeof row.message === "string" ? row.message : undefined,
     submission: rawSubmission && typeof rawSubmission === "object" ? mapSubmission(rawSubmission as ApiRow) : undefined,
     storyChoices: Array.isArray(row.storyChoices) && row.storyChoices.length === 3 && row.storyChoices.every(Number.isInteger) ? row.storyChoices as number[] : undefined,
+    wrong: Boolean(row.wrong), mistakes: Number(row.mistakes || 0), firstTry: Number(row.firstTry || 0), legacy: Boolean(row.legacy),
+    voice: mapVoice(row.voice),
   };
+}
+
+function mapVoice(value: unknown): ReadyAttempt["voice"] {
+  if (!value || typeof value !== "object") return null;
+  const row = value as ApiRow;
+  const status = row.status === "accepted" || row.status === "revision" || row.status === "pending" ? row.status : null;
+  return status ? { status, points: Number(row.points || 0), comment: typeof row.comment === "string" ? row.comment : "" } : null;
 }
 
 async function mutate(taskId: string, body: Record<string, unknown>) {

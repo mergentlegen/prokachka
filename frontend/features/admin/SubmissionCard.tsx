@@ -43,17 +43,19 @@ export function SubmissionAnswer({ submission }: { submission: Submission }) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const type = submission.mediaType;
-  const hasMedia = type === "photo" || type === "video" || type === "document";
+  const hasMedia = type === "photo" || type === "video" || type === "document" || type === "voice";
   const mediaUrl = `/api/submissions/${encodeURIComponent(submission.id)}/media`;
   return <div className={styles.answer}>
     {submission.answerText && <AnswerText key={submission.id} submission={submission} />}
     {!submission.answerText && !hasMedia && <p className={styles.muted}>Текст ответа отсутствует.</p>}
     {hasMedia && <div className={styles.media}>
-      {!showMedia ? <button type="button" className={styles.open} onClick={() => setShowMedia(true)}>{type === "photo" ? "Посмотреть фото" : type === "video" ? "Посмотреть видео" : "Посмотреть файл"}</button> : <>
+      {!showMedia ? <button type="button" className={styles.open} onClick={() => setShowMedia(true)}>{type === "photo" ? "Посмотреть фото" : type === "video" ? "Посмотреть видео" : type === "voice" ? "▶ Послушать голосовое" : "Посмотреть файл"}</button> : <>
         {failed ? <div className={styles.mediaError} role="alert"><p>Не удалось загрузить вложение.</p><button type="button" className={styles.open} onClick={() => { setFailed(false); setAttempt((value) => value + 1); }}>Повторить</button></div> : <>
           {type === "photo" && <a href={mediaUrl} target="_blank" rel="noopener noreferrer" aria-label="Открыть фото в полном размере"><img key={attempt} src={mediaUrl} alt="Ответ участника" onError={() => setFailed(true)} /></a>}
           {type === "video" && <video key={attempt} src={mediaUrl} controls playsInline preload="metadata" onError={() => setFailed(true)} />}
           {type === "document" && <a className={styles.open} href={mediaUrl} target="_blank" rel="noopener noreferrer">Открыть файл ↗</a>}
+          {type === "voice" && <><audio key={attempt} src={mediaUrl} controls preload="metadata" onError={() => setFailed(true)} />
+            <p className={styles.muted}>Не играет на этом устройстве? Это голосовое продублировано вам в Telegram.</p></>}
         </>}
       </>}
     </div>}

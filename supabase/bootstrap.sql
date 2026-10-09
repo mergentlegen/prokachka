@@ -45,3 +45,4 @@
 \ir 20261026-company-voyage-reward.sql
 \ir 20261027-safety-watch.sql
 \ir 20261028-program-catch-up.sql
+\ir 20261029-company-voyage-v2.sql

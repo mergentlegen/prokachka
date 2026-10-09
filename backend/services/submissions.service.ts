@@ -48,7 +48,7 @@ async function reviewableSubmission(id: string, viewer: SubmissionViewer | undef
 export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer) {
   const result = await reviewableSubmission(id, viewer, "telegram_file_id,media_type");
   if (!("row" in result)) return result;
-  if (!result.row.telegram_file_id || !["photo", "video", "document"].includes(String(result.row.media_type))) {
+  if (!result.row.telegram_file_id || !["photo", "video", "document", "voice"].includes(String(result.row.media_type))) {
     return { notFound: true as const };
   }
   return { data: { fileId: String(result.row.telegram_file_id), mediaType: String(result.row.media_type) } };

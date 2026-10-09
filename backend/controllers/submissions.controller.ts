@@ -150,5 +150,7 @@ export async function streamSubmissionMedia(request: Request, id: string) {
 function mediaContentType(mediaType: string) {
   if (mediaType === "photo") return "image/jpeg";
   if (mediaType === "video") return "video/mp4";
+  // Telegram voice messages are Opus audio in an Ogg file.
+  if (mediaType === "voice") return "audio/ogg";
   return "application/octet-stream";
 }

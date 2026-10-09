@@ -9,6 +9,8 @@ export type TelegramSubmissionResult = {
   ready?: boolean;
   purpose?: "answer" | "company-voice" | "captain-screenshot";
   summary?: string;
+  /** The voice is a work for the mentor's review (it brings the miles), not practice. */
+  review?: boolean;
 };
 
 export function telegramTokenHash(token: string) {
