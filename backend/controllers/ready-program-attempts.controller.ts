@@ -7,6 +7,7 @@ import { captainCruiseAction, type CaptainAction } from "@/backend/services/capt
 import { countYourDreamAction } from "@/backend/services/count-your-dream.service";
 import { dreamRouteAction } from "@/backend/services/dream-route.service";
 import { firstYearAction } from "@/backend/services/first-year.service";
+import { safetyWatchAction, type SafetyWatchOperation } from "@/backend/services/safety-watch.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
@@ -22,8 +23,21 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
     const action = body?.action;
+    if (action === "safety-watch") {
+      const payload = body.payload as { answers?: unknown } | undefined;
+      if (!body.operation || !["start", "save", "complete"].includes(body.operation)
+        || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 4))
+        || (payload !== undefined && (!payload || typeof payload !== "object" || Array.isArray(payload)))
+        || (payload?.answers !== undefined && (!Array.isArray(payload.answers) || payload.answers.length > 7 || !payload.answers.every((value) => Number.isInteger(value) && value >= 0 && value <= 2)))
+        || JSON.stringify(payload || {}).length > 1000) return failure("Некорректные данные игры.", 400);
+      const result = await safetyWatchAction(user.id, taskId, body.operation as SafetyWatchOperation, Number(body.step || 0), payload as Record<string, unknown> | undefined);
+      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс игры.", 409);
+      if ("error" in result) return failure("Не удалось сохранить игру. Попробуйте ещё раз.");
+      return ok({ attempt: result.data });
+    }
     if (action === "first-year") {
       if (!body.operation || !["start", "save", "complete"].includes(body.operation)
         || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) > 12))

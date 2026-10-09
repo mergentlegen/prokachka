@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { addProgramGame, deleteAdminProgram, reorderProgramSteps, updateAdminProgram } from "@/frontend/shared/api/admin-client";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
-import { FIRST_YEAR_DESCRIPTION, FIRST_YEAR_KIND, FIRST_YEAR_REWARD, FIRST_YEAR_TITLE } from "@/shared/domain/first-year";
+import { PROGRAM_GAMES, type ProgramGame } from "@/shared/domain/program-games";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { actionIcons } from "./AdminIcons";
 import { comparePublications } from "@/shared/domain/publication-order";
@@ -34,14 +34,14 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   const [deleteTarget, setDeleteTarget] = useState<TaskProgram | null>(null);
   const [gamePicker, setGamePicker] = useState<TaskProgram | null>(null);
 
-  async function addGame(program: TaskProgram) {
+  async function addGame(program: TaskProgram, game: ProgramGame) {
     if (busyId) return;
     setBusyId(program.id);
     try {
-      const { task, reopened } = await addProgramGame(program.id, FIRST_YEAR_KIND);
+      const { task, reopened } = await addProgramGame(program.id, game.kind);
       onChange(programs, [...tasks.filter((item) => item.id !== task.id), task]);
       setGamePicker(null);
-      onError(`Игра «${FIRST_YEAR_TITLE}» добавлена последним шагом. Стрелками ↑ ↓ её можно переставить.${reopenedNotice(reopened)}`);
+      onError(`Игра «${game.title}» добавлена последним шагом. Стрелками ↑ ↓ её можно переставить.${reopenedNotice(reopened)}`);
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось добавить игру."); }
     finally { setBusyId(""); }
   }
@@ -174,14 +174,14 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     {gamePicker && <ModalSheet title="Готовая игра в программу" onClose={() => { if (!busyId) setGamePicker(null); }}>
       <div className={styles.gameCatalog}>
         <p>Игра встанет последним шагом программы «{gamePicker.title}». Срока у неё нет, мили начисляются сразу после прохождения, и участнику открывается следующий шаг. Тем, кто уже прошёл программу, игра тоже откроется.</p>
-        {(() => {
-          const added = tasks.some((task) => task.programId === gamePicker.id && task.interactiveKind === FIRST_YEAR_KIND);
-          return <article className={styles.gameCard}>
-            <span aria-hidden="true">⚓</span>
-            <div><strong>{FIRST_YEAR_TITLE}</strong><p>{FIRST_YEAR_DESCRIPTION}</p><small>{FIRST_YEAR_REWARD} мили за прохождение · без срока · около 7 минут</small></div>
-            <button type="button" className="button button-primary" disabled={Boolean(busyId) || added} onClick={() => void addGame(gamePicker)}>{added ? "Уже в программе" : busyId ? "Добавляем…" : "Добавить"}</button>
+        {PROGRAM_GAMES.map((game) => {
+          const added = tasks.some((task) => task.programId === gamePicker.id && task.interactiveKind === game.kind);
+          return <article key={game.kind} className={styles.gameCard}>
+            <span aria-hidden="true">{game.icon}</span>
+            <div><strong>{game.title}</strong><p>{game.description}</p><small>{formatMiles(game.reward)} за прохождение · без срока · около {game.minutes} минут</small></div>
+            <button type="button" className="button button-primary" disabled={Boolean(busyId) || added} onClick={() => void addGame(gamePicker, game)}>{added ? "Уже в программе" : busyId ? "Добавляем…" : "Добавить"}</button>
           </article>;
-        })()}
+        })}
       </div>
     </ModalSheet>}
     {deleteTarget && <ConfirmModal title="Удалить программу?" description={<>«{deleteTarget.title}», все её шаги и отправленные работы будут удалены без возможности восстановления.</>} confirmLabel="Удалить программу" busy={Boolean(busyId)} onClose={() => { if (!busyId) setDeleteTarget(null); }} onConfirm={() => void remove()} />}

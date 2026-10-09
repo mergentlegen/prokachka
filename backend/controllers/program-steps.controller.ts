@@ -5,6 +5,7 @@ import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
 import { validMiles } from "@/shared/domain/miles";
+import { programGame } from "@/shared/domain/program-games";
 
 type RpcResult = { data?: unknown; reopened?: number; forbidden?: boolean; validationError?: string };
 
@@ -23,13 +24,15 @@ export async function addProgramGame(request: Request, programId: string) {
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
   try {
     const body = await readLimitedJson(request);
-    const result = await call("app_program_add_game", { p_actor: user.id, p_program: programId, p_kind: typeof body.kind === "string" ? body.kind : "" });
+    const game = programGame(body.kind);
+    if (!game) return failure("Такой игры нет в каталоге.", 400);
+    const result = await call("app_program_add_game", { p_actor: user.id, p_program: programId, p_kind: game.kind });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("error" in result) return failure("Не удалось добавить игру.", 503);
     if (result.payload.forbidden) return failure("Изменять программу может её автор или руководитель команды.", 403);
     if (result.payload.validationError) return failure(result.payload.validationError, 409);
     const program = await auditRecord("task_programs", programId);
-    await recordAudit(user, { action: "task.create", targetId: String((result.payload.data as { id?: string })?.id || ""), targetLabel: "Игра «Мой первый год в клубе»", teamId: program?.teamId, details: { programStep: true, miles: 2 } });
+    await recordAudit(user, { action: "task.create", targetId: String((result.payload.data as { id?: string })?.id || ""), targetLabel: `Игра «${game.title}»`, teamId: program?.teamId, details: { programStep: true, miles: game.reward } });
     return ok({ task: result.payload.data, reopened: Number(result.payload.reopened || 0) }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

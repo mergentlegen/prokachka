@@ -124,3 +124,51 @@ test('a step added after a participant finished is shown as open, not missed', a
   assert.equal(added.dueAt, tables.member_program_progress[0].due_at, 'the deadline counts from the day the step opened');
   assert.equal(result.data[0].members[0].status, 'active');
 });
+
+test('«Вахта безопасности»: the answers in the game and in the database are the same', () => {
+  const watch = loadTs('shared/domain/safety-watch.ts');
+  const sql = require('node:fs').readFileSync(require('node:path').join(__dirname, '../supabase/20261027-safety-watch.sql'), 'utf8');
+  for (let deck = 1; deck <= 4; deck++) {
+    const key = sql.match(new RegExp(`when ${deck} then '(\[[0-9,]+\])'::jsonb`))[1];
+    assert.deepEqual(watch.safetyWatchKey(deck), JSON.parse(key), `deck ${deck}`);
+  }
+  assert.equal(watch.SAFETY_WATCH_TOTAL, 25);
+  assert.equal(watch.SAFETY_WATCH_REWARD, 2);
+  for (const deck of watch.SAFETY_WATCH_DECKS) for (const question of deck.qs) {
+    const options = deck.type === 'two' ? deck.labels : question.opts;
+    assert.ok(question.a >= 0 && question.a < options.length, question.q);
+    assert.ok(watch.SAFETY_WATCH_SOURCES[question.src], question.q);
+  }
+  const games = loadTs('shared/domain/program-games.ts');
+  assert.deepEqual(games.PROGRAM_GAMES.map((game) => game.kind), ['first-year', 'safety-watch']);
+});
+
+test('«Вахта безопасности» requests are checked before they reach the database', async () => {
+  const calls = [];
+  const controller = loadTs('backend/controllers/ready-program-attempts.controller.ts', {
+    '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'm', role: 'member', teamId: 'team' }) },
+    '@/backend/services/safety-watch.service': { safetyWatchAction: async (...args) => { calls.push(args); return { data: { step: 1, completed: false } }; } },
+  });
+  const post = (body) => controller.postReadyProgramAttempt(new Request('http://localhost/api/ready-programs/' + task + '/attempt', { method: 'POST', body: JSON.stringify(body) }), task);
+  assert.equal((await post({ action: 'safety-watch', operation: 'cheat' })).status, 400);
+  assert.equal((await post({ action: 'safety-watch', operation: 'save', step: 5, payload: { answers: [0] } })).status, 400, 'no fifth deck');
+  assert.equal((await post({ action: 'safety-watch', operation: 'save', step: 1, payload: { answers: [0, 9] } })).status, 400, 'no such option');
+  assert.equal((await post({ action: 'safety-watch', operation: 'save', step: 1, payload: { answers: [0, 1, 0, 1, 1, 1, 1, 0] } })).status, 400, 'too many answers');
+  assert.equal(calls.length, 0);
+  assert.equal((await post({ action: 'safety-watch', operation: 'save', step: 1, payload: { answers: [0, 1, 0, 1, 1, 1, 1], fixes: 1, seen: 8 } })).status, 200);
+  assert.deepEqual(calls[0].slice(1, 4), [task, 'save', 1]);
+});
+
+test('only games from the catalog can be added to a program', async () => {
+  const rpc = [];
+  const controller = loadTs('backend/controllers/program-steps.controller.ts', {
+    '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'a', role: 'admin', teamId: 'team', name: 'Асель' }) },
+    '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => ({ rpc: async (name, args) => { rpc.push([name, args]); return { data: { data: { id: task }, reopened: 0 }, error: null }; } }) },
+    '@/backend/services/audit-log.service': { auditRecord: async () => ({ teamId: 'team' }), recordAudit: async (_user, entry) => { rpc.push(['audit', entry.targetLabel]); } },
+  });
+  const req = (body) => new Request('http://localhost/api/programs/' + program + '/games', { method: 'POST', body: JSON.stringify(body) });
+  assert.equal((await controller.addProgramGame(req({ kind: 'unknown' }), program)).status, 400);
+  assert.equal(rpc.length, 0);
+  assert.equal((await controller.addProgramGame(req({ kind: 'safety-watch' }), program)).status, 201);
+  assert.deepEqual(rpc, [['app_program_add_game', { p_actor: 'a', p_program: program, p_kind: 'safety-watch' }], ['audit', 'Игра «Вахта безопасности»']]);
+});
