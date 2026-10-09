@@ -66,12 +66,12 @@ test('parallel captain finishes and screenshot webhooks award exactly 19 plus 1 
   assert.equal(query(`select count(*) from telegram_notification_jobs where submission_id='${submission}' and kind='captain-screenshot'`), '1');
 });
 
-test('parallel company completions create one ten-mile reward; story saves cannot duplicate it', { skip: !port }, async () => {
+test('parallel company completions create one two-mile reward; story saves cannot duplicate it', { skip: !port }, async () => {
   const { team, root, alice } = fixture();
   query(`update users set parent_user_id='${root}' where id='${alice}';`);
   const published = JSON.parse(query(`select app_create_program('${JSON.stringify({
     teamId: team, publisherId: root, title: 'Company voyage', deadlineHours: 720, templateKey: 'company-voyage',
-    tasks: [{ title: 'Company voyage', description: 'Read the cards and answer.', maxPoints: 10, publicationType: 'evergreen', interactiveKind: 'company-voyage' }],
+    tasks: [{ title: 'Company voyage', description: 'Read the cards and answer.', maxPoints: 2, publicationType: 'evergreen', interactiveKind: 'company-voyage' }],
   })}'::jsonb);`));
   const task = published.tasks[0].id;
   query(`select app_start_ready_program('${alice}','${task}');`);
@@ -80,7 +80,7 @@ test('parallel company completions create one ten-mile reward; story saves canno
   answers.forEach((answer, index) => query(`select app_answer_ready_program('${alice}','${task}',${answer},${index});`));
   const results = await Promise.all(Array.from({ length: 8 }, () => parallel(`select app_complete_ready_program('${alice}','${task}');`)));
   assert.equal(new Set(results.map(result => JSON.parse(result).submission.id)).size, 1);
-  assert.ok(results.every(result => JSON.parse(result).earnedPoints === 10));
+  assert.ok(results.every(result => JSON.parse(result).earnedPoints === 2));
   await Promise.all(Array.from({ length: 4 }, () => parallel(`select app_save_company_story('${alice}','${task}',array[2,4,1]);`)));
   const telegramId = String(900000000000000 + parseInt(alice.replaceAll('-','').slice(0,12),16));
   const updateId = parseInt(alice.replaceAll('-','').slice(0,12),16);
@@ -93,7 +93,7 @@ test('parallel company completions create one ten-mile reward; story saves canno
   assert.equal(voices.filter(value => JSON.parse(value).duplicate === false).length, 1);
   assert.equal(voices.filter(value => JSON.parse(value).duplicate === true).length, 7);
   assert.equal(query(`select count(*) from telegram_notification_jobs where submission_id='${JSON.parse(results[0]).submission.id}' and kind='company-voice'`), '1');
-  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${task}'`), '1:10');
+  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${task}'`), '1:2');
 });
 
 test('parallel first task-order saves accept one revision without overwriting the winner', { skip: !port }, async () => {
