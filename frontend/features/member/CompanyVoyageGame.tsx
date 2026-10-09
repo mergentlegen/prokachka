@@ -5,6 +5,7 @@ import { COMPANY_ANSWER_OPTIONS, COMPANY_CARDS, COMPANY_PHRASE_BANK, COMPANY_QUE
 import { advanceReadyProgram, answerReadyProgram, completeReadyProgram, createCompanyVoiceLink, restartReadyProgramQuiz, saveCompanyStory, startReadyProgram, type ReadyAttempt } from "@/frontend/shared/api/ready-program-client";
 import { ApiError, createTelegramLink } from "@/frontend/shared/api/client";
 import type { Submission } from "@/shared/domain/types";
+import { formatMiles } from "@/frontend/shared/lib/format";
 import styles from "./CompanyVoyageGame.module.css";
 
 type View = "intro" | "cards" | "quiz" | "bank" | "story";
@@ -147,13 +148,13 @@ export function CompanyVoyageGame({ taskId, onCompleted }: { taskId: string; onC
   const alert = error && <div className={styles.failure} role="alert"><p>{error}</p>{!attempt && <button type="button" className={styles.secondary} onClick={() => { setError(""); setLoadKey((key) => key + 1); }}>Повторить загрузку</button>}</div>;
 
   return <section className={styles.game} aria-label={`Игра ${COMPANY_VOYAGE_TITLE}`}>
-    <header className={styles.top}><span>О компании · {view === "intro" ? "Твой маршрут" : view === "cards" ? "Узнай компанию" : view === "quiz" ? "Правда или миф" : view === "bank" ? "Твой результат" : "Мой рассказ"}</span><span className={styles.reward}>{attempt?.completed ? "+" : "Награда · "}{COMPANY_VOYAGE_REWARD} миль</span></header>
+    <header className={styles.top}><span>О компании · {view === "intro" ? "Твой маршрут" : view === "cards" ? "Узнай компанию" : view === "quiz" ? "Правда или миф" : view === "bank" ? "Твой результат" : "Мой рассказ"}</span><span className={styles.reward}>{attempt?.completed ? "+" : "Награда · "}{formatMiles(COMPANY_VOYAGE_REWARD)}</span></header>
     <div className={styles.progress} role="progressbar" aria-label="Прогресс задания" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress || 0)}><i style={{ width: `${progress || 0}%` }} /></div>
 
     {view === "intro" && <>
       <div className={styles.hero}><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M7 39h50L47 53H17L7 39Z" fill="currentColor"/><path d="M19 39V25h26v14M30 25V12h5v13" fill="none" stroke="currentColor" strokeWidth="4"/><path d="M7 59q6-5 12 0t12 0t12 0t12 0" fill="none" stroke="currentColor" strokeWidth="3"/></svg><p className={styles.kicker}>Поднимаемся на борт</p><h4 ref={heading} tabIndex={-1}>{COMPANY_VOYAGE_TITLE}</h4><p>Узнай, что это за компания, собери ответы на вопросы друзей и расскажи о ней своими словами.</p></div>
       <ol className={styles.route}><li><span>01</span><div><strong>Узнай компанию</strong><p>Восемь карточек с фактами и источниками.</p></div></li><li><span>02</span><div><strong>Правда или миф</strong><p>17 вопросов, включая три фразы-ловушки.</p></div></li><li><span>03</span><div><strong>Мой рассказ за 60 секунд</strong><p>Собери план и поделись им с наставником.</p></div></li></ol>
-      <p className={styles.note}>Пройди тест без ошибок и нажми «Завершить» — получишь 10 миль. Если ошибёшься, сможешь пройти тест заново.</p>
+      <p className={styles.note}>Пройди тест без ошибок и нажми «Завершить» — получишь {formatMiles(COMPANY_VOYAGE_REWARD)}. Если ошибёшься, сможешь пройти тест заново.</p>
       {alert}<button type="button" className={styles.primary} disabled={!attempt || busy} onClick={() => { setView("cards"); setCardIndex(0); }}>{!attempt ? error ? "Игра пока недоступна" : "Загружаем прогресс…" : "Поднимаюсь на борт →"}</button><p className={styles.hint}>10–15 минут · без дедлайна · прогресс сохраняется</p>
     </>}
 
@@ -179,8 +180,8 @@ export function CompanyVoyageGame({ taskId, onCompleted }: { taskId: string; onC
         {feedback && <div id={feedbackId} className={feedback === "incorrect" ? styles.failure : styles.success} role={feedback === "incorrect" ? "alert" : "status"}><strong>{feedback === "incorrect" ? "Этот ответ неверный" : "Верно!"}</strong><p>{question.explanation}</p><div className={styles.phrase}><small>Как ответить другу</small><p>{question.phrase}</p></div>{feedback === "incorrect" && <><p>Нажми «Пройти заново», чтобы повторить тест. Изученные карточки сохранятся.</p><button type="button" className={styles.retry} disabled={busy} onClick={retry}>Пройти заново</button></>}</div>}
         {alert}
         {feedback === "correct" && !attempt.ready && <button type="button" className={styles.primary} onClick={() => { setQuestionIndex(attempt.questionIndex); setSelected(null); setFeedback(""); setError(""); }}>Следующий вопрос →</button>}
-        {attempt.ready && <div className={styles.finish}><p>Все 17 ответов верные. Подтверди завершение, чтобы получить награду.</p><button type="button" className={styles.primary} disabled={busy} onClick={finish}>{busy ? "Начисляем мили…" : "Завершить и получить 10 миль"}</button></div>}
-        {!feedback && <p className={styles.hint}>Выбери один вариант. 10 миль начисляются после завершения всего теста.</p>}
+        {attempt.ready && <div className={styles.finish}><p>Все 17 ответов верные. Подтверди завершение, чтобы получить награду.</p><button type="button" className={styles.primary} disabled={busy} onClick={finish}>{busy ? "Начисляем мили…" : `Завершить и получить ${formatMiles(COMPANY_VOYAGE_REWARD)}`}</button></div>}
+        {!feedback && <p className={styles.hint}>Выбери один вариант. {formatMiles(COMPANY_VOYAGE_REWARD)} начисляются после завершения всего теста.</p>}
       </article>
     </>}
 
@@ -194,7 +195,7 @@ export function CompanyVoyageGame({ taskId, onCompleted }: { taskId: string; onC
       <button type="button" className={styles.back} onClick={() => { setView("bank"); setError(""); }}>← К результату</button><div className={styles.storyHeading}><p className={styles.kicker}>Своими словами</p><h4 ref={heading} tabIndex={-1}>Мой рассказ за 60 секунд</h4><p>В каждой части выбери одну близкую тебе фразу. Это план, а не текст для заучивания.</p></div>
       {COMPANY_STORY_PARTS.map((part, partIndex) => <fieldset key={part.title} className={styles.storyPart}><legend>{partIndex + 1}. {part.title}</legend>{part.options.map((option, index) => <label className={`${styles.storyOption} ${choices[partIndex] === index ? styles.chosen : ""}`} key={option}><input type="radio" name={`${feedbackId}-part-${partIndex}`} checked={choices[partIndex] === index} disabled={busy} onChange={() => { setChoices((current) => current.map((choice, i) => i === partIndex ? index : choice)); setNotice(""); }} /><span>{option}</span></label>)}</fieldset>)}
       {storyReady && <article className={styles.card}><h5>Твой план рассказа</h5><p className={styles.storyText}>{storyText}</p><div className={styles.actions}><button type="button" className={styles.secondary} onClick={() => void share(true)}>Скопировать</button><button type="button" className={styles.secondary} onClick={() => void share()}>Поделиться</button></div></article>}
-      <article className={styles.card}><h5>Запиши голосовое наставнику</h5><ul className={styles.facts}><li>Длина — 30–60 секунд. Начни: «Я хочу рассказать тебе о компании, в которой я теперь…»</li><li>Говори своими словами. Сбился — продолжай: живая речь лучше заученного текста.</li><li>Не обещай обналичивание баллов, возврат денег в любой момент или высокие доходы для всех.</li></ul><p className={styles.note}>Этот шаг — для практики. Твои 10 миль уже начислены за тест.</p></article>
+      <article className={styles.card}><h5>Запиши голосовое наставнику</h5><ul className={styles.facts}><li>Длина — 30–60 секунд. Начни: «Я хочу рассказать тебе о компании, в которой я теперь…»</li><li>Говори своими словами. Сбился — продолжай: живая речь лучше заученного текста.</li><li>Не обещай обналичивание баллов, возврат денег в любой момент или высокие доходы для всех.</li></ul><p className={styles.note}>Этот шаг — для практики. Твои {formatMiles(COMPANY_VOYAGE_REWARD)} уже начислены за тест.</p></article>
       {alert}{notice && <p className={styles.success} role="status">{notice}</p>}<button type="button" className={styles.primary} disabled={!storyReady || busy} onClick={() => void openVoice()}>{busy ? "Подготавливаем…" : linkRequired ? "Привязать Telegram" : "Отправить голосовое наставнику"}</button><p className={styles.hint}>{linkRequired ? "После привязки вернись сюда и нажми кнопку ещё раз." : "Откроется Telegram. Нажми «Начать» / Start и запиши голосовое в чате. План рассказа сохранится автоматически."}</p><button type="button" className={styles.secondary} disabled={!storyReady || busy} onClick={() => void run(() => saveCompanyStory(taskId, choices as number[]), () => setNotice("План рассказа сохранён. Ты сможешь вернуться к нему позже."))}>Сохранить план рассказа</button>
     </>}
   </section>;

@@ -10,7 +10,7 @@ test('company catalog and publication use a separate evergreen task with ten-mil
   const { mapTask, mapProgram } = load('frontend/shared/api/client.ts');
   const game = readyProgramByKey('company-voyage');
   assert.equal(game.title, 'Корабль, на который ты поднялся');
-  assert.equal(game.tasks[0].maxPoints, 10);
+  assert.equal(game.tasks[0].maxPoints, 2);
   assert.equal(game.tasks[0].publicationType, 'evergreen');
   assert.equal(COMPANY_CARDS.length, 8); assert.equal(COMPANY_QUESTIONS.length, 17);
   assert.deepEqual(COMPANY_STORY_PARTS.map(part => part.options.length), [3,5,3]);
@@ -26,14 +26,14 @@ test('company catalog and publication use a separate evergreen task with ten-mil
   });
   await service.publishReadyProgram({ teamId: 'team', key: 'company-voyage', publisherId: 'publisher', audienceRootId: 'publisher' });
   assert.equal(input.templateKey, 'company-voyage'); assert.equal(input.audienceRootId, 'publisher');
-  assert.equal(input.tasks[0].maxPoints, 10); assert.equal(input.tasks[0].interactiveKind, 'company-voyage');
+  assert.equal(input.tasks[0].maxPoints, 2); assert.equal(input.tasks[0].interactiveKind, 'company-voyage');
 });
 
 test('attempt API accepts question 17 and validates optional story input before the private RPC', async () => {
   const calls = [];
   const service = load('backend/services/ready-programs.service.ts', {
     '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => ({ rpc: async (name, args) => {
-      calls.push({ name, args }); return { data: { completed: true, earnedPoints: 10, storyChoices: [2,4,1] } };
+      calls.push({ name, args }); return { data: { completed: true, earnedPoints: 2, storyChoices: [2,4,1] } };
     } }) },
   });
   const controller = load('backend/controllers/ready-program-attempts.controller.ts', {
@@ -66,12 +66,12 @@ test('company quiz retains red failure until explicit retry and finishes with te
       return state;
     },
     restartReadyProgramQuiz: async () => { retries++; state = { ...state, failed: false, lastAnswer: null, questionIndex: 0, answeredQuestions: 0, ready: false }; return state; },
-    completeReadyProgram: async () => { finishes++; state = { ...state, completed: true, earnedPoints: 10, submission: { id: 'result', points: 10 } }; return state; },
+    completeReadyProgram: async () => { finishes++; state = { ...state, completed: true, earnedPoints: 2, submission: { id: 'result', points: 2 } }; return state; },
   };
   const { CompanyVoyageGame } = load('frontend/features/member/CompanyVoyageGame.tsx', { react, '@/frontend/shared/api/ready-program-client': api,
     './CompanyVoyageGame.module.css': { __esModule: true, default: new Proxy({}, { get: (_target, key) => key }) },
   });
-  harness.mount(CompanyVoyageGame, { taskId: 'company', onCompleted(result) { assert.equal(result.points, 10); received++; } });
+  harness.mount(CompanyVoyageGame, { taskId: 'company', onCompleted(result) { assert.equal(result.points, 2); received++; } });
   let tree = await harness.settle();
   const press = async predicate => { const button = nodes(tree, node => node.type === 'button' && predicate(node))[0]; assert.ok(button); assert.equal(Boolean(button.props.disabled), false); button.props.onClick(); tree = await harness.settle(); };
   const select = index => press(node => node.props['aria-pressed'] !== undefined && node.props.children[1].props.children === ['Правда','Миф','Не совсем так'][index]);
@@ -83,7 +83,7 @@ test('company quiz retains red failure until explicit retry and finishes with te
     await press(node => node.props.children === 'Пройти заново'); assert.equal(retries, 1);
     for (const answer of answers) { await select(answer); if (!state.ready) await press(node => node.props.children === 'Следующий вопрос →'); }
     assert.equal(finishes, 0); assert.equal(state.earnedPoints, 0);
-    await press(node => node.props.children === 'Завершить и получить 10 миль');
+    await press(node => node.props.children === 'Завершить и получить 2 мили');
     assert.equal(finishes, 1); assert.equal(received, 1);
     assert.equal(nodes(tree, node => node.type === 'button' && String(node.props.children).includes('Завершить')).length, 0);
   } finally { harness.unmount(); }

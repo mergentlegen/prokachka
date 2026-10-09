@@ -93,7 +93,7 @@ const labels = ['Правда','Миф','Не совсем так'];
       if (index < 16) await button('Следующий вопрос →').click();
     }
     assert.equal(submissions.length, 0);
-    await button('Завершить и получить 10 миль').click();
+    await button('Завершить и получить 2 мили').click();
     await page.getByRole('heading', { name: 'Теперь у тебя есть ответы' }).waitFor();
     await checkLayouts('result');
     await button('Собрать мой рассказ →').click();
@@ -104,7 +104,7 @@ const labels = ['Правда','Миф','Не совсем так'];
     assert.deepEqual(attempt.storyChoices, [2,4,2]);
     await close(); await open(); await button('Собрать мой рассказ →').click();
     assert.equal(await page.getByRole('radio', { checked: true }).count(), 3);
-    assert.equal(submissions.length, 1); assert.equal(submissions[0].points, 10);
+    assert.equal(submissions.length, 1); assert.equal(submissions[0].points, 2);
     assert.equal(actions.filter(action => action === 'complete').length, 1);
     await button('Отправить голосовое наставнику').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(artifacts, 'company-voice-button-375.png') });
@@ -119,7 +119,7 @@ const labels = ['Правда','Миф','Не совсем так'];
     await button('Отправить голосовое наставнику').click();
     await page.getByRole('heading', { name: 'Fake Telegram' }).waitFor();
     assert.deepEqual(telegramVisits, ['link_fixture','company_voice_fixture']);
-    assert.equal(submissions.length, 1); assert.equal(submissions[0].points, 10);
+    assert.equal(submissions.length, 1); assert.equal(submissions[0].points, 2);
     assert.deepEqual(errors, []);
     console.log('Company game: five widths, quiz/reward, saved story, Telegram linking and voice deep link passed (no external writes).');
   } finally { await browser.close(); }

@@ -6,7 +6,7 @@ export type AuditAction =
   | "user.access" | "user.delete" | "user.network"
   | "team.create" | "team.update" | "team.disable" | "team.enable" | "team.delete"
   | "request.approve" | "request.reject"
-  | "task.create" | "task.delete" | "task.nudge" | "task.video" | "program.create" | "program.delete"
+  | "task.create" | "task.delete" | "task.nudge" | "task.video" | "task.reward" | "program.create" | "program.delete"
   | "announcement.create" | "announcement.delete"
   | "star.award" | "star.revoke";
 

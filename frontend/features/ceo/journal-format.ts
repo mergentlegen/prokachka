@@ -9,7 +9,7 @@ const titles: Record<string, string> = {
   "user.access": "Изменён доступ", "user.delete": "Удалён пользователь", "user.network": "Изменены права в сети",
   "team.create": "Создана команда", "team.update": "Изменена команда", "team.disable": "Команда отключена", "team.enable": "Команда включена", "team.delete": "Удалена команда",
   "request.approve": "Заявка одобрена", "request.reject": "Заявка отклонена",
-  "task.create": "Опубликовано задание", "task.delete": "Удалено задание", "task.nudge": "Напоминание по заданию", "task.video": "Загружено видео к заданию",
+  "task.create": "Опубликовано задание", "task.delete": "Удалено задание", "task.nudge": "Напоминание по заданию", "task.video": "Загружено видео к заданию", "task.reward": "Изменена награда за задание",
   "program.create": "Опубликована программа", "program.delete": "Удалена программа",
   "announcement.create": "Опубликовано объявление", "announcement.delete": "Удалено объявление",
   "star.award": "Выданы звёзды", "star.revoke": "Отменена выдача звёзд",
@@ -53,6 +53,8 @@ export function journalDetails(entry: CeoJournalEntry): string[] {
   if (Array.isArray(d.parent)) lines.push("Наставник: " + pair(d.parent, "нет"));
   if (Array.isArray(d.name)) lines.push("Название: " + pair(d.name, "—"));
   if (typeof d.miles === "number" && entry.action === "task.create") lines.push(d.programStep ? `Шаг программы · ${d.miles} ${plural(d.miles, "миля", "мили", "миль")}` : `${d.miles} ${plural(d.miles, "миля", "мили", "миль")}`);
+  if (Array.isArray(d.reward)) { const [from, to] = (d.reward as unknown[]).map(Number); lines.push(`Награда: ${from} → ${to} ${plural(to, "миля", "мили", "миль")}`); }
+  if (typeof d.recounted === "number") lines.push(`Пересчитано у ${d.recounted} ${plural(d.recounted, "участника", "участников", "участников")}, прошедших задание`);
   if (typeof d.steps === "number") lines.push(`${d.steps} ${plural(d.steps, "шаг", "шага", "шагов")}`);
   if (typeof d.stars === "number") lines.push(`${entry.action === "star.revoke" ? "−" : "+"}${d.stars} ★${typeof d.kind === "string" ? " · " + d.kind[0].toUpperCase() + d.kind.slice(1) : ""}`);
   if (typeof d.recipients === "number") lines.push(`В Telegram: ${d.recipients} ${plural(d.recipients, "участнику", "участникам", "участникам")}`);

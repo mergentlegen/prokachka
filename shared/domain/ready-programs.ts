@@ -64,7 +64,7 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     key: "company-voyage", title: COMPANY_VOYAGE_TITLE, eyebrow: "О компании · правда или миф",
     description: "Восемь карточек о компании, 17 вопросов и свой рассказ за 60 секунд. Узнай клуб и собери ответы на вопросы друзей.",
     badge: "Без дедлайна", taskCount: 1,
-    tasks: [{ title: COMPANY_VOYAGE_TITLE, description: "Познакомься с компанией, пройди игру «Правда или миф» без ошибок и получи 10 миль автоматически. Затем собери свой рассказ для наставника.", maxPoints: COMPANY_VOYAGE_REWARD, publicationType: "evergreen", interactiveKind: "company-voyage" }],
+    tasks: [{ title: COMPANY_VOYAGE_TITLE, description: "Познакомься с компанией, пройди игру «Правда или миф» без ошибок и получи 2 мили автоматически. Затем собери свой рассказ для наставника.", maxPoints: COMPANY_VOYAGE_REWARD, publicationType: "evergreen", interactiveKind: "company-voyage" }],
   },
   {
     key: "captain-cruise", title: CAPTAIN_CRUISE_TITLE, eyebrow: "Тренажёр поиска круиза",

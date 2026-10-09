@@ -42,3 +42,4 @@
 \ir 20261023-task-quizzes.sql
 \ir 20261024-program-games.sql
 \ir 20261025-program-steps.sql
+\ir 20261026-company-voyage-reward.sql

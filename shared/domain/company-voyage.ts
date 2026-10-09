@@ -1,5 +1,5 @@
 export const COMPANY_VOYAGE_TITLE = "Корабль, на который ты поднялся";
-export const COMPANY_VOYAGE_REWARD = 10;
+export const COMPANY_VOYAGE_REWARD = 2;
 export const COMPANY_ANSWER_OPTIONS = ["Правда", "Миф", "Не совсем так"] as const;
 
 type CompanyCard = { icon: string; title: string; heading: string; paragraphs: readonly string[]; takeaway?: string; sources: string; sourceUrl?: string };
