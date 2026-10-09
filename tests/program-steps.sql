@@ -30,13 +30,13 @@ begin
 
   -- The step goes to the end with the program's time per step.
   result := public.app_program_add_step(leader, program, '  Новый шаг ', ' Описание ', 'https://youtu.be/x', 5);
-  assert result ? 'data', 'step not added: ' || result;
+  assert result ? 'data', 'step not added: ' || result::text;
   added := (result->'data'->>'id')::uuid;
   assert (select position = 3 and title = 'Новый шаг' and description = 'Описание' and max_points = 5 and publication_type = 'sequential'
     and deadline_hours = 48 and resource_url = 'https://youtu.be/x' and publisher_id = leader and deadline_at is null and is_active from public.tasks where id = added), 'step stored wrong';
 
   -- Whoever had finished the program gets the new step with a fresh deadline; others keep their place.
-  assert (result->>'reopened')::int = 1, 'reopened count wrong: ' || result;
+  assert (result->>'reopened')::int = 1, 'reopened count wrong: ' || result::text;
   select * into progress from public.member_program_progress where user_id = finished and program_id = program;
   assert progress.status = 'active' and progress.current_task_id = added and progress.completed_at is null, 'finished participant not reopened';
   assert progress.unlocked_at > now() - interval '1 minute' and abs(extract(epoch from progress.due_at - progress.unlocked_at) - 48 * 3600) < 1, 'reopened step has the wrong deadline';

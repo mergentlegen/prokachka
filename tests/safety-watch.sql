@@ -22,7 +22,7 @@ begin
   -- Added like the first game: last step, 2 miles, reopened for those who had finished.
   assert public.app_program_add_game(member_id, program, 'safety-watch') ? 'forbidden', 'a participant added a game';
   result := public.app_program_add_game(leader, program, 'safety-watch');
-  assert result ? 'data', 'game not added: ' || result;
+  assert result ? 'data', 'game not added: ' || result::text;
   game := (result->'data'->>'id')::uuid;
   assert (select title = 'Вахта безопасности' and max_points = 2 and position = 3 and interactive_kind = 'safety-watch' from public.tasks where id = game), 'game stored wrong';
   assert (result->>'reopened')::int = 1, 'finished participant did not get the game';
@@ -48,7 +48,7 @@ begin
 
   -- Two miles once; the program moves on; the result stays readable.
   result := public.app_safety_watch(member_id, game, 'complete', 0, '{}');
-  assert result->>'completed' = 'true' and (result->>'earnedPoints')::int = 2 and (result->'stats'->>'seen')::int = 28, 'completion failed: ' || result;
+  assert result->>'completed' = 'true' and (result->>'earnedPoints')::int = 2 and (result->'stats'->>'seen')::int = 28, 'completion failed: ' || result::text;
   assert (select count(*) = 1 and sum(points) = 2 from public.submissions where user_id = member_id and task_id = game and status = 'accepted'), 'miles wrong';
   assert public.app_safety_watch(member_id, game, 'complete', 0, '{}')->>'completed' = 'true', 'finished game not readable';
   assert (select count(*) from public.submissions where user_id = member_id and task_id = game) = 1, 'paid twice';

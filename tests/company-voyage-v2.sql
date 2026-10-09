@@ -21,18 +21,18 @@ begin
   perform app_start_ready_program(member_id,game);
   for i in 1..9 loop perform app_advance_ready_program(member_id,game,i); end loop;
   result:=app_answer_ready_program(member_id,game,0,0);
-  assert (result->>'wrong')::boolean and (result->>'questionIndex')::int = 0 and (result->>'mistakes')::int = 1 and not (result->>'failed')::boolean, 'wrong answer handled wrong: '||result;
+  assert (result->>'wrong')::boolean and (result->>'questionIndex')::int = 0 and (result->>'mistakes')::int = 1 and not (result->>'failed')::boolean, 'wrong answer handled wrong: '|| result::text;
   result:=app_answer_ready_program(member_id,game,2,0);
   assert (result->>'mistakes')::int = 2 and (result->>'questionIndex')::int = 0, 'second wrong answer not counted';
   result:=app_answer_ready_program(member_id,game,answers[1],0);
-  assert not (result->>'wrong')::boolean and (result->>'questionIndex')::int = 1 and (result->>'firstTry')::int = 0, 'retried answer counted as first try: '||result;
+  assert not (result->>'wrong')::boolean and (result->>'questionIndex')::int = 1 and (result->>'firstTry')::int = 0, 'retried answer counted as first try: '|| result::text;
   assert app_complete_ready_program(member_id,game) ? 'validationError', 'completed with questions left';
   for i in 1..17 loop result:=app_answer_ready_program(member_id,game,answers[i+1],i); end loop;
-  assert (result->>'ready')::boolean and (result->>'firstTry')::int = 17 and (result->>'mistakes')::int = 2, 'quiz result wrong: '||result;
+  assert (result->>'ready')::boolean and (result->>'firstTry')::int = 17 and (result->>'mistakes')::int = 2, 'quiz result wrong: '|| result::text;
 
   -- Finishing the game gives no miles: they come from the mentor.
   result:=app_complete_ready_program(member_id,game);
-  assert (result->>'completed')::boolean and (result->>'earnedPoints')::int = 0 and not (result ? 'submission'), 'game paid by itself: '||result;
+  assert (result->>'completed')::boolean and (result->>'earnedPoints')::int = 0 and not (result ? 'submission'), 'game paid by itself: '|| result::text;
   assert not exists(select 1 from submissions where user_id=member_id and task_id=game), 'a record was created without the voice';
   assert tg_company_voice_error(member_id,game) is null, 'voice not allowed after the game';
 
@@ -40,10 +40,10 @@ begin
   insert into telegram_submission_sessions(token_hash,user_id,task_id,telegram_id,expires_at,purpose) values
     ('v2-'||member_id,member_id,game,'820000000000001',now()+interval '15 minutes','company-voice');
   result:=tg_begin_submission('v2-'||member_id,'820000000000001',100);
-  assert (result->>'review')::boolean, 'voice not marked for review: '||result;
+  assert (result->>'review')::boolean, 'voice not marked for review: '|| result::text;
   assert tg_submit_answer('820000000000001','820000000000001',101,8200000001,'text','Текст',null) ? 'validationError', 'text replaced the voice';
   result:=tg_submit_answer('820000000000001','820000000000001',102,8200000002,'voice','','voice-file-1');
-  assert (result->>'review')::boolean and result->>'purpose' = 'company-voice', 'voice not saved for review: '||result;
+  assert (result->>'review')::boolean and result->>'purpose' = 'company-voice', 'voice not saved for review: '|| result::text;
   voice_id:=(result->'data'->>'id')::uuid;
   assert (select status='pending' and media_type='voice' and telegram_file_id='voice-file-1' and points=0 and submission_source='telegram' from submissions where id=voice_id), 'voice stored wrong';
   assert (tg_submit_answer('820000000000001','820000000000001',102,8200000002,'voice','','voice-file-1')->>'duplicate')::boolean, 'webhook repeat not recognised';
@@ -55,7 +55,7 @@ begin
   -- «На доработку» lets the participant record again; acceptance gives at most 2 miles.
   select review_version into version from submissions where id=voice_id;
   result:=tg_review_submission(voice_id,publisher,false,'revision',0,'Расскажи подробнее про клуб',version);
-  assert result ? 'data', 'revision failed: '||result;
+  assert result ? 'data', 'revision failed: '|| result::text;
   assert tg_company_voice_error(member_id,game) is null, 'cannot record again after revision';
   insert into telegram_submission_sessions(token_hash,user_id,task_id,telegram_id,expires_at,purpose) values
     ('v2b-'||member_id,member_id,game,'820000000000001',now()+interval '15 minutes','company-voice');

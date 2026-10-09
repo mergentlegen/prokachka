@@ -16,7 +16,9 @@ begin
       else p_stamp + make_interval(hours => coalesce(task.deadline_hours, (select deadline_hours from public.task_programs where id = task.program_id), 72)) end,
     updated_at = p_stamp
     where program_id = task.program_id and status = 'completed';
-  get diagnostics reopened = row_count;
+  -- Counted by who is now on this step (a database rule may already have opened it a moment earlier).
+  select count(*) into reopened from public.member_program_progress
+    where program_id = task.program_id and current_task_id = task.id and status = 'active' and unlocked_at = p_stamp;
   return reopened;
 end $$;
 
