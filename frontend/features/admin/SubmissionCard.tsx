@@ -33,9 +33,9 @@ function AnswerText({ submission }: { submission: Submission }) {
   }
   const truncated = submission.answerTruncated && full === null;
   return <div className={styles.text}>
-    {full ?? submission.answerText}{truncated && "…"}
+    {full ?? submission.answerText}{truncated && submission.answerText && "…"}
     {truncated && <button type="button" className={styles.more} disabled={state === "loading"} onClick={() => void expand()}>
-      {state === "loading" ? "Загружаем…" : state === "failed" ? "Не удалось загрузить. Повторить" : "Показать полностью"}</button>}
+      {state === "loading" ? "Загружаем…" : state === "failed" ? "Не удалось загрузить. Повторить" : submission.answerText ? "Показать полностью" : "Показать ответ"}</button>}
   </div>;
 }
 
@@ -47,8 +47,8 @@ export function SubmissionAnswer({ submission }: { submission: Submission }) {
   const hasMedia = type === "photo" || type === "video" || type === "document" || type === "voice";
   const mediaUrl = `/api/submissions/${encodeURIComponent(submission.id)}/media`;
   return <div className={styles.answer}>
-    {submission.answerText && <AnswerText key={submission.id} submission={submission} />}
-    {!submission.answerText && !hasMedia && <p className={styles.muted}>Текст ответа отсутствует.</p>}
+    {(submission.answerText || submission.answerTruncated) && <AnswerText key={submission.id} submission={submission} />}
+    {!submission.answerText && !submission.answerTruncated && !hasMedia && <p className={styles.muted}>Текст ответа отсутствует.</p>}
     {hasMedia && <div className={styles.media}>
       {!showMedia ? <button type="button" className={styles.open} onClick={() => setShowMedia(true)}>{type === "photo" ? "Посмотреть фото" : type === "video" ? "Посмотреть видео" : type === "voice" ? "▶ Послушать голосовое" : "Посмотреть файл"}</button> : <>
         {failed ? <div className={styles.mediaError} role="alert"><p>Не удалось загрузить вложение.</p><button type="button" className={styles.open} onClick={() => { setFailed(false); setAttempt((value) => value + 1); }}>Повторить</button></div> : <>

@@ -105,15 +105,16 @@ test('reviewer personal history is scoped to self, not the descendant review que
   assert.equal((await controller.listSubmissions(new Request('https://fixture.test/api/submissions?userId=bob'))).status, 403);
 });
 
-test('team submission query uses inner joins and both team filters, hides empty legacy placeholders', async () => {
+test('the mentor team list is one database call; the team, branch and placeholder rules live in app_mentor_submissions', async () => {
   const db = database({ submissions: { data: [] } });
-  const service = load('backend/services/submissions.service.ts', { ...dbOverrides(db), [networkKey]: {} });
-  await service.findSubmissions({ teamId: 'team', viewer: { role: 'admin' } });
-  const ops = db.calls[0].ops;
-  assert.match(ops.find(([op]) => op === 'select')[1], /users!inner.*tasks!inner/);
-  assert.ok(ops.some(([op, key, value]) => op === 'eq' && key === 'tasks.team_id' && value === 'team'));
-  assert.ok(ops.some(([op, key, value]) => op === 'eq' && key === 'users.team_id' && value === 'team'));
-  assert.ok(ops.some(([op, value]) => op === 'or' && value.includes('media_type.not.is.null')));
+  const calls = [];
+  db.rpc = async (name, args) => { calls.push([name, args]); return { data: [{ id: 's1', status: 'pending', answer_text: 'Ответ' }], error: null }; };
+  const service = load('backend/services/submissions.service.ts', { ...dbOverrides(db), [networkKey]: {},
+    '@/backend/services/mentor-list-cache.service': { cachedMentorList: (_viewer, _team, read) => read(), forgetTeamLists() {} } });
+  const result = await service.findSubmissions({ teamId: 'team', viewer: { id: 'mentor', role: 'admin' } });
+  assert.deepEqual(calls, [['app_mentor_submissions', { p_viewer: 'mentor' }]]);
+  assert.equal(db.calls.length, 0, 'no table is read row by row');
+  assert.deepEqual(result.data.map((row) => row.id), ['s1']);
 });
 
 test('history mapper keeps titles of completed program steps no longer present in active task feed', () => {

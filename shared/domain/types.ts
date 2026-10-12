@@ -58,7 +58,9 @@ export type StarAward = {
 };
 export type Submission = {
   id: string; userId: string; taskId: string; taskTitle?: string; taskMaxPoints?: number; reviewVersion?: number; status: SubmissionStatus; telegramChatId?: string; telegramMessageId?: string;
-  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "voice" | "demo"; answerText?: string; answerTruncated?: boolean; quizScore?: number; quizTotal?: number;
+  source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "voice" | "demo"; answerText?: string; answerTruncated?: boolean;
+  /** The mentor's list carries accepted works without the comment; it loads when the work is opened. */
+  commentOmitted?: boolean; quizScore?: number; quizTotal?: number;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number };

@@ -7,7 +7,7 @@ import { userScope } from "@/shared/domain/live-updates";
 import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, request, uploadTaskAttachment } from "@/frontend/shared/api/client";
-import { addProgramStep, createAdminTask, deleteAdminTask, recordMentorCompletion, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
+import { addProgramStep, createAdminTask, loadSubmissionTexts, deleteAdminTask, recordMentorCompletion, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ProfileDialog } from "@/frontend/features/profile/ProfileDialog";
@@ -305,11 +305,14 @@ export function AdminApp() {
 
   const openReviewModal = useCallback((submission: Submission, status: "accepted" | "revision") => {
     const task = store.tasks.find((item) => item.id === submission.taskId);
-    setReviewDraft({
-      points: String(submission.points || (status === "accepted" ? (task?.maxPoints ?? submission.taskMaxPoints ?? 0) : 0)),
-      comment: submission.comment || "",
-    });
-    setModal({ type: "review", submission, status });
+    const open = (comment: string) => {
+      setReviewDraft({ points: String(submission.points || (status === "accepted" ? (task?.maxPoints ?? submission.taskMaxPoints ?? 0) : 0)), comment });
+      setModal({ type: "review", submission, status });
+    };
+    if (!submission.commentOmitted) { open(submission.comment || ""); return; }
+    // The list has no comment for accepted works: load it, so re-grading never overwrites it with an empty one.
+    void loadSubmissionTexts(submission.id).then((texts) => open(texts.comment))
+      .catch(() => setToast("Не удалось загрузить работу. Проверьте интернет и попробуйте ещё раз."));
   }, [store.tasks]);
 
   useEffect(() => {

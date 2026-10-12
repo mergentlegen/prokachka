@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { loadSubmissionTexts } from "@/frontend/shared/api/admin-client";
 import type { Store, Submission } from "@/shared/domain/types";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { formatMiles } from "@/frontend/shared/lib/format";
@@ -61,6 +62,13 @@ function ReviewStep({ submission, store, templates, canEditTemplates, intent, ca
   const maxPoints = task?.maxPoints ?? submission.taskMaxPoints ?? 0;
   const [points, setPoints] = useState(String(submission.points || maxPoints));
   const [comment, setComment] = useState(submission.comment || "");
+  // An accepted work opened again (e.g. from a conversation): its saved comment comes from the server.
+  useEffect(() => {
+    if (!submission.commentOmitted) return;
+    let active = true;
+    void loadSubmissionTexts(submission.id).then((texts) => { if (active) setComment((value) => value || texts.comment); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [submission.id, submission.commentOmitted]);
   const [busy, setBusy] = useState<"" | "accepted" | "revision">("");
   const [error, setError] = useState("");
   const commentField = useRef<HTMLTextAreaElement>(null);

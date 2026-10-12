@@ -105,3 +105,31 @@ test('the invite QR code is drawn from the link itself', () => {
   assert.ok(path.length > 500, 'the code has its squares');
   assert.notEqual(path, QrCode({ value: 'https://prokachka.kz/?invite=xyz', size: 120, label: 'QR' }).props.children[1].props.d, 'another link, another code');
 });
+
+test('the mentor list is kept until the team changes, read once for parallel requests', async () => {
+  let listener;
+  const cache = loadTs('backend/services/mentor-list-cache.service.ts', {
+    '@/backend/services/live-events.service': { liveEvents: { subscribe: (value) => { listener = value; value.status(true); return () => {}; } } },
+  });
+  let reads = 0;
+  const read = async () => { reads++; await new Promise((resolve) => setTimeout(resolve, 5)); return { data: [{ id: 'w' + reads }] }; };
+  delete globalThis.prokachkaMentorLists;
+  const [first, second] = await Promise.all([cache.cachedMentorList('m1', 'team', read), cache.cachedMentorList('m1', 'team', read)]);
+  assert.equal(reads, 1, 'parallel requests share one read');
+  assert.deepEqual(first, second);
+  assert.deepEqual((await cache.cachedMentorList('m1', 'team', read)).data, [{ id: 'w1' }], 'nothing changed: from memory');
+  listener.change({ topics: ['feedback'], teamIds: ['team'], userIds: [] });
+  await cache.cachedMentorList('m1', 'team', read);
+  assert.equal(reads, 1, 'a chat message does not touch the list');
+  listener.change({ topics: ['submissions'], teamIds: ['other'], userIds: [] });
+  await cache.cachedMentorList('m1', 'team', read);
+  assert.equal(reads, 1, 'another team does not touch the list');
+  listener.change({ topics: ['submissions', 'tasks'], teamIds: ['team'], userIds: [] });
+  assert.deepEqual((await cache.cachedMentorList('m1', 'team', read)).data, [{ id: 'w2' }], 'a new work in the team: read again');
+  cache.forgetTeamLists('team');
+  await cache.cachedMentorList('m1', 'team', read);
+  assert.equal(reads, 3, 'the mentor\'s own review forgets the list at once');
+  listener.status(false);
+  await cache.cachedMentorList('m1', 'team', read);
+  assert.equal(reads, 4, 'without the change feed nothing old is trusted');
+});

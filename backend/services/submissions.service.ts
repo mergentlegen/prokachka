@@ -1,3 +1,4 @@
+import { cachedMentorList, forgetTeamLists } from "@/backend/services/mentor-list-cache.service";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork } from "@/backend/services/network.service";
 
@@ -55,14 +56,25 @@ export async function findSubmissionMedia(id: string, viewer?: SubmissionViewer)
 }
 
 export async function findSubmissionAnswer(id: string, viewer?: SubmissionViewer) {
-  const result = await reviewableSubmission(id, viewer, "answer_text");
+  const result = await reviewableSubmission(id, viewer, "answer_text,comment");
   if (!("row" in result)) return result;
-  return { data: { answerText: typeof result.row.answer_text === "string" ? result.row.answer_text : "" } };
+  // The mentor's list carries accepted works without texts; this brings the answer and the comment when one is opened.
+  return { data: { answerText: typeof result.row.answer_text === "string" ? result.row.answer_text : "", comment: typeof result.row.comment === "string" ? result.row.comment : "" } };
 }
 
 export async function findSubmissions(options: FindOptions = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
+  // A mentor's team or branch list: one database request with previews instead of all answers in full.
+  if (!options.userId && options.viewer && options.teamId && options.viewer.id !== "ceo") {
+    // Kept in memory until something changes in the team (see mentor-list-cache.service).
+    const viewerId = options.viewer.id;
+    return cachedMentorList(viewerId, options.teamId, async () => {
+      const result = await supabase.rpc("app_mentor_submissions", { p_viewer: viewerId });
+      if (result.error) return { error: result.error };
+      return { data: (Array.isArray(result.data) ? result.data : []) as Record<string, unknown>[] };
+    });
+  }
   let query = supabase.from("submissions").select(`${submissionSelect}, users!inner(id,name,team_id), tasks!inner(title,max_points,team_id)`).order("submitted_at", { ascending: false }).order("id", { ascending: false });
   if (options.userId) query = query.eq("user_id", options.userId);
   if (options.teamId) query = query.eq("tasks.team_id", options.teamId).eq("users.team_id", options.teamId);
@@ -103,6 +115,7 @@ export async function saveReview(id: string, input: { status: "accepted" | "revi
     p_points: Math.round(input.points), p_comment: input.comment.trim(), p_expected_version: input.expectedVersion,
   });
   if (result.error) return { error: result.error };
+  forgetTeamLists(viewer.teamId);
   return result.data as { data?: Record<string, unknown>; forbidden?: boolean; validationError?: string };
 }
 
@@ -116,5 +129,6 @@ export async function recordMentorCompletion(input: { taskId: string; memberId: 
     p_ceo: viewer.role === "ceo", p_points: Math.round(input.points), p_comment: input.comment.trim(),
   });
   if (result.error) return { error: result.error };
+  forgetTeamLists(viewer.teamId);
   return result.data as { data?: Record<string, unknown>; forbidden?: boolean; validationError?: string };
 }

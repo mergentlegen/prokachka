@@ -191,16 +191,26 @@ test('live updates coalesce bursts, pause when hidden and resync after becoming 
     useLiveUpdates({ id: 'user', role: 'member', teamId: 'team' }, async (topics) => callbacks.push(topics));
     effects[0](); cleanup = effects[1](); await tick();
     connections[0].send('event: ready\ndata: {}\n\n'); await tick();
-    t.mock.timers.tick(250); await tick(); callbacks.length = 0;
+    t.mock.timers.tick(1_500); await tick(); callbacks.length = 0;
     connections[0].send('event: change\ndata: ["stars"]\n\nevent: change\ndata: ["submissions", "stars"]\n\n');
-    await tick(); t.mock.timers.tick(250); await tick();
+    await tick(); t.mock.timers.tick(1_500); await tick();
     assert.equal(callbacks.length, 1); assert.deepEqual(callbacks[0].sort(), ['stars', 'submissions']);
+    // A short switch to another app keeps the stream: changes that came meanwhile are applied, nothing is reloaded.
     doc.visibilityState = 'hidden'; doc.dispatchEvent(new Event('visibilitychange')); await tick();
+    connections[0].send('event: change\ndata: ["tasks"]\n\n'); await tick();
+    t.mock.timers.tick(10_000); await tick();
+    assert.equal(connections[0].signal.aborted, false); assert.equal(callbacks.length, 1, 'nothing applied while hidden');
+    doc.visibilityState = 'visible'; doc.dispatchEvent(new Event('visibilitychange')); await tick();
+    t.mock.timers.tick(1_500); await tick();
+    assert.deepEqual(callbacks.at(-1), ['tasks']); assert.equal(connections.length, 1, 'the same stream, no reconnect');
+    // A long absence closes the stream; coming back reconnects and reloads everything.
+    doc.visibilityState = 'hidden'; doc.dispatchEvent(new Event('visibilitychange')); await tick();
+    t.mock.timers.tick(30_000); await tick();
     assert.equal(connections[0].signal.aborted, true);
     const count = callbacks.length; t.mock.timers.tick(180_000); await tick();
     assert.equal(callbacks.length, count); assert.equal(connections.length, 1);
     doc.visibilityState = 'visible'; doc.dispatchEvent(new Event('visibilitychange')); await tick();
-    t.mock.timers.tick(250); await tick();
+    t.mock.timers.tick(1_500); await tick();
     assert.equal(connections.length, 2); assert.ok(callbacks.at(-1).includes('resync'));
     assert.ok(invalidations.length > 0);
   } finally { cleanup?.(); await tick(); global.window = originalWindow; global.document = originalDocument; }
@@ -280,7 +290,7 @@ test('failed realtime reconnects do not postpone the 30-second fallback', async 
   try {
     useLiveUpdates({ id: 'member', role: 'member' }, async (topics) => changes.push(topics));
     effects[0](); cleanup = effects[1](); await tick();
-    for (let i = 0; i < 31; i++) { t.mock.timers.tick(1_000); await tick(); }
+    for (let i = 0; i < 32; i++) { t.mock.timers.tick(1_000); await tick(); }
     assert.ok(connections >= 4); assert.equal(changes.length, 1); assert.deepEqual(changes[0], ['resync']);
   } finally { cleanup?.(); await tick(); global.window = originalWindow; global.document = originalDocument; }
 });

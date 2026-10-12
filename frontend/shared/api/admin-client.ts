@@ -104,3 +104,9 @@ export async function publishReadyProgram(key: ReadyProgramKey): Promise<{ progr
   const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[]; alreadyPublished?: boolean }>>("/api/ready-programs", { method: "POST", body: JSON.stringify({ key }) });
   return { program: mapProgram(response.program), tasks: response.tasks.map(mapTask), alreadyPublished: Boolean(response.alreadyPublished) };
 }
+
+/** The full answer and comment of one work (the mentor's list carries accepted works without texts). */
+export async function loadSubmissionTexts(id: string): Promise<{ answerText: string; comment: string }> {
+  const body = await request<{ answerText?: string; comment?: string }>(`/api/submissions/${encodeURIComponent(id)}/answer`, { cache: "no-store" });
+  return { answerText: body.answerText || "", comment: body.comment || "" };
+}

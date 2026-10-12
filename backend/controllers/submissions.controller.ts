@@ -96,7 +96,7 @@ export async function readSubmissionAnswer(request: Request, id: string) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("forbidden" in result) return failure("Работа относится к другой команде.", 403);
   if ("notFound" in result || !("data" in result)) return failure("Работа не найдена.", 404);
-  return ok({ answerText: result.data.answerText });
+  return ok({ answerText: result.data.answerText, comment: result.data.comment });
 }
 
 export async function streamSubmissionMedia(request: Request, id: string) {

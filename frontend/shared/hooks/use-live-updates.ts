@@ -23,6 +23,14 @@ export function useLiveUpdates(user: AuthUser | null, onChange: (topics: ChangeT
     let pollTimer: ReturnType<typeof setTimeout> | undefined;
     let watchdog: ReturnType<typeof setTimeout> | undefined;
     const pending = new Set<ChangeTopic>();
+    // Changes are gathered for a moment and applied once: a burst of reviews or answers is one reload, not ten.
+    const GATHER_MS = 1_500;
+    // With a live change feed the safety resync is rare; without it the page polls more often.
+    const RESYNC_HEALTHY_MS = 10 * 60_000, RESYNC_FALLBACK_MS = 30_000;
+    // Switching apps for a moment keeps the stream open, so nothing is missed and nothing is reloaded;
+    // after a longer absence the stream closes and the page reloads once it is back.
+    const KEEP_STREAM_HIDDEN_MS = 30_000;
+    let hideTimer: ReturnType<typeof setTimeout> | undefined;
     const visible = () => !stopped && document.visibilityState !== "hidden";
     async function flush() {
       flushTimer = undefined;
@@ -34,18 +42,18 @@ export function useLiveUpdates(user: AuthUser | null, onChange: (topics: ChangeT
       catch { /* The page keeps its last good state; fallback/reconnect retries. */ }
       finally {
         busy = false;
-        if (visible() && pending.size) flushTimer = setTimeout(() => void flush(), 250);
+        if (visible() && pending.size) flushTimer = setTimeout(() => void flush(), GATHER_MS);
       }
     }
     function queue(topics: ChangeTopic[], invalidate = true) {
       if (stopped || !topics.length) return;
       if (invalidate) invalidateData(topics);
       topics.forEach((topic) => pending.add(topic));
-      if (!flushTimer && !busy && visible()) flushTimer = setTimeout(() => void flush(), 250);
+      if (!flushTimer && !busy && visible()) flushTimer = setTimeout(() => void flush(), GATHER_MS);
     }
     function schedulePoll() {
       clearTimeout(pollTimer);
-      if (visible()) pollTimer = setTimeout(() => { queue(["resync"]); schedulePoll(); }, healthy ? 120_000 : 30_000);
+      if (visible()) pollTimer = setTimeout(() => { queue(["resync"]); schedulePoll(); }, healthy ? RESYNC_HEALTHY_MS : RESYNC_FALLBACK_MS);
     }
     function resetWatchdog() {
       clearTimeout(watchdog);
@@ -100,7 +108,22 @@ export function useLiveUpdates(user: AuthUser | null, onChange: (topics: ChangeT
     function visibilityChanged() {
       clearTimeout(reconnectTimer);
       clearTimeout(pollTimer);
-      if (!visible()) { controller?.abort(); clearTimeout(flushTimer); flushTimer = undefined; return; }
+      clearTimeout(hideTimer);
+      if (!visible()) {
+        clearTimeout(flushTimer); flushTimer = undefined;
+        hideTimer = setTimeout(() => controller?.abort(), KEEP_STREAM_HIDDEN_MS);
+        return;
+      }
+      // The stream stayed open: only what arrived meanwhile is applied. It was closed: reload everything.
+      if (controller) { if (pending.size) flushTimer = setTimeout(() => void flush(), GATHER_MS); }
+      else queue(["resync"]);
+      schedulePoll();
+      void connect();
+    }
+    function cameOnline() {
+      clearTimeout(reconnectTimer);
+      clearTimeout(pollTimer);
+      if (!visible()) return;
       queue(["resync"]);
       schedulePoll();
       void connect();
@@ -110,16 +133,16 @@ export function useLiveUpdates(user: AuthUser | null, onChange: (topics: ChangeT
       if (Array.isArray(topics)) queue(topics.filter(isChangeTopic), false);
     }
     document.addEventListener("visibilitychange", visibilityChanged);
-    window.addEventListener("online", visibilityChanged);
+    window.addEventListener("online", cameOnline);
     window.addEventListener(localChangeEvent, localChange);
     schedulePoll();
     void connect();
     return () => {
       stopped = true;
       controller?.abort();
-      [flushTimer, reconnectTimer, pollTimer, watchdog].forEach(clearTimeout);
+      [flushTimer, reconnectTimer, pollTimer, watchdog, hideTimer].forEach(clearTimeout);
       document.removeEventListener("visibilitychange", visibilityChanged);
-      window.removeEventListener("online", visibilityChanged);
+      window.removeEventListener("online", cameOnline);
       window.removeEventListener(localChangeEvent, localChange);
     };
   }, [scope]);

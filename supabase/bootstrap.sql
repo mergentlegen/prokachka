@@ -48,3 +48,4 @@
 \ir 20261029-company-voyage-v2.sql
 \ir 20261030-profile-contacts.sql
 \ir 20261031-profile-stage2.sql
+\ir 20261101-mentor-submissions.sql
