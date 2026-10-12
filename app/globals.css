@@ -320,6 +320,9 @@ h1,h2,h3 { font-family:'Manrope', sans-serif; letter-spacing:-.04em; }
 .telegram-connect-refresh { border:0; background:none; color:#7185ae; font-size:10px; cursor:pointer; }
 .telegram-connect-refresh:disabled,.button-telegram:disabled { cursor:wait; opacity:.6; }
 .admin-top-actions > .telegram-connect { margin:0; padding:0; border:0; background:transparent; }
+.telegram-connect.telegram-connect-confirm { flex-wrap:wrap; border-color:#efd3c4; background:#fff8f3; }
+.telegram-connect-confirm .telegram-connect-copy { flex-basis:220px; }
+.telegram-connect-confirm .button-danger { min-height:36px; padding:7px 14px; font-size:12px; }
 .admin-top-actions > .telegram-connect .telegram-connect-icon,.admin-top-actions > .telegram-connect .telegram-connect-copy { display:none; }
 .admin-top-actions > .telegram-connect .telegram-connect-actions { flex-wrap:nowrap; }
 .admin-top-actions > .telegram-connect .telegram-connect-status { font-size:10px; }

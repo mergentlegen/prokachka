@@ -21,6 +21,9 @@ module.exports = function hookHarness() {
       });
     },
     useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
+    // Context: the default value; providers simply render their children.
+    createContext(value) { return { Provider: ({ children }) => children, defaultValue: value }; },
+    useContext(context) { return context.defaultValue; },
   };
   const render = (...next) => {
     if (next.length) args = next;

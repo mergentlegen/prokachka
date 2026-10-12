@@ -6,6 +6,7 @@ import { Avatar } from "@/frontend/shared/Avatar";
 import type { Submission } from "@/shared/domain/types";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { waitingInfo } from "./review-queue";
+import { PhoneLinks } from "@/frontend/shared/PhoneBook";
 import styles from "./SubmissionCard.module.css";
 
 type Props = { submission: Submission; name: string; avatarUrl?: string; taskTitle: string };
@@ -14,7 +15,7 @@ export function SubmissionHeader({ submission, name, avatarUrl, taskTitle }: Pro
   const waiting = submission.status === "pending" ? waitingInfo(submission.submittedAt) : null;
   return <header className={styles.header}>
     <Avatar className={styles.avatar} name={name} src={avatarUrl} />
-    <div className={styles.identity}><strong>{name}</strong><span>{taskTitle}</span></div>
+    <div className={styles.identity}><strong>{name}</strong><span>{taskTitle}</span><PhoneLinks userId={submission.userId} compact /></div>
     <div className={styles.when}><time dateTime={submission.submittedAt}>{formatDateTime(submission.submittedAt)}</time>{waiting && <span className={`${styles.wait} ${styles[waiting.tone]}`}>{waiting.text}</span>}</div>
   </header>;
 }

@@ -7,6 +7,75 @@ import { AVATAR_UPLOAD_MAX_BYTES, validateProfileNames } from "@/shared/domain/p
 import { serverEnv } from "@/backend/config/env";
 import { sessionCookie } from "@/backend/http/session-cookie";
 import { FormDataLimitError, readLimitedFormData } from "@/backend/http/form-data";
+import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
+import { changeOwnPassword, memberPrograms, ownProfileExtras, setOwnPhone, unlinkOwnTelegram, visiblePhones } from "@/backend/services/account-security.service";
+import { normalizePhone } from "@/shared/domain/phone";
+
+/** What the profile shows besides the session: own phone, team and mentor names. */
+export async function getOwnProfile(request: Request) {
+  const user = await getCurrentUser(request);
+  if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (!isUuid(user.id)) return ok({ profile: {} });
+  const result = await ownProfileExtras(user.id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("error" in result) return failure("Не удалось загрузить профиль.", 503);
+  return ok({ profile: result.data });
+}
+
+/** A new password: the current one is checked, other devices are signed out, this one gets a fresh session. */
+export async function changePassword(request: Request) {
+  const user = await getCurrentUser(request);
+  if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (!isUuid(user.id)) return failure("Для этого системного аккаунта смена пароля недоступна.", 403);
+  const blocked = enforceRateLimit(`password-change:${user.id}`, 5, 15 * 60_000);
+  if (blocked) return blocked;
+  try {
+    const body = await readLimitedJson(request);
+    const result = await changeOwnPassword(user.id, body.currentPassword, body.newPassword);
+    if ("error" in result) return failure(result.error, result.status);
+    const updated = await findAccountById(user.id);
+    if (!updated) return failure("Пароль изменён. Войдите в аккаунт заново.", 401);
+    const session = createSession(updated);
+    const response = ok({ user: updated, ...(serverEnv.authDevMode ? { session } : {}) });
+    if (!serverEnv.authDevMode) response.headers.set("Set-Cookie", sessionCookie(session));
+    return response;
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
+}
+
+/** «Мои программы» in the profile. */
+export async function listMyPrograms(request: Request) {
+  const user = await getCurrentUser(request);
+  if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (!isUuid(user.id)) return ok({ programs: [] });
+  const result = await memberPrograms(user.id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("error" in result) return failure("Не удалось загрузить программы.", 503);
+  return ok({ programs: result.data });
+}
+
+/** Unlinks Telegram from the own account; it can be linked again at any time. */
+export async function unlinkTelegram(request: Request) {
+  const user = await getCurrentUser(request);
+  if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (!isUuid(user.id)) return failure("Для этого аккаунта Telegram не привязывается.", 400);
+  const blocked = enforceRateLimit(`telegram-unlink:${user.id}`, 5, 15 * 60_000);
+  if (blocked) return blocked;
+  const result = await unlinkOwnTelegram(user.id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("error" in result) return failure("Не удалось отвязать Telegram. Попробуйте ещё раз.", 503);
+  return ok({ unlinked: true });
+}
+
+/** Phones of the participants a mentor may see. Participants get nothing. */
+export async function listVisiblePhones(request: Request) {
+  const user = await getCurrentUser(request);
+  if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (!isUuid(user.id) || !(user.role === "admin" || user.canReview)) return ok({ phones: {} });
+  const result = await visiblePhones(user.id);
+  if ("unavailable" in result) return failure("База данных не настроена.", 503);
+  if ("error" in result) return failure("Не удалось загрузить телефоны.", 503);
+  return ok({ phones: result.data });
+}
 
 export async function updateOwnProfile(request: Request) {
   const user = await getCurrentUser(request);
@@ -22,6 +91,10 @@ export async function updateOwnProfile(request: Request) {
   const action = form.get("avatarAction"), version = form.get("expectedVersion");
   if (action !== "keep" && action !== "replace" && action !== "remove") return failure("Некорректное действие с фотографией.", 400);
   if (typeof version !== "string" || version.length > 40 || !Number.isFinite(Date.parse(version))) return failure("Обновите профиль и попробуйте снова.", 409);
+  // The phone is optional; an absent field keeps the saved one, an empty one removes it.
+  const phoneField = form.get("phone");
+  const phone = phoneField === null ? undefined : normalizePhone(phoneField);
+  if (phone && "error" in phone) return failure(phone.error, 400);
   const file = form.get("avatar");
   if (action !== "replace" && file !== null) return failure("Некорректные данные фотографии.", 400);
   let avatar: Buffer | undefined;
@@ -35,6 +108,11 @@ export async function updateOwnProfile(request: Request) {
   if ("conflict" in result) return failure("Профиль уже изменён в другом окне. Обновите данные и повторите сохранение.", 409);
   if ("storageError" in result) return failure("Не удалось загрузить фотографию. Попробуйте ещё раз.", 502);
   if ("error" in result) return failure("Не удалось сохранить профиль. Попробуйте ещё раз.", 500);
+  if (phone && "phone" in phone) {
+    const saved = await setOwnPhone(user.id, phone.phone);
+    if ("validationError" in saved) return failure(saved.validationError || "Проверьте номер телефона.", 400);
+    if (!("data" in saved)) return failure("Имя и фото сохранены, а телефон — нет. Попробуйте ещё раз.", 503);
+  }
   const updated = await findAccountById(user.id);
   if (!updated) return failure("Профиль сохранён, но не удалось обновить данные. Обновите страницу.", 503);
   if ((updated.sessionVersion || 0) !== (user.sessionVersion || 0)) return failure("Пароль изменён. Войдите в аккаунт заново.", 401);

@@ -1,0 +1,5 @@
+.phone { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.number { color: var(--navy); font-weight: 700; font-variant-numeric: tabular-nums; }
+.link { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 10px; border: 1px solid #d5e0f2; border-radius: 999px; background: #f4f7fd; color: var(--blue); font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.link:hover { border-color: #b9c8e6; background: #eaf0fc; }
+.compact { gap: 6px; margin-top: 6px; }

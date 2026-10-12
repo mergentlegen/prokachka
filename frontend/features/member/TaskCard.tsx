@@ -65,7 +65,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     return <button className={styles.submit} disabled={sending} onClick={() => void send()}>{sending ? "Открываем..." : submitLabel}</button>;
   }
   return <>
-    <article className={styles.card}>
+    <article className={styles.card} id={"task-" + task.id}>
       {task.isPinned && <PinBadge />}
       <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
       {step && <div className={styles.program}><span>{task.programTitle ? `«${task.programTitle}» · ` : "Программа · "}шаг {step}{task.programSteps ? ` из ${task.programSteps}` : ""}</span>{task.programSteps && <i style={{ "--progress": `${Math.max(4, Math.min(100, ((step - 1) / task.programSteps) * 100))}%` } as CSSProperties} />}</div>}

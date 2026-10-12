@@ -5,8 +5,8 @@ import { TaskCard } from "./TaskCard";
 import { FeedbackPanel } from "@/frontend/features/feedback/FeedbackPanel";
 import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 import { Avatar } from "@/frontend/shared/Avatar";
-import { ProfileEditor } from "@/frontend/features/profile/ProfileEditor";
-import { ModalSheet } from "@/frontend/shared/ModalSheet";
+import { MemberProfile } from "./MemberProfile";
+import { unlinkTelegram } from "@/frontend/shared/api/profile-client";
 import { Toast } from "@/frontend/shared/Toast";
 import { MemberNetwork } from "@/frontend/features/member/MemberNetwork";
 import { HomeOverview } from "./HomeOverview";
@@ -25,23 +25,12 @@ import { useMemberData, type MemberTab } from "./use-member-data";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
 import { WelcomeVideoGate } from "@/frontend/features/member/WelcomeVideoGate";
 import { TeamSelectionScreen } from "@/frontend/features/teams/TeamSelectionScreen";
-import { formatDate, formatMiles, milesUnit } from "@/frontend/shared/lib/format";
+import { formatMiles, milesUnit } from "@/frontend/shared/lib/format";
 import { ApiError, authFetch, clearDevSession, createMemberSubmission, createTelegramLink, loadTelegramLinkStatus, mapAuthUserToUser, refreshAuthSession, request } from "@/frontend/shared/api/client";
 import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsBlock } from "@/frontend/features/announcements/AnnouncementsBlock";
 import { createNetworkInvitation } from "@/frontend/shared/api/network-client";
-import type { AuthUser, Store, Submission, SubmissionStatus, Task, User } from "@/shared/domain/types";
-
-type MemberStatus = SubmissionStatus | "missed";
-
-
-function statusLabel(status: MemberStatus | undefined) {
-  if (status === "accepted") return "Принято";
-  if (status === "pending") return "На проверке";
-  if (status === "revision") return "На доработке";
-  if (status === "missed") return "Просрочено";
-  return "Не начато";
-}
+import type { AuthUser, Submission, Task, User } from "@/shared/domain/types";
 
 function isExpired(task: Task) {
   const deadline = task.dueAt || task.deadlineAt;
@@ -164,6 +153,13 @@ export function MemberApp() {
     }
   });
 
+  function openTaskFromProfile(taskId: string) {
+    const task = store.tasks.find((item) => item.id === taskId);
+    setTaskView(task?.publicationType === "sequential" ? "programs" : "regular");
+    setTaskFilter("all");
+    setTab("tasks");
+    window.setTimeout(() => document.getElementById("task-" + taskId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+  }
   const ranking = ratingType === "stars" ? starRanking : teamRanking;
   const currentRank = user ? teamRanking.findIndex((member) => member.id === user.id) + 1 : 0;
   const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
@@ -237,6 +233,20 @@ export function MemberApp() {
     }
   }
 
+  async function unlinkMemberTelegram() {
+    if (!user) return;
+    setTelegramBusy(true);
+    try {
+      await unlinkTelegram();
+      setUser({ ...user, telegramId: undefined });
+      setToast("Telegram отвязан. Чтобы снова получать уведомления, привяжи его заново.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Не удалось отвязать Telegram.");
+    } finally {
+      setTelegramBusy(false);
+    }
+  }
+
   async function checkTelegram(silent = false) {
     if (!user) return;
     setTelegramBusy(true);
@@ -295,7 +305,7 @@ export function MemberApp() {
       return <TaskCard key={task.id} task={task} submission={latest} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} />;
     })}</div>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={ranking} metric={ratingType} onMetric={setRatingType} userId={user.id} /></aside></SectionBoundary></div></div></div>
     <MemberBottomNav tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} />
-    {tab === "profile" && <ProfileModal loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onClose={closeProfile} onLogout={logout} />}
+    {tab === "profile" && <MemberProfile loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} now={now} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onNotice={setToast} openableTaskIds={new Set(activeTasks.map((task) => task.id))} onOpenTask={openTaskFromProfile} onOpenRanking={() => navigate("ranking")} onUnlinkTelegram={unlinkMemberTelegram} onClose={closeProfile} onLogout={logout} />}
     {showLogin && <div className="modal-backdrop" onClick={() => setShowLogin(false)}><div className="simple-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}>×</button><p className="eyebrow">Нужна идентификация</p><h2>Сначала представься</h2><p>Войди или создай аккаунт, чтобы отправить работу.</p><button className="primary-button full" onClick={() => { setShowLogin(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Перейти ко входу</button></div></div>}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}<PullToRefresh onRefresh={refreshAll} /><CelebrationWatcher userId={user.id} submissions={store.submissions} rank={currentRank} />
   </main><WelcomeVideoGate user={user} /></>;
@@ -303,16 +313,3 @@ export function MemberApp() {
 
 function EmptyState({ text }: { text: string }) { return <div className="empty-state"><span>◌</span><p>{text}</p></div>; }
 
-type HistoryItem = { id: string; title: string; date: string; status: MemberStatus; points: number; comment: string };
-
-function ProfileModal({ loading, error, onRetry, user, store, rank, points, stars, telegramBusy, onLinkTelegram, onRefreshTelegram, inviteUrl, inviteBusy, onCreateInvite, onCopyInvite, onProfileSaved, onClose, onLogout }: { loading?: boolean; error?: string; onRetry?: () => void; user: User; store: Store; rank: number; points: number; stars: number; telegramBusy: boolean; onLinkTelegram: () => void; onRefreshTelegram: () => void; inviteUrl: string; inviteBusy: boolean; onCreateInvite: () => void; onCopyInvite: (url: string) => void; onProfileSaved: (user: AuthUser) => void; onClose: () => void; onLogout: () => void }) {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const submissions = store.submissions.filter((submission) => submission.userId === user.id);
-  const submittedTaskIds = new Set(submissions.map((submission) => submission.taskId));
-  const history: HistoryItem[] = [
-    ...submissions.map((submission) => ({ id: submission.id, title: submission.taskTitle || store.tasks.find((task) => task.id === submission.taskId)?.title || "Задание", date: submission.submittedAt, status: submission.status as MemberStatus, points: submission.points, comment: submission.comment })),
-    ...store.tasks.filter((task) => isExpired(task) && !submittedTaskIds.has(task.id)).map((task) => ({ id: `missed-${task.id}`, title: task.title, date: task.dueAt || task.deadlineAt || task.createdAt, status: "missed" as const, points: 0, comment: task.isActive && task.publicationType === "sequential" ? "Можно отправить с опозданием." : "Срок сдачи истёк, отправить работу больше нельзя." })),
-  ].sort((a, b) => b.date.localeCompare(a.date));
-  return <ModalSheet title={editing ? "Редактировать профиль" : "Мой профиль"} onClose={() => { if (!saving) onClose(); }}>{editing ? <ProfileEditor user={user} onBusyChange={setSaving} onCancel={() => setEditing(false)} onSaved={(updated) => { onProfileSaved(updated); setEditing(false); }} /> : <SectionBoundary loading={Boolean(loading)} error={error} onRetry={onRetry}><div className="profile-content"><div className="profile-header"><Avatar className="profile-avatar" name={user.name} src={user.avatarUrl} eager /><div><h2>{user.name}</h2><span>Участник команды</span></div></div><button type="button" className="button button-edit profile-edit-button" onClick={() => setEditing(true)}>Редактировать профиль</button><div className="profile-stats"><div><strong>{points}</strong><span>{milesUnit(points)}</span></div><div><strong>{rank || "—"}</strong><span>место</span></div><div><strong>{new Set(submissions.filter((item) => item.status === "accepted" && item.interactiveCompleted !== false).map((item) => item.taskId)).size}</strong><span>выполнено</span></div><div><strong>{stars}</strong><span>звёзд</span></div></div><TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={onLinkTelegram} onRefresh={onRefreshTelegram} />{user.teamId && <div className="profile-invite-card"><div><strong>Твоя ссылка в команду</strong><small>Бессрочная ссылка. Вступление подтверждает наставник.</small></div>{inviteUrl ? <div className="profile-invite-controls"><input aria-label="Твоя ссылка приглашения" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /><button type="button" className="button button-edit" onClick={() => { void onCopyInvite(inviteUrl); }}>Копировать</button></div> : <button type="button" className="button button-primary" disabled={inviteBusy} onClick={onCreateInvite}>{inviteBusy ? "Создаём..." : "Получить ссылку"}</button>}</div>}<div className="profile-account-actions"><button type="button" className="button button-danger" onClick={onLogout}>Выйти из аккаунта</button></div><details className="profile-history"><summary>История заданий <span>{history.length}</span></summary><div className="history-list">{history.length === 0 ? <EmptyState text="Ты ещё ничего не отправлял." /> : history.map((item) => <div className="history-row" key={item.id}><div><strong>{item.title}</strong><span>{formatDate(item.date)}</span>{item.comment && <small>{item.comment}</small>}</div><div className={`history-status status-${item.status}`}>{statusLabel(item.status)}{item.status === "accepted" && ` +${formatMiles(item.points)}`}</div></div>)}</div></details></div></SectionBoundary>}</ModalSheet>;
-}

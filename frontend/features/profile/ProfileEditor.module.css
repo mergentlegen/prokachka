@@ -22,6 +22,21 @@
 .fields label { display:grid; gap:8px; color:var(--navy); font-size:13px; font-weight:600; }
 .fields input { width:100%; min-width:0; min-height:48px; padding:11px 13px; border:1px solid #d7e0ed; border-radius:10px; background:#fff; color:var(--navy); font:inherit; font-size:16px; }
 .fields input:focus-visible { outline:2px solid #869ddd; outline-offset:2px; }
+.phoneField { display:grid; gap:8px; color:var(--navy); font-size:13px; font-weight:600; }
+.phoneField input { width:100%; min-width:0; min-height:48px; padding:11px 13px; border:1px solid #d7e0ed; border-radius:10px; background:#fff; color:var(--navy); font:inherit; font-size:16px; }
+.phoneField input:focus-visible { outline:2px solid #869ddd; outline-offset:2px; }
+.phoneField small { color:#677891; font-size:12px; font-weight:500; line-height:1.5; }
+.password { display:grid; gap:14px; min-width:0; }
+.password > label:not(.showPassword) { display:grid; gap:8px; color:var(--navy); font-size:13px; font-weight:600; }
+.password input:not([type=checkbox]) { width:100%; min-width:0; min-height:48px; padding:11px 13px; border:1px solid #d7e0ed; border-radius:10px; background:#fff; color:var(--navy); font:inherit; font-size:16px; }
+.password input:focus-visible { outline:2px solid #869ddd; outline-offset:2px; }
+.password .hint { margin-top:0; }
+/* The sign-up checklist is drawn for the dark sign-in screen; on a white form it needs darker text. */
+.password ul li { border-color:#d3dbe8; color:#52627c; }
+.password ul li b { border-color:#aab6c8; }
+.password ul li[class]:not([class=""]) { border-color:#9fd6c1; background:#eef9f4; color:#1f7a55; }
+.showPassword { display:flex; align-items:center; gap:8px; min-height:40px; color:#52627c; font-size:13px; cursor:pointer; }
+.showPassword input { width:18px; height:18px; accent-color:var(--blue); }
 .accountInfo { display:grid; gap:6px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#fafbfd; }
 .accountInfo span { color:#738098; font-size:12px; }
 .accountInfo strong { overflow-wrap:anywhere; color:#52627c; font-size:14px; font-weight:500; }
@@ -36,6 +51,14 @@
 .identity p { margin:0; color:#677891; font-size:13px; }
 .identity > div { min-width:0; }
 .overview { display:grid; gap:18px; }
+.overview :global(.telegram-connect) { margin:0; }
+.summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.summary > div, .summary > button { display:grid; gap:4px; padding:14px; border:1px solid var(--line); border-radius:12px; background:#f8faff; color:inherit; font:inherit; text-align:left; }
+.summary > button { cursor:pointer; }
+.summary > button:hover { border-color:#c9d5ee; }
+.summary strong { color:var(--navy); font-size:24px; line-height:1.1; }
+.summary span { color:#5f6f87; font-size:12px; line-height:1.4; }
+.telegramWarning { margin:0; padding:10px 12px; border-radius:10px; background:#fff4e5; color:#8a5300; font-size:13px; line-height:1.45; }
 .editButton { min-height:46px; width:100%; }
 @media(max-width:480px) {
   .photoSection { padding:16px; }

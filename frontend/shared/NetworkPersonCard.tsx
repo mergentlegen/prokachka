@@ -7,6 +7,7 @@ import { ModalSheet } from "./ModalSheet";
 import { isNewMember, networkActivity, networkAncestors, type NetworkEntry } from "./lib/network-tree";
 import { milesUnit } from "./lib/format";
 import { plural } from "./lib/plural";
+import { PhoneLinks, usePhone } from "./PhoneBook";
 import styles from "./NetworkPersonCard.module.css";
 
 export function daysAgo(value: string, now = Date.now()) {
@@ -27,6 +28,7 @@ export function NetworkPersonCard({ entry, byId, currentUserId, canReveal, onRev
   const joined = user.teamJoinedAt || user.createdAt;
   const roles = [user.role === "admin" && "Руководитель", user.canReview && "Проверяет работы", user.canPublishTasks && "Публикует задания"].filter(Boolean) as string[];
   const points = user.points ?? 0;
+  const phone = usePhone(user.id);
   return <ModalSheet title={user.id === currentUserId ? "Ваша карточка" : "Участник сети"} onClose={onClose}>
     <div className={styles.card}>
       <div className={styles.header}>
@@ -50,6 +52,7 @@ export function NetworkPersonCard({ entry, byId, currentUserId, canReveal, onRev
       </div>
 
       <dl className={styles.facts}>
+        {phone && <div><dt>Телефон</dt><dd><PhoneLinks userId={user.id} /></dd></div>}
         {leader && <div><dt>Руководитель</dt><dd>{leader.name}</dd></div>}
         {ancestors.length > 1 && <div><dt>Путь в структуре</dt><dd>{[...ancestors, user].map((person) => person.name).join(" → ")}</dd></div>}
         <div><dt>В команде с</dt><dd>{fullDate(joined)}</dd></div>

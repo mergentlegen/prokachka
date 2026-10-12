@@ -1,7 +1,11 @@
-import { updateOwnProfile } from "@/backend/controllers/profile.controller";
+import { getOwnProfile, updateOwnProfile } from "@/backend/controllers/profile.controller";
 import { enforceRequestSecurity } from "@/backend/http/security";
 
 export const runtime = "nodejs";
+export async function GET(request: Request) {
+  const blocked = enforceRequestSecurity(request, "profile-read", { max: 60 });
+  return blocked || getOwnProfile(request);
+}
 export async function PATCH(request: Request) {
   const blocked = enforceRequestSecurity(request, "profile-update", { max: 20, maxBodyBytes: 768 * 1024 });
   return blocked || updateOwnProfile(request);

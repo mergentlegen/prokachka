@@ -11,6 +11,8 @@ import { addProgramStep, createAdminTask, deleteAdminTask, recordMentorCompletio
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ProfileDialog } from "@/frontend/features/profile/ProfileDialog";
+import { PhoneBookProvider } from "@/frontend/shared/PhoneBook";
+import { loadVisiblePhones, unlinkTelegram } from "@/frontend/shared/api/profile-client";
 import { Toast } from "@/frontend/shared/Toast";
 import { TelegramConnect } from "@/frontend/features/telegram/TelegramConnect";
 import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel";
@@ -73,6 +75,8 @@ export function AdminApp() {
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [feedbackVersion, setFeedbackVersion] = useState(0);
   const [feedbackNeedsReply, setFeedbackNeedsReply] = useState(0);
+  // Phones of the participants this mentor may see; the server decides who.
+  const [phones, setPhones] = useState<Record<string, string>>({});
   const [toast, setToast] = useState("");
   const { store, setStore, requests, setRequests, programHistory, publicationHistory, counts, networkUsers, setNetworkUsers, dataError, dataLoading, refreshData } = useAdminData(authUser, section);
   const [modal, setModal] = useState<AdminModal>(null);
@@ -135,6 +139,15 @@ export function AdminApp() {
       .catch(() => undefined);
     return () => { active = false; };
   }, [authUser?.id, authUser?.role, authUser?.canReview, feedbackVersion]);
+
+  // Re-read on the sections where mentors call or write to participants.
+  const phonesViewer = authUser && hasMentorAccess(authUser) && (authUser.role === "admin" || authUser.canReview) ? authUser.id : "";
+  useEffect(() => {
+    if (!phonesViewer || !["network", "review", "history", "dashboard"].includes(section)) return;
+    let active = true;
+    void loadVisiblePhones().then((list) => { if (active) setPhones(list); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [phonesViewer, section]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -202,6 +215,17 @@ export function AdminApp() {
     clearDevSession();
     await authFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     window.location.href = "/";
+  }
+
+  async function unlinkAdminTelegram() {
+    if (!authUser) return;
+    setTelegramBusy(true);
+    try {
+      await unlinkTelegram();
+      setAuthUser({ ...authUser, telegramId: undefined });
+      setToast("Telegram отвязан. Чтобы снова получать уведомления о работах, привяжите его заново.");
+    } catch (error) { setToast(error instanceof Error ? error.message : "Не удалось отвязать Telegram."); }
+    finally { setTelegramBusy(false); }
   }
 
   async function linkTelegram() {
@@ -561,7 +585,7 @@ export function AdminApp() {
   const menuBadge = canReview ? counts.pending + feedbackNeedsReply + counts.requests : 0;
   const visibleSections = sections.filter(([id]) => adminSectionAllowed(id, authUser));
 
-  return <><main className="admin-shell" ref={shellRef}>
+  return <PhoneBookProvider phones={phones}><main className="admin-shell" ref={shellRef}>
     <header className="admin-topbar"><button type="button" className="admin-mobile-menu-button" aria-label={menuBadge ? `Открыть меню, ждут внимания: ${menuBadge}` : "Открыть меню"} aria-expanded={mobileMenuOpen} aria-controls="mentor-mobile-menu" onClick={() => setMobileMenuOpen(true)}><span /><span /><span />{menuBadge > 0 && <b className="admin-menu-badge">{menuBadge > 99 ? "99+" : menuBadge}</b>}</button><a className="brand" href="/"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="admin-top-actions"><a className="admin-back-link" href="/">← Обычный интерфейс</a><button type="button" className="avatar-button" aria-label="Открыть профиль" onClick={() => setProfileOpen(true)}><Avatar name={authUser.name} src={authUser.avatarUrl} className="header-avatar" eager /></button></div></header>
     <div className="admin-layout">
       <aside className="admin-sidebar"><p className="eyebrow">Управление</p><nav>
@@ -599,7 +623,7 @@ export function AdminApp() {
         <button type="button" className="admin-drawer-link admin-drawer-logout" onClick={logout}><span>{logoutIcon}</span>Выйти</button>
       </div>
     </MobileDrawer>
-    {profileOpen && <ProfileDialog user={authUser} onClose={() => setProfileOpen(false)} onSaved={(updated) => { setAuthUser(updated); setToast("Профиль обновлён."); void refreshData(); }} />}
+    {profileOpen && <ProfileDialog user={authUser} onNotice={setToast} mentor={{ pending: counts.pending, onOpenReview: () => { setProfileOpen(false); setSection("review"); }, telegramBusy, onLinkTelegram: () => void linkTelegram(), onRefreshTelegram: () => checkTelegram(false), onUnlinkTelegram: unlinkAdminTelegram }} onClose={() => setProfileOpen(false)} onSaved={(updated) => { setAuthUser(updated); setToast("Профиль обновлён."); void refreshData(); }} />}
     {taskOrderOpen && <TaskOrderDialog onClose={() => setTaskOrderOpen(false)} onSaved={() => { setTaskOrderOpen(false); setToast("Порядок заданий сохранён."); void refreshData(); }} />}
     {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
@@ -614,6 +638,6 @@ export function AdminApp() {
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}
-  </main><WelcomeVideoGate user={authUser} /></>;
+  </main><WelcomeVideoGate user={authUser} /></PhoneBookProvider>;
 }
 

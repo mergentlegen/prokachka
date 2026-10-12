@@ -19,13 +19,13 @@ function normalizeEmail(email: string) {
 export const validatePassword = validateNewPassword;
 const deriveKey = promisify(scrypt);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const hash = ((await deriveKey(password, salt, 64)) as Buffer).toString("hex");
   return salt + ":" + hash;
 }
 
-async function verifyPassword(password: string, stored: string) {
+export async function verifyPassword(password: string, stored: string) {
   if (!/^[^:]{1,128}:[a-f0-9]{128}$/i.test(stored)) return false;
   const [salt, expected] = stored.split(":");
   if (!salt || !expected) return false;

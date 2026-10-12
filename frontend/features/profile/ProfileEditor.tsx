@@ -8,15 +8,19 @@ import { AVATAR_FILE_ACCEPT, profileNames, validateProfileNames } from "@/shared
 import { Avatar } from "@/frontend/shared/Avatar";
 import { ApiError, refreshAuthSession } from "@/frontend/shared/api/client";
 import { updateProfile } from "@/frontend/shared/api/profile-client";
+import { formatPhone, normalizePhone, PHONE_HINT } from "@/shared/domain/phone";
 import { cropRegion, initialCrop, loadAvatarImage, prepareAvatar, type AvatarCrop, type AvatarImage } from "./avatar-image";
 import styles from "./ProfileEditor.module.css";
 
-export function ProfileEditor({ user, onSaved, onCancel, onBusyChange }: {
-  user: AuthUser; onSaved: (user: AuthUser) => void; onCancel: () => void; onBusyChange?: (busy: boolean) => void;
+export function ProfileEditor({ user, phone: savedPhone = "", onSaved, onCancel, onBusyChange, onDirtyChange }: {
+  user: AuthUser; phone?: string; onSaved: (user: AuthUser) => void; onCancel: () => void; onBusyChange?: (busy: boolean) => void;
+  /** Tells the window whether closing would lose typed changes. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [original] = useState(() => profileNames(user));
   const [firstName, setFirstName] = useState(original.firstName);
   const [lastName, setLastName] = useState(original.lastName);
+  const [phone, setPhone] = useState(() => savedPhone ? formatPhone(savedPhone) : "");
   const [version, setVersion] = useState(user.profileVersion || "");
   const [image, setImage] = useState<AvatarImage | null>(null);
   const [crop, setCrop] = useState<AvatarCrop>(initialCrop);
@@ -27,7 +31,11 @@ export function ProfileEditor({ user, onSaved, onCancel, onBusyChange }: {
   const [conflict, setConflict] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const selection = useRef(0);
-  const dirty = firstName.trim() !== original.firstName || lastName.trim() !== original.lastName || Boolean(image) || remove;
+  const typedPhone = normalizePhone(phone);
+  const phoneChanged = "error" in typedPhone || (typedPhone.phone || "") !== savedPhone;
+  const dirty = firstName.trim() !== original.firstName || lastName.trim() !== original.lastName || Boolean(image) || remove || phoneChanged;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
   useEffect(() => () => { if (image) URL.revokeObjectURL(image.url); }, [image]);
   useEffect(() => () => { selection.current++; }, []);
 
@@ -47,10 +55,11 @@ export function ProfileEditor({ user, onSaved, onCancel, onBusyChange }: {
     if (busy || imageBusy || !dirty) return;
     const names = validateProfileNames(firstName, lastName);
     if ("error" in names) { setError(names.error); return; }
+    if ("error" in typedPhone) { setError(typedPhone.error); return; }
     setBusy(true); onBusyChange?.(true); setError(""); setConflict(false);
     try {
       const avatar = image ? await prepareAvatar(image, crop) : undefined;
-      const updated = await updateProfile({ ...names, expectedVersion: version, avatarAction: image ? "replace" : remove ? "remove" : "keep", avatar });
+      const updated = await updateProfile({ ...names, expectedVersion: version, avatarAction: image ? "replace" : remove ? "remove" : "keep", avatar, phone: phoneChanged ? typedPhone.phone || "" : undefined });
       onSaved(updated);
     } catch (caught) {
       setConflict(caught instanceof ApiError && caught.status === 409);
@@ -84,6 +93,10 @@ export function ProfileEditor({ user, onSaved, onCancel, onBusyChange }: {
       <label htmlFor="profile-first-name">Имя<input id="profile-first-name" autoComplete="given-name" value={firstName} maxLength={60} minLength={2} required disabled={busy} onChange={(event) => setFirstName(event.target.value)} /></label>
       <label htmlFor="profile-last-name">Фамилия<input id="profile-last-name" autoComplete="family-name" value={lastName} maxLength={80} minLength={2} required disabled={busy} onChange={(event) => setLastName(event.target.value)} /></label>
     </div>
+    <label className={styles.phoneField} htmlFor="profile-phone">Номер телефона
+      <input id="profile-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} maxLength={30} disabled={busy} placeholder={PHONE_HINT.replace("Например, ", "")} onChange={(event) => setPhone(event.target.value)} />
+      <small>🔒 Номер видят только твои наставники и руководитель команды — чтобы позвонить или написать в WhatsApp. Другие участники его не видят.</small>
+    </label>
     {user.login && <div className={styles.accountInfo}><span>{user.login.includes("@") ? "Почта аккаунта" : "Логин аккаунта"}</span><strong>{user.login}</strong></div>}
     {error && <div className={styles.error} role="alert"><p>{error}</p>{conflict && <button type="button" className="button button-edit" disabled={busy} onClick={() => void reloadVersion()}>Обновить данные</button>}</div>}
     <div className={styles.formActions}><button type="submit" className="button button-primary" disabled={busy || imageBusy || !dirty}>{busy ? "Сохраняем…" : "Сохранить изменения"}</button><button type="button" className="button button-edit" disabled={busy || imageBusy} onClick={onCancel}>Отмена</button></div>

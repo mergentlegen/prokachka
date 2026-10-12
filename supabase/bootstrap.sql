@@ -46,3 +46,5 @@
 \ir 20261027-safety-watch.sql
 \ir 20261028-program-catch-up.sql
 \ir 20261029-company-voyage-v2.sql
+\ir 20261030-profile-contacts.sql
+\ir 20261031-profile-stage2.sql
