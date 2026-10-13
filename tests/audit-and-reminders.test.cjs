@@ -85,6 +85,14 @@ test('a start reminder greets the participant by name and is cancelled after the
   assert.ok(done.patches.some((patch) => patch.cancelled_at));
 });
 
+test('a participant whose miles were recounted gets one message with the old and new miles', async () => {
+  const { result, messages } = await deliver([{ id: 'm1', kind: 'miles-recount', payload: { taskId, title: 'Тест «На воспроизведение»', from: 5, to: 2 } }]);
+  assert.equal(result.delivered, 1);
+  assert.match(messages[0].text, /задания «Тест «На воспроизведение»»: теперь оно даёт 2 мили\./);
+  assert.match(messages[0].text, /было 5, стало 2\./);
+  assert.match(messages[0].text, /https:\/\/prokachka\.test\//);
+});
+
 test('one worker run sends at most 20 messages', async () => {
   const jobs = Array.from({ length: 30 }, (_, index) => ({ id: 'n' + index, kind: 'task-nudge', payload: { taskId } }));
   const { rpcCalls } = await deliver(jobs, { rpc: { app_task_nudge_due: false } });

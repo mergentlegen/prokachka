@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { serverEnv } from "@/backend/config/env";
+import { milesUnit } from "@/shared/domain/miles";
 
 type TelegramApiResponse = {
   ok?: boolean;
@@ -83,8 +84,8 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 
 type NotificationJob = {
   id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null;
-  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder";
-  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number }; summary_sent: boolean; attempts: number; lock_token: string;
+  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount";
+  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
 // Mass mailings go out at this pace: one worker run a minute, personal notifications first.
@@ -114,6 +115,15 @@ export function startReminderText(step: number, firstName: string, teamName: str
     "Если что-то непонятно или не получается начать — напишите своему наставнику, он поможет сделать первый шаг.",
   ];
   return [...lines, link ? "Открыть задания: " + link : ""].filter(Boolean).join("\n");
+}
+
+/** The task became cheaper after the participant got its miles: their miles for it went down to the new weight. */
+export function milesRecountText(title: string, from: number, to: number, link: string) {
+  return [
+    "🔄 Изменён вес задания «" + (title.trim().slice(0, 200) || "Задание") + "»: теперь оно даёт " + to + " " + milesUnit(to) + ".",
+    "Ваши мили за него пересчитаны: было " + from + ", стало " + to + ".",
+    link ? "Открыть сайт: " + link : "",
+  ].filter(Boolean).join("\n");
 }
 
 export function scheduleTelegramDelivery() {
@@ -213,6 +223,8 @@ export async function deliverTelegramNotifications() {
         if (profile.error || !profile.data) throw new Error("Cannot load reminder recipient");
         const team = Array.isArray(profile.data.teams) ? profile.data.teams[0] : profile.data.teams;
         delivery = await sendTelegramMessage(chatId, startReminderText(Number(job.payload.step || 1), String(profile.data.first_name || ""), String(team?.name || ""), appUrl() ? appUrl() + "/?tab=tasks" : ""));
+      } else if (job.kind === "miles-recount") {
+        delivery = await sendTelegramMessage(chatId, milesRecountText(String(job.payload.title || ""), Number(job.payload.from || 0), Number(job.payload.to || 0), appUrl() ? appUrl() + "/" : ""));
       } else if (job.kind === "permissions") {
         const review = job.payload.canReview && (user.role === "admin" || user.can_review);
         const publish = job.payload.canPublishTasks && (user.role === "admin" || user.can_publish_tasks);
