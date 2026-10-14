@@ -1,5 +1,5 @@
 import { plural } from "@/frontend/shared/lib/plural";
-import type { RankEntry, Submission, Task } from "@/shared/domain/types";
+import type { ProgramModule, RankEntry, Submission, Task } from "@/shared/domain/types";
 import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 
 export type TaskState = "todo" | "review" | "done" | "closed";
@@ -29,6 +29,27 @@ export function deadlineInfo(deadline: string | null | undefined, now = Date.now
     : days === 1 ? `остался 1 день${hours ? ` ${hours} ч` : ""}`
     : hours ? `осталось ${hours} ч${hours < 6 && minutes ? ` ${minutes} мин` : ""}` : `осталось ${minutes} мин`;
   return { text, tone: left <= 6 * HOUR ? "urgent" : left <= 2 * DAY ? "soon" : "calm" };
+}
+
+export type ProgramStepState = "done" | "current" | "locked" | "skipped";
+
+// A step is passed once its work is accepted; the step the program waits on is the current one; everything after it is closed.
+// A step left behind without an accepted work (the order was changed later) is shown as not passed.
+export function programStepStates(module: ProgramModule, latest: ReadonlyMap<string, Submission>): ProgramStepState[] {
+  const current = module.steps.findIndex((step) => step.id === module.currentTaskId);
+  return module.steps.map((step, index) => {
+    const submission = latest.get(step.id);
+    if (module.status === "active" && step.id === module.currentTaskId) return "current";
+    if (submission?.status === "accepted" && submission.interactiveCompleted !== false) return "done";
+    return module.status === "completed" || index < current ? "skipped" : "locked";
+  });
+}
+
+/** Programs in progress first (pinned ones on top), passed programs at the end; otherwise the order they were published in. */
+export function orderedProgramModules(modules: ProgramModule[]) {
+  return modules.map((module, index) => ({ module, index }))
+    .sort((a, b) => Number(a.module.status === "completed") - Number(b.module.status === "completed") || Number(b.module.isPinned) - Number(a.module.isPinned) || a.index - b.index)
+    .map(({ module }) => module);
 }
 
 export function latestSubmissions(submissions: Submission[], userId: string) {

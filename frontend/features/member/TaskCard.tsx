@@ -23,7 +23,7 @@ import { QuizSentNotice, TaskQuiz } from "./TaskQuiz";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
 
-export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void }) {
+export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [linkOpened, setLinkOpened] = useState(false);
@@ -40,7 +40,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const status = submission?.status || (expired ? "missed" : "new");
   const statusText = captainPending ? "Тренировка пройдена · ждём скриншот" : surveyInProgress ? `Сохранено ${submission?.points} из 5 ответов` : status === "accepted" ? "Принято" : status === "pending" ? "На проверке" : status === "revision" ? "На доработку" : status === "missed" ? "Срок истёк" : "Не начато";
   const countdown = deadlineInfo(deadline);
-  const step = task.publicationType === "sequential" && task.position ? task.position : undefined;
+  const step = !inModule && task.publicationType === "sequential" && task.position ? task.position : undefined;
   const resource = externalHref(task.resourceUrl);
   const canSubmit = task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   const submitLabel = status === "revision" ? "Отправить повторно" : expired ? "Отправить с опозданием" : "Отправить ответ";

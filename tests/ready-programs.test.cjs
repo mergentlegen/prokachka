@@ -72,7 +72,7 @@ function nodes(tree, predicate) {
   return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
 }
 
-test("member Tasks view contains games and ordinary tasks, while Programs only contains sequential steps", async () => {
+test("member Tasks view contains games and ordinary tasks, while Programs shows the modules with sequential steps", async () => {
   const harness = hookHarness(), previousWindow = global.window;
   global.window = { setInterval: () => 0, clearInterval() {}, setTimeout: () => 0, clearTimeout() {}, addEventListener() {}, removeEventListener() {} };
   const tasks = [
@@ -81,12 +81,15 @@ test("member Tasks view contains games and ordinary tasks, while Programs only c
     { id: "step", title: "Шаг", isActive: true, publicationType: "sequential", createdAt: "2026-09-25" },
   ];
   const TaskCard = () => null;
+  const ProgramModules = () => null;
+  const programModules = [{ id: "p1", title: "Старт", isPinned: false, status: "active", currentTaskId: "step", steps: [{ id: "step", number: 1, title: "Шаг", maxPoints: 5 }] }];
   const { MemberApp } = loadTs("frontend/features/member/MemberApp.tsx", {
     react: harness.react,
     "@/frontend/features/auth/AuthScreen": { AuthScreen: () => null },
     "./TaskCard": { TaskCard },
+    "./ProgramModules": { ProgramModules },
     "@/frontend/shared/hooks/use-live-updates": { useLiveUpdates() {} },
-    "./use-member-data": { useMemberData: () => ({ store: { tasks, submissions: [], announcements: [], starAwards: [] }, ranking: [], starRanking: [], network: [], refreshData() {}, dataLoading: false }) },
+    "./use-member-data": { useMemberData: () => ({ store: { tasks, programModules, submissions: [], announcements: [], starAwards: [] }, ranking: [], starRanking: [], network: [], refreshData() {}, dataLoading: false }) },
     "@/frontend/shared/api/client": { refreshAuthSession: async () => ({ id: "member", role: "member", name: "Участник", teamId: "team" }), mapAuthUserToUser: (user) => user, request: async () => ({ counts: { unread: 0 } }) },
   });
   try {
@@ -96,7 +99,13 @@ test("member Tasks view contains games and ordinary tasks, while Programs only c
     const switcher = nodes(tree, (node) => node.props?.className === "task-switch")[0];
     nodes(switcher, (node) => node.type === "button" && node.props.children === "Программы")[0].props.onClick();
     tree = harness.render();
-    assert.deepEqual(nodes(tree, (node) => node.type === TaskCard).map((node) => node.props.task.id), ["step"]);
+    assert.deepEqual(nodes(tree, (node) => node.type === TaskCard), [], "steps are shown inside their program");
+    const modules = nodes(tree, (node) => node.type === ProgramModules)[0];
+    assert.equal(modules.props.modules, programModules);
+    assert.deepEqual(modules.props.tasks.map((task) => task.id), ["step"]);
+    const card = modules.props.renderTask(tasks[2]);
+    assert.equal(card.type, TaskCard);
+    assert.equal(card.props.inModule, true);
   } finally { harness.unmount(); global.window = previousWindow; }
 });
 

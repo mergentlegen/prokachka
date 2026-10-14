@@ -4,6 +4,29 @@ import { ancestors, findTeamNetwork, isAudienceVisible } from "@/backend/service
 
 function addHours(value: string, hours: number) { return new Date(new Date(value).getTime() + hours * 60 * 60 * 1000).toISOString(); }
 
+type Row = Record<string, unknown>;
+
+// Every program of the participant with all its visible steps, so the page can show what is done and what is ahead.
+// Steps not reached yet travel without their text: it opens together with the step.
+export function programModules(programs: Row[], tasks: Row[], progressByProgram: ReadonlyMap<string, Row>) {
+  return programs.filter((program) => !program.template_key).flatMap((program) => {
+    const steps = tasks.filter((task) => task.publication_type === "sequential" && String(task.program_id) === String(program.id))
+      .sort((a, b) => Number(a.position) - Number(b.position) || String(a.id).localeCompare(String(b.id)));
+    if (!steps.length) return [];
+    const progress = progressByProgram.get(String(program.id));
+    const completed = progress?.status === "completed";
+    const current = completed ? steps.length : steps.findIndex((task) => String(task.id) === String(progress?.current_task_id));
+    return [{
+      id: String(program.id), title: String(program.title || ""), is_pinned: Boolean(program.is_pinned), status: completed ? "completed" : "active",
+      current_task_id: !completed && current >= 0 ? String(steps[current].id) : null, completed_at: completed ? progress?.completed_at ?? null : null,
+      steps: steps.map((task, index) => ({
+        id: String(task.id), number: index + 1, title: String(task.title || ""), max_points: Number(task.max_points || 0), interactive_kind: task.interactive_kind ?? null,
+        ...(index < current ? { description: String(task.description || ""), resource_url: task.resource_url ?? null } : {}),
+      })),
+    }];
+  });
+}
+
 export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt?: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
@@ -75,7 +98,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
       group.slice(1).forEach((task) => excluded.add(String(task.id)));
     }
   }
-  return { data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
+  return { programs: programModules(programs, tasks, existing), data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
     const program = programsById.get(String(task.program_id));
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;

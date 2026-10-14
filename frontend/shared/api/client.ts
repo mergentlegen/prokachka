@@ -1,4 +1,4 @@
-import type { Announcement, AnnouncementPhoto, AuthUser, NetworkMember, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
+import type { Announcement, AnnouncementPhoto, AuthUser, NetworkMember, ProgramModule, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
 import type { TaskVideoSummary } from "@/shared/domain/task-video";
 import { isReadyProgramKey, isTaskInteractiveKind } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
@@ -104,6 +104,18 @@ function mapTaskVideo(value: unknown): TaskVideoSummary | undefined {
   if (row.status !== "processing" && row.status !== "ready" && row.status !== "failed") return undefined;
   return { status: row.status, playable: row.playable === true, durationSeconds: typeof row.duration_seconds === "number" ? row.duration_seconds : typeof row.durationSeconds === "number" ? row.durationSeconds : undefined, error: typeof row.error === "string" ? row.error : undefined };
 }
+export function mapProgramModule(row: ApiRow): ProgramModule {
+  const steps: ApiRow[] = Array.isArray(row.steps) ? row.steps : [];
+  return {
+    id: String(row.id), title: String(row.title || ""), isPinned: row.is_pinned === true, status: row.status === "completed" ? "completed" : "active",
+    currentTaskId: row.current_task_id ? String(row.current_task_id) : undefined, completedAt: row.completed_at ? String(row.completed_at) : undefined,
+    steps: steps.map((step) => ({
+      id: String(step.id), number: Number(step.number || 0), title: String(step.title || ""), maxPoints: Number(step.max_points || 0),
+      interactiveKind: isTaskInteractiveKind(step.interactive_kind) ? step.interactive_kind : undefined,
+      description: typeof step.description === "string" ? step.description : undefined, resourceUrl: step.resource_url ? String(step.resource_url) : undefined,
+    })),
+  };
+}
 export function mapTask(row: ApiRow): Task {
   return { id: String(row.id), title: String(row.title || ""), description: String(row.description || ""), maxPoints: Number(row.max_points || 0),
     feedOrder: typeof row.feed_order === "number" && Number.isFinite(row.feed_order) ? row.feed_order : undefined,
@@ -154,10 +166,10 @@ export async function loadMemberData(userId: string, keys: readonly MemberDatase
   const read = <T,>(key: MemberDataset, url: string, empty: T): Promise<T> => keys.includes(key)
     ? request<T>(url) : Promise.resolve(dataCache.peek<T>(url) ?? empty);
   const [tasksResponse, submissionsResponse, rankingResponse, announcementsResponse, starsResponse, networkResponse] = await Promise.all([
-    read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
+    read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[], programs: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
     read("ranking", "/api/ranking", { ranking: [] as RankEntry[], starRanking: [] as RankEntry[] }), read("announcements", "/api/announcements", { announcements: [] as ApiRow[] }), read("stars", "/api/stars", { awards: [] as ApiRow[] }), read("network", "/api/network", { users: [] as ApiRow[] }),
   ]);
-  return { store: { tasks: tasksResponse.tasks.map(mapTask), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapNetworkMember) };
+  return { store: { tasks: tasksResponse.tasks.map(mapTask), programModules: (tasksResponse.programs || []).map(mapProgramModule), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapNetworkMember) };
 }
 export async function createMemberSubmission(taskId: string): Promise<string> {
   const response = await request<ApiResponse<{ url: string }>>("/api/submissions", { method: "POST", body: JSON.stringify({ taskId }) });

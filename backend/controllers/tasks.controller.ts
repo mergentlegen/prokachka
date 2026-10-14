@@ -34,7 +34,7 @@ export async function listTasks(request: Request) {
     const result = await getMemberTaskFeed(user.id, teamId, user.teamJoinedAt);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("error" in result) return failure("Не удалось загрузить задания.");
-    return withTaskDetails(result.data, user, false);
+    return withTaskDetails(result.data, user, false, { programs: "programs" in result ? result.programs : [] });
   }
   if ((user.role === "admin" || user.role === "member") && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "ceo" ? undefined : user.teamId, user);
@@ -45,7 +45,7 @@ export async function listTasks(request: Request) {
 
 // The database is far away (each request is a round trip), so everything that only needs the task ids
 // — files, the feed order, video and questions — is asked for at once rather than one after another.
-async function withTaskDetails(rows: Record<string, unknown>[], user: NonNullable<Awaited<ReturnType<typeof currentUser>>>, manager: boolean) {
+async function withTaskDetails(rows: Record<string, unknown>[], user: NonNullable<Awaited<ReturnType<typeof currentUser>>>, manager: boolean, extra: Record<string, unknown> = {}) {
   const ids = rows.map((task) => String(task.id));
   const [attachments, ordered, videos, quizzes] = await Promise.all([
     listTaskAttachments(ids), applyTaskFeedOrder(rows, user, manager), taskVideoSummaries(ids, manager), taskQuizSummaries(ids),
@@ -53,7 +53,7 @@ async function withTaskDetails(rows: Record<string, unknown>[], user: NonNullabl
   if ("unavailable" in attachments) return failure("База данных не настроена.", 503);
   if ("error" in attachments) return failure("Не удалось загрузить вложения заданий.");
   if (!ordered.data) return failure("Не удалось загрузить порядок заданий.", 503);
-  return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [], video: videos.get(String(task.id)), quiz: quizzes.get(String(task.id)) })) });
+  return ok({ tasks: ordered.data.map((task) => ({ ...task, attachments: attachments.data.get(String(task.id)) || [], video: videos.get(String(task.id)), quiz: quizzes.get(String(task.id)) })), ...extra });
 }
 
 export async function createTask(request: Request) {

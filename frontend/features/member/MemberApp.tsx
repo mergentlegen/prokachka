@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { TaskCard } from "./TaskCard";
+import { ProgramModules } from "./ProgramModules";
 import { FeedbackPanel } from "@/frontend/features/feedback/FeedbackPanel";
 import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 import { Avatar } from "@/frontend/shared/Avatar";
@@ -70,6 +71,7 @@ export function MemberApp() {
   // The open section lives in the address (?tab=ranking, ?view=programs), so a reload or a Telegram link
   // (?feedback=<thread>, ?tab=tasks) opens exactly that screen.
   const [taskView, setTaskView] = useState<"regular" | "programs">("regular");
+  const [programTab, setProgramTab] = useState<string | null>(null);
   const [placeRead, setPlaceRead] = useState(false);
   useEffect(() => {
     if (!user?.id) return;
@@ -77,6 +79,7 @@ export function MemberApp() {
       const target = readPageParam("feedback") ? "feedback" : pageTab(readPageParam("tab"));
       if (target) setTab(target);
       if (readPageParam("view") === "programs") setTaskView("programs");
+      setProgramTab(readPageParam("program"));
       setPlaceRead(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -97,8 +100,9 @@ export function MemberApp() {
     if (!placeRead || tab === "profile") return;
     writePageParam("tab", tab === "home" ? null : tab);
     writePageParam("view", tab === "tasks" && taskView === "programs" ? "programs" : null);
+    writePageParam("program", tab === "tasks" && taskView === "programs" ? programTab : null);
     if (tab !== "feedback") writePageParam("feedback", null);
-  }, [placeRead, tab, taskView]);
+  }, [placeRead, tab, taskView, programTab]);
   useRestoreScroll(placeRead && !dataLoading);
   const [toast, setToast] = useState("");
   const [showLogin, setShowLogin] = useState(false);
@@ -156,6 +160,7 @@ export function MemberApp() {
   function openTaskFromProfile(taskId: string) {
     const task = store.tasks.find((item) => item.id === taskId);
     setTaskView(task?.publicationType === "sequential" ? "programs" : "regular");
+    if (task?.programId) setProgramTab(task.programId);
     setTaskFilter("all");
     setTab("tasks");
     window.setTimeout(() => document.getElementById("task-" + taskId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
@@ -165,6 +170,7 @@ export function MemberApp() {
   const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   const activeTasks = store.tasks.filter((task) => task.isActive && (task.publicationType === "sequential" || !isExpired(task))).sort(compareTaskFeed);
+  const programModules = store.programModules || [];
   const visibleTasks = activeTasks.filter((task) => taskView === "programs" ? task.publicationType === "sequential" : task.publicationType !== "sequential");
   const latestByTask = latestSubmissions(store.submissions, user?.id || "");
   const taskCounts = { todo: 0, review: 0, done: 0, closed: 0 };
@@ -298,12 +304,14 @@ export function MemberApp() {
 <div className="member-layout"><MemberSidebar tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} /><div className="member-main">
     <section className="welcome-section page-width"><div><h1>Привет, {user.name.split(" ")[0]} <span className="wave">⌁</span></h1></div><div className="score-card"><span className="score-label">Общий результат</span><div className={"score-value " + (ratingType === "stars" ? "is-stars" : "")}><strong><CountUp value={ratingType === "stars" ? currentStars : currentPoints} /></strong><span className="score-unit">{ratingType === "stars" ? "★ звёзд" : milesUnit(currentPoints)}</span></div><span className="rank-line">{currentRank ? `${currentRank} место в рейтинге` : "Пока нет места в рейтинге"} <i>↗</i></span></div></section>
 <div className="page-width content-grid"><SectionBoundary loading={tab !== "profile" && dataLoading} error={tab !== "profile" ? dataError : undefined} onRetry={() => void refreshData()}><section className="main-column"><div className="member-section member-section-announcements"><HomeOverview userId={user.id} tasks={activeTasks} submissions={store.submissions} ranking={teamRanking} feedbackUnread={feedbackUnread} now={now} onOpen={(next) => { if (next === "ranking") setRatingType("points"); if (next === "tasks") setTaskFilter("todo"); navigate(next); }} />
-        <AnnouncementsBlock announcements={store.announcements} /></div><div className="member-section member-section-network"><MemberNetwork users={networkUsers} currentUserId={user.id} canInvite={Boolean(user.teamId)} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={() => void createInviteLink()} onCopyInvite={(url) => void copyInviteLink(url)} /></div><div className="member-section member-section-feedback">{tab === "feedback" && <FeedbackPanel viewerId={user.id} refreshKey={feedbackVersion} selectedTaskId={feedbackTaskId} selectedThreadId={feedbackTaskId ? null : typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}</div><div className="member-section member-section-tasks"><div className="section-heading"><div><p className="eyebrow">Практика</p><h2>Актуальные задания</h2></div><div className="task-switch"><button className={taskView === "regular" ? "active" : ""} onClick={() => setTaskView("regular")}>Задания</button><button className={taskView === "programs" ? "active" : ""} onClick={() => setTaskView("programs")}>Программы</button></div><span className="task-count">{visibleTasks.length} {plural(visibleTasks.length, "задание", "задания", "заданий")}</span></div>
+        <AnnouncementsBlock announcements={store.announcements} /></div><div className="member-section member-section-network"><MemberNetwork users={networkUsers} currentUserId={user.id} canInvite={Boolean(user.teamId)} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={() => void createInviteLink()} onCopyInvite={(url) => void copyInviteLink(url)} /></div><div className="member-section member-section-feedback">{tab === "feedback" && <FeedbackPanel viewerId={user.id} refreshKey={feedbackVersion} selectedTaskId={feedbackTaskId} selectedThreadId={feedbackTaskId ? null : typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}</div><div className="member-section member-section-tasks"><div className="section-heading"><div><p className="eyebrow">Практика</p><h2>Актуальные задания</h2></div><div className="task-switch"><button className={taskView === "regular" ? "active" : ""} onClick={() => setTaskView("regular")}>Задания</button><button className={taskView === "programs" ? "active" : ""} onClick={() => setTaskView("programs")}>Программы</button></div><span className="task-count">{taskView === "programs" ? `${programModules.length} ${plural(programModules.length, "программа", "программы", "программ")}` : `${visibleTasks.length} ${plural(visibleTasks.length, "задание", "задания", "заданий")}`}</span></div>
+        {taskView === "programs" ? <ProgramModules modules={programModules} tasks={visibleTasks} latest={latestByTask} selectedId={programTab} onSelect={setProgramTab} onFeedback={openFeedback}
+          renderTask={(task) => <TaskCard task={task} submission={latestByTask.get(task.id)} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} inModule />} /> : <>
         {visibleTasks.length > 0 && <div className="task-filters" role="group" aria-label="Фильтр заданий">{taskFilters.filter(([id, , count]) => id === "all" || count > 0).map(([id, label, count]) => <button type="button" key={id} className={activeFilter === id ? "active" : ""} aria-pressed={activeFilter === id} onClick={() => setTaskFilter(id)}>{label}<b>{count}</b></button>)}</div>}
         {visibleTasks.length === 0 ? <EmptyState text="Пока нет активных заданий." /> : <div className="task-list">{shownTasks.map((task) => {
       const latest = store.submissions.filter((submission) => submission.userId === user.id && submission.taskId === task.id).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))[0];
       return <TaskCard key={task.id} task={task} submission={latest} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} />;
-    })}</div>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={ranking} metric={ratingType} onMetric={setRatingType} userId={user.id} /></aside></SectionBoundary></div></div></div>
+    })}</div>}</>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={ranking} metric={ratingType} onMetric={setRatingType} userId={user.id} /></aside></SectionBoundary></div></div></div>
     <MemberBottomNav tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} />
     {tab === "profile" && <MemberProfile loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} now={now} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onNotice={setToast} openableTaskIds={new Set(activeTasks.map((task) => task.id))} onOpenTask={openTaskFromProfile} onOpenRanking={() => navigate("ranking")} onUnlinkTelegram={unlinkMemberTelegram} onClose={closeProfile} onLogout={logout} />}
     {showLogin && <div className="modal-backdrop" onClick={() => setShowLogin(false)}><div className="simple-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}>×</button><p className="eyebrow">Нужна идентификация</p><h2>Сначала представься</h2><p>Войди или создай аккаунт, чтобы отправить работу.</p><button className="primary-button full" onClick={() => { setShowLogin(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Перейти ко входу</button></div></div>}
