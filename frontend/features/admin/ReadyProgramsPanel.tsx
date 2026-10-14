@@ -16,7 +16,14 @@ type Props = {
   canManageAll: boolean;
   onChange: (programs: TaskProgram[], tasks: Task[]) => void;
   onError: (message: string) => void;
+  /** Inside the catalog window: the window carries the title, so the panel drops its own header. */
+  embedded?: boolean;
 };
+
+/** Ready games this mentor manages: the whole team's for the team leader, their own branch for others. */
+export function readyPublications(programs: TaskProgram[], actorId: string, canManageAll: boolean) {
+  return programs.filter((program) => program.templateKey && (canManageAll ? !program.audienceRootId : program.publisherId === actorId && (!program.audienceRootId || program.audienceRootId === actorId)));
+}
 
 type CatalogFilter = "all" | "published" | "available";
 const rewards = new Map(READY_PROGRAMS.map((program) => [program.key, program.tasks.reduce((total, task) => total + task.maxPoints, 0)]));
@@ -26,7 +33,7 @@ const filters: { value: CatalogFilter; label: string }[] = [
   { value: "available", label: "Доступные" },
 ];
 
-export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onChange, onError }: Props) {
+export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onChange, onError, embedded = false }: Props) {
   const [readyPrograms, setReadyPrograms] = useState<ReadyProgramStatus[]>(() => READY_PROGRAMS.map(({ tasks: _tasks, ...program }) => ({ ...program, published: false })));
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState("");
@@ -49,7 +56,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
     return () => { cancelled = true; };
   }, [programs, reload]);
 
-  const publications = new Map(programs.filter((program) => program.templateKey && (canManageAll ? !program.audienceRootId : program.publisherId === actorId && (!program.audienceRootId || program.audienceRootId === actorId))).map((program) => [program.templateKey, program]));
+  const publications = new Map(readyPublications(programs, actorId, canManageAll).map((program) => [program.templateKey, program]));
   const catalog = readyPrograms.map((item) => {
     const program = publications.get(item.key);
     return program ? {
@@ -104,8 +111,8 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
     } finally { setBusyKey(""); setPinning(false); }
   }
 
-  return <section className={styles.panel} aria-labelledby="ready-programs-title">
-    <div className={styles.header}>
+  return <section className={`${styles.panel} ${embedded ? styles.embedded : ""}`} aria-labelledby={embedded ? undefined : "ready-programs-title"} aria-label={embedded ? "Каталог готовых заданий" : undefined}>
+    {!embedded && <div className={styles.header}>
       <span className={styles.spark} aria-hidden="true">✦</span>
       <div className={styles.heading}>
         <p className="eyebrow">Быстрый старт</p>
@@ -113,7 +120,8 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
         <p className={styles.intro}>Тесты и игры с автоматическим начислением миль. {canManageAll ? "Публикации здесь доступны всей команде." : "Публикации здесь доступны вам и участникам ниже по вашей ветке."} Без настройки шагов и дедлайнов.</p>
       </div>
       <span className={styles.summary}>Добавлено {catalog.filter((item) => item.publishedActive).length} из {catalog.length}</span>
-    </div>
+    </div>}
+    {embedded && <p className={styles.embeddedIntro}>Тесты и игры с автоматическим начислением миль. Добавленные появляются у участников в «Заданиях». Добавлено {catalog.filter((item) => item.publishedActive).length} из {catalog.length}.</p>}
     {loadError && <div className={styles.warning} role="status">
       <span>Не удалось проверить статус каталога. Попробуйте загрузить его ещё раз.</span>
       <button type="button" disabled={loading} onClick={() => { setLoading(true); setReload((value) => value + 1); }}>Повторить</button>

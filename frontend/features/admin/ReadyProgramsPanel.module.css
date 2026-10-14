@@ -45,3 +45,6 @@
   .filters { width:100%; }
   .filters button { flex:1; padding:8px; }
 }
+/* Inside the catalog window: no frame of its own, the window is the frame. */
+.embedded { overflow:visible; border:0; border-radius:0; background:transparent; }
+.embeddedIntro { margin:0 0 4px; color:#5b6b85; font-size:14px; line-height:1.55; }

@@ -19,7 +19,9 @@ import { AnnouncementsPanel } from "@/frontend/features/admin/AnnouncementsPanel
 import { StarsPanel } from "@/frontend/features/admin/StarsPanel";
 import { ProgramsPanel, reopenedNotice } from "@/frontend/features/admin/ProgramsPanel";
 import { ProgramEditorModal } from "./ProgramEditorModal";
-import { ReadyProgramsPanel } from "./ReadyProgramsPanel";
+import { ReadyProgramsPanel, readyPublications } from "./ReadyProgramsPanel";
+import { READY_PROGRAMS } from "@/shared/domain/ready-programs";
+import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { TaskOrderDialog } from "./TaskOrderDialog";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { WelcomeVideoSettingsPanel } from "@/frontend/features/admin/WelcomeVideoSettingsPanel";
@@ -97,7 +99,8 @@ export function AdminApp() {
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [reviewFlow, setReviewFlow] = useState<{ startId: string; intent?: "accepted" | "revision"; single?: boolean } | null>(null);
+  const [reviewFlow, setReviewFlow] = useState<{ startId: string; intent?: "accepted" | "revision"; single?: boolean; taskId?: string } | null>(null);
+  const [readyCatalogOpen, setReadyCatalogOpen] = useState(false);
   const [templates, setTemplates] = useState<{ list: string[]; canEdit: boolean }>({ list: [], canEdit: false });
   const [templatesEditorOpen, setTemplatesEditorOpen] = useState(false);
   const [resultsTaskId, setResultsTaskId] = useState("");
@@ -601,8 +604,12 @@ export function AdminApp() {
         <SectionBoundary key={section} loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
         {section === "dashboard" && <AdminDashboard store={store} queue={queue} feedbackNeedsReply={feedbackNeedsReply} requests={counts.requests} canReview={canReview} now={now} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
-          <ReadyProgramsPanel programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />
-          <TasksView store={store} onOpenResults={(task) => setResultsTaskId(task.id)} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
+          <button type="button" className="ready-catalog-row" onClick={() => setReadyCatalogOpen(true)}>
+            <span className="ready-catalog-icon" aria-hidden="true">✦</span>
+            <span className="ready-catalog-text"><strong>Готовые игры и тесты</strong><small>Добавлено {readyPublications(store.programs, authUser.id, authUser.role === "admin").filter((program) => program.isActive).length} из {READY_PROGRAMS.length}</small></span>
+            <span className="ready-catalog-open">Открыть каталог <span aria-hidden="true">→</span></span>
+          </button>
+          <TasksView store={store} onOpenResults={(task) => setResultsTaskId(task.id)} onReview={authUser.role === "admin" || authUser.canReview ? (task) => { const first = queue.find((item) => item.taskId === task.id); if (first) setReviewFlow({ startId: first.id, taskId: task.id }); } : undefined} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
         </div>}
         {section === "review" && <ReviewView store={store} submissions={queue} onReview={(submission, intent) => setReviewFlow({ startId: submission.id, intent })} onStart={() => { if (queue[0]) setReviewFlow({ startId: queue[0].id }); }} onEditTemplates={templates.canEdit ? () => setTemplatesEditorOpen(true) : undefined} />}
 {section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} templates={templates.list.length ? templates.list : DEFAULT_REVIEW_TEMPLATES} onOpenSubmission={openSubmission} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
@@ -631,7 +638,10 @@ export function AdminApp() {
     {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     <PullToRefresh onRefresh={async () => { setFeedbackVersion((value) => value + 1); await refreshData(); }} />
-    {reviewFlow && <ReviewFlow queue={reviewFlow.single ? store.submissions.filter((item) => item.id === reviewFlow.startId) : queue} startId={reviewFlow.startId} intent={reviewFlow.intent} store={store} templates={templates.list} canEditTemplates={templates.canEdit}
+    {readyCatalogOpen && <ModalSheet title="Готовые игры и тесты" tall onClose={() => setReadyCatalogOpen(false)}>
+      <ReadyProgramsPanel embedded programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />
+    </ModalSheet>}
+    {reviewFlow && <ReviewFlow queue={reviewFlow.single ? store.submissions.filter((item) => item.id === reviewFlow.startId) : reviewFlow.taskId ? queue.filter((item) => item.taskId === reviewFlow.taskId) : queue} startId={reviewFlow.startId} intent={reviewFlow.intent} store={store} templates={templates.list} canEditTemplates={templates.canEdit}
       onSave={saveDecision} onEditTemplates={() => setTemplatesEditorOpen(true)} onClose={() => setReviewFlow(null)} />}
     {resultsTaskId && store.tasks.some((task) => task.id === resultsTaskId) && <TaskResultsSheet task={store.tasks.find((task) => task.id === resultsTaskId)!} store={store} actorId={authUser.id}
       canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast}

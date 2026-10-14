@@ -341,6 +341,17 @@ h1,h2,h3 { font-family:'Manrope', sans-serif; letter-spacing:-.04em; }
 .submission-media-preview { display:block; max-width:min(320px, 100%); max-height:260px; margin-top:9px; border-radius:8px; background:#edf2f8; object-fit:contain; }
 .submission-file-link { display:inline-block; margin-top:9px; color:var(--blue); font-size:10px; }
 
+/* Mentor tasks: the ready games catalog as one row above the task list */
+.ready-catalog-row { display:flex; align-items:center; gap:14px; width:100%; margin-bottom:18px; padding:14px 18px; border:1px solid #eadfca; border-radius:16px; background:#fffdf8; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+.ready-catalog-row:hover { border-color:#d9b96d; box-shadow:0 6px 18px #a8741a14; }
+.ready-catalog-row:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.ready-catalog-icon { display:grid; place-items:center; flex:0 0 40px; width:40px; height:40px; border-radius:12px; background:#fff1ce; color:#ae8134; font-size:18px; }
+.ready-catalog-text { display:grid; gap:2px; min-width:0; flex:1; }
+.ready-catalog-text strong { color:var(--navy); font-family:'Manrope',system-ui,sans-serif; font-size:16px; font-weight:800; letter-spacing:-.01em; }
+.ready-catalog-text small { color:#7a6a46; font-size:13px; font-weight:600; }
+.ready-catalog-open { flex:none; color:var(--blue); font-size:14px; font-weight:700; white-space:nowrap; }
+@media (max-width:480px) { .ready-catalog-row { flex-wrap:wrap; padding:14px; } .ready-catalog-open { width:100%; padding-left:54px; } }
+
 /* Team announcements */
 .member-announcements { margin-bottom:34px; }
 .member-announcements .section-heading { margin-bottom:15px; }
