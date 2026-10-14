@@ -79,10 +79,13 @@ export async function patchProgram(request: Request, id: string) {
     if (body.deadlineHours !== undefined && (!Number.isInteger(Number(body.deadlineHours)) || Number(body.deadlineHours) < 1 || Number(body.deadlineHours) > 720)) return failure("Интервал должен быть от 1 до 720 часов.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус.", 400);
     if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
+    const before = body.title !== undefined ? await auditRecord("task_programs", id) : null;
     const result = await updateProgram(id, { title: body.title, deadlineHours: body.deadlineHours === undefined ? undefined : Number(body.deadlineHours), isActive: body.isActive, isPinned: body.isPinned }, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
     if (result.error) return failure("Не удалось обновить программу.");
+    const title = typeof result.data?.title === "string" ? result.data.title : undefined;
+    if (before && title && before.label !== title) await recordAudit(user, { action: "program.rename", targetId: id, targetLabel: title, teamId: before.teamId, details: { name: [before.label, title] } });
     return ok({ program: result.data });
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

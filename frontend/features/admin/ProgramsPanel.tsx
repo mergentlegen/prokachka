@@ -5,6 +5,7 @@ import { addProgramGame, deleteAdminProgram, reorderProgramSteps, updateAdminPro
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { PROGRAM_GAMES, type ProgramGame } from "@/shared/domain/program-games";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
+import { FormSheet } from "@/frontend/shared/FormSheet";
 import { actionIcons } from "./AdminIcons";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { formatMiles } from "@/frontend/shared/lib/format";
@@ -33,6 +34,8 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProgram | null>(null);
   const [gamePicker, setGamePicker] = useState<TaskProgram | null>(null);
+  const [renameTarget, setRenameTarget] = useState<TaskProgram | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   async function addGame(program: TaskProgram, game: ProgramGame) {
     if (busyId) return;
@@ -61,14 +64,23 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     finally { setBusyId(""); }
   }
 
-  async function update(program: TaskProgram, patch: { isActive?: boolean; isPinned?: boolean }) {
-    if (busyId) return;
+  async function update(program: TaskProgram, patch: { title?: string; isActive?: boolean; isPinned?: boolean }) {
+    if (busyId) return false;
     setBusyId(program.id);
     try {
       const updated = await updateAdminProgram(program.id, patch);
       onChange(programs.map((item) => item.id === updated.id ? updated : item), tasks);
-    } catch (error) { onError(error instanceof Error ? error.message : "Не удалось изменить программу."); }
+      return true;
+    } catch (error) { onError(error instanceof Error ? error.message : "Не удалось изменить программу."); return false; }
     finally { setBusyId(""); }
+  }
+
+  // Participants see the new name at once: in their program blocks and on every step card.
+  async function rename() {
+    if (!renameTarget) return;
+    const title = renameValue.trim();
+    if (title === renameTarget.title) { setRenameTarget(null); return; }
+    if (await update(renameTarget, { title })) { setRenameTarget(null); onError("Название программы сохранено."); }
   }
 
   async function remove() {
@@ -162,6 +174,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
             {canManage && <div className={styles.programActions}>
               <span>Вся программа</span>
               <div>
+                <button type="button" className={styles.programAction} disabled={busy} onClick={() => { setRenameValue(program.title); setRenameTarget(program); }}>{actionIcons.edit}Переименовать</button>
                 <button type="button" className={styles.programAction} disabled={busy} onClick={() => void update(program, { isPinned: !program.isPinned })} aria-pressed={Boolean(program.isPinned)}>{program.isPinned ? "Открепить" : "Закрепить сверху"}</button>
                 <button type="button" className={styles.programAction} disabled={busy} onClick={() => void update(program, { isActive: !program.isActive })}>{program.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
                 <button type="button" className={`${styles.programAction} ${styles.toolDanger}`} disabled={busy} onClick={() => setDeleteTarget(program)}>{actionIcons.remove}Удалить</button>
@@ -184,6 +197,10 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
         })}
       </div>
     </ModalSheet>}
+    {renameTarget && <FormSheet title="Название программы" submitLabel="Сохранить" busy={Boolean(busyId)} submitDisabled={renameValue.trim().length < 2}
+      intro="Участники сразу увидят новое название. Шаги, прогресс и мили не меняются." onClose={() => setRenameTarget(null)} onSubmit={() => void rename()}>
+      <label>Название<input id="program-rename" value={renameValue} maxLength={160} onChange={(event) => setRenameValue(event.target.value)} autoFocus /></label>
+    </FormSheet>}
     {deleteTarget && <ConfirmModal title="Удалить программу?" description={<>«{deleteTarget.title}», все её шаги и отправленные работы будут удалены без возможности восстановления.</>} confirmLabel="Удалить программу" busy={Boolean(busyId)} onClose={() => { if (!busyId) setDeleteTarget(null); }} onConfirm={() => void remove()} />}
   </>;
 }

@@ -10,7 +10,7 @@ const titles: Record<string, string> = {
   "team.create": "Создана команда", "team.update": "Изменена команда", "team.disable": "Команда отключена", "team.enable": "Команда включена", "team.delete": "Удалена команда",
   "request.approve": "Заявка одобрена", "request.reject": "Заявка отклонена",
   "task.create": "Опубликовано задание", "task.delete": "Удалено задание", "task.nudge": "Напоминание по заданию", "task.video": "Загружено видео к заданию", "task.reward": "Изменена награда за задание",
-  "program.create": "Опубликована программа", "program.delete": "Удалена программа",
+  "program.create": "Опубликована программа", "program.rename": "Переименована программа", "program.delete": "Удалена программа",
   "announcement.create": "Опубликовано объявление", "announcement.delete": "Удалено объявление",
   "star.award": "Выданы звёзды", "star.revoke": "Отменена выдача звёзд",
 };
