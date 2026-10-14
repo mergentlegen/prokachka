@@ -1,6 +1,7 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import { withAvatarUrls } from "@/backend/services/avatar-urls.service";
 import { releaseAnnouncementPhotoIntent, uploadAnnouncementPhotos, validatePhotoFiles, withAnnouncementPhotoUrls, type StoredAnnouncementPhoto } from "@/backend/services/announcement-photos.service";
 
 type AnnouncementViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
@@ -38,7 +39,13 @@ export async function findAnnouncements(options: { teamId?: string; includeInact
   if ("error" in network) return { error: network.error };
   const allowedAuthors = descendants(network.data, options.viewer?.id || "", true);
   const visible = (result.data || []).filter((announcement) => isAudienceVisible(network.data, options.viewer?.id || "", announcement.audience_root_id) || (announcement.author_id && allowedAuthors.has(String(announcement.author_id))));
-  return { data: await withAnnouncementPhotoUrls(visible) };
+  // The card shows who wrote it: the author's name and photo, taken from the team the participant already sees.
+  const people = new Map(network.data.map((user) => [String(user.id), user]));
+  const signed = await withAvatarUrls(visible.map((announcement) => {
+    const author = announcement.author_id ? people.get(String(announcement.author_id)) : undefined;
+    return { ...announcement, author_name: author?.name ?? null, avatar_path: author?.avatar_path ?? null };
+  }));
+  return { data: await withAnnouncementPhotoUrls(signed.map(({ avatar_path: _path, avatar_url, ...announcement }) => ({ ...announcement, author_avatar_url: avatar_url ?? null }))) };
 }
 
 export async function insertAnnouncement(input: {

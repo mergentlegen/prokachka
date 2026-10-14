@@ -53,7 +53,7 @@ export type Task = {
   attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary; quiz?: { questions: number };
 };
 export type Announcement = {
-  id: string; teamId: string; authorId?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
+  id: string; teamId: string; authorId?: string; authorName?: string; authorAvatarUrl?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
 };
 export type AnnouncementPhoto = { id: string; url: string; thumbnailUrl: string; width: number; height: number };
 export type StarAward = {
