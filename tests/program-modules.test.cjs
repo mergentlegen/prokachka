@@ -18,14 +18,14 @@ const accepted = (taskId, points) => ({ id: 's-' + taskId, userId: 'me', taskId,
 test('the server sends every step in order; steps not reached yet carry only the title and miles', () => {
   const programs = [{ id: 'p1', title: 'Старт', is_pinned: false }, { id: 'ready', title: 'Игра', template_key: 'dream-plan' }];
   const tasks = [step('c', 3), step('a', 1), step('b', 2), step('other', 1, { program_id: 'p2' }), step('g', 1, { program_id: 'ready' })];
-  const [module, ...rest] = programModules(programs, tasks, new Map([['p1', { status: 'active', current_task_id: 'b' }]]));
+  const [program, ...rest] = programModules(programs, tasks, new Map([['p1', { status: 'active', current_task_id: 'b' }]]));
   assert.equal(rest.length, 0, 'ready games are not modules');
-  assert.deepEqual(module.steps.map((item) => [item.id, item.number]), [['a', 1], ['b', 2], ['c', 3]]);
-  assert.equal(module.current_task_id, 'b');
-  assert.equal(module.steps[0].description, 'Текст a', 'a passed step keeps its text');
-  assert.equal(module.steps[1].description, undefined, 'the current step text comes with its task card');
-  assert.equal(module.steps[2].description, undefined, 'a closed step has no text');
-  assert.equal(module.steps[2].title, 'Шаг c');
+  assert.deepEqual(program.steps.map((item) => [item.id, item.number]), [['a', 1], ['b', 2], ['c', 3]]);
+  assert.equal(program.current_task_id, 'b');
+  assert.equal(program.steps[0].description, 'Текст a', 'a passed step keeps its text');
+  assert.equal(program.steps[1].description, undefined, 'the current step text comes with its task card');
+  assert.equal(program.steps[2].description, undefined, 'a closed step has no text');
+  assert.equal(program.steps[2].title, 'Шаг c');
   const [done] = programModules(programs.slice(0, 1), tasks, new Map([['p1', { status: 'completed', current_task_id: null, completed_at: '2026-10-11T10:00:00Z' }]]));
   assert.equal(done.status, 'completed');
   assert.equal(done.current_task_id, null);
@@ -33,13 +33,13 @@ test('the server sends every step in order; steps not reached yet carry only the
 });
 
 test('steps are passed, current or closed; passed programs go to the end', () => {
-  const module = { id: 'p1', title: 'Старт', isPinned: false, status: 'active', currentTaskId: 'b', steps: ['a', 'b', 'c'].map((id, index) => ({ id, number: index + 1, title: id, maxPoints: 5 })) };
-  assert.deepEqual(progress.programStepStates(module, new Map([['a', accepted('a', 5)]])), ['done', 'current', 'locked']);
-  assert.deepEqual(progress.programStepStates(module, new Map()), ['skipped', 'current', 'locked'], 'a step left behind without acceptance is not shown as passed');
-  const finished = { ...module, id: 'p0', status: 'completed', currentTaskId: undefined };
+  const program = { id: 'p1', title: 'Старт', isPinned: false, status: 'active', currentTaskId: 'b', steps: ['a', 'b', 'c'].map((id, index) => ({ id, number: index + 1, title: id, maxPoints: 5 })) };
+  assert.deepEqual(progress.programStepStates(program, new Map([['a', accepted('a', 5)]])), ['done', 'current', 'locked']);
+  assert.deepEqual(progress.programStepStates(program, new Map()), ['skipped', 'current', 'locked'], 'a step left behind without acceptance is not shown as passed');
+  const finished = { ...program, id: 'p0', status: 'completed', currentTaskId: undefined };
   assert.deepEqual(progress.programStepStates(finished, new Map(['a', 'b', 'c'].map((id) => [id, accepted(id, 2)]))), ['done', 'done', 'done']);
-  const pinned = { ...module, id: 'p2', isPinned: true };
-  assert.deepEqual(progress.orderedProgramModules([finished, module, pinned]).map((item) => item.id), ['p2', 'p1', 'p0']);
+  const pinned = { ...program, id: 'p2', isPinned: true };
+  assert.deepEqual(progress.orderedProgramModules([finished, program, pinned]).map((item) => item.id), ['p2', 'p1', 'p0']);
 });
 
 test('programs are blocks with progress; a tap opens passed steps with miles, the current card and closed steps with titles', () => {
