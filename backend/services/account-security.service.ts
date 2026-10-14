@@ -77,22 +77,6 @@ export async function setOwnPhone(userId: string, phone: string | null) {
   return data.forbidden ? { error: new Error("forbidden") } : { data: true as const };
 }
 
-export type MemberProgram = { programId: string; title: string; status: "active" | "completed"; currentTaskId?: string; currentStep?: number; totalSteps: number; completedAt?: string };
-
-/** The programs the participant has started, with the step they are on. */
-export async function memberPrograms(userId: string) {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return { unavailable: true as const };
-  const result = await supabase.rpc("app_member_programs", { p_user: userId });
-  if (result.error) return { error: result.error };
-  const rows = Array.isArray(result.data) ? result.data as Record<string, unknown>[] : [];
-  return { data: rows.map((row): MemberProgram => ({
-    programId: String(row.programId), title: String(row.title || "Программа"), status: row.status === "completed" ? "completed" : "active",
-    currentTaskId: row.currentTaskId ? String(row.currentTaskId) : undefined, currentStep: Number(row.currentStep) || undefined,
-    totalSteps: Number(row.totalSteps) || 0, completedAt: row.completedAt ? String(row.completedAt) : undefined,
-  })) };
-}
-
 /** Removes the Telegram link of the own account. */
 export async function unlinkOwnTelegram(userId: string) {
   const supabase = getSupabaseAdmin();

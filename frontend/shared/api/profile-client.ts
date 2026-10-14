@@ -40,13 +40,6 @@ export async function loadVisiblePhones(): Promise<Record<string, string>> {
   return phones || {};
 }
 
-export type MyProgram = { programId: string; title: string; status: "active" | "completed"; currentTaskId?: string; currentStep?: number; totalSteps: number; completedAt?: string };
-/** The programs the participant has started, with the step they are on. */
-export async function loadMyPrograms(): Promise<MyProgram[]> {
-  const { programs } = await request<{ programs: MyProgram[] }>("/api/profile/programs", { cache: "no-store" });
-  return Array.isArray(programs) ? programs : [];
-}
-
 /** Unlinks Telegram from the own account. */
 export async function unlinkTelegram() {
   await request<{ unlinked: boolean }>("/api/telegram/unlink", { method: "POST", body: "{}" });

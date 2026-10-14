@@ -8,7 +8,7 @@ import { serverEnv } from "@/backend/config/env";
 import { sessionCookie } from "@/backend/http/session-cookie";
 import { FormDataLimitError, readLimitedFormData } from "@/backend/http/form-data";
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
-import { changeOwnPassword, memberPrograms, ownProfileExtras, setOwnPhone, unlinkOwnTelegram, visiblePhones } from "@/backend/services/account-security.service";
+import { changeOwnPassword, ownProfileExtras, setOwnPhone, unlinkOwnTelegram, visiblePhones } from "@/backend/services/account-security.service";
 import { normalizePhone } from "@/shared/domain/phone";
 
 /** What the profile shows besides the session: own phone, team and mentor names. */
@@ -40,17 +40,6 @@ export async function changePassword(request: Request) {
     if (!serverEnv.authDevMode) response.headers.set("Set-Cookie", sessionCookie(session));
     return response;
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
-}
-
-/** «Мои программы» in the profile. */
-export async function listMyPrograms(request: Request) {
-  const user = await getCurrentUser(request);
-  if (!user) return failure("Сначала войдите в аккаунт.", 401);
-  if (!isUuid(user.id)) return ok({ programs: [] });
-  const result = await memberPrograms(user.id);
-  if ("unavailable" in result) return failure("База данных не настроена.", 503);
-  if ("error" in result) return failure("Не удалось загрузить программы.", 503);
-  return ok({ programs: result.data });
 }
 
 /** Unlinks Telegram from the own account; it can be linked again at any time. */

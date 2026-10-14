@@ -157,13 +157,10 @@ export function MemberApp() {
     }
   });
 
-  function openTaskFromProfile(taskId: string) {
-    const task = store.tasks.find((item) => item.id === taskId);
-    setTaskView(task?.publicationType === "sequential" ? "programs" : "regular");
-    if (task?.programId) setProgramTab(task.programId);
-    setTaskFilter("all");
+  function openDoneTasks() {
+    setTaskView("regular");
+    setTaskFilter("done");
     setTab("tasks");
-    window.setTimeout(() => document.getElementById("task-" + taskId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
   }
   const ranking = ratingType === "stars" ? starRanking : teamRanking;
   const currentRank = user ? teamRanking.findIndex((member) => member.id === user.id) + 1 : 0;
@@ -313,7 +310,7 @@ export function MemberApp() {
       return <TaskCard key={task.id} task={task} submission={latest} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} />;
     })}</div>}</>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={ranking} metric={ratingType} onMetric={setRatingType} userId={user.id} /></aside></SectionBoundary></div></div></div>
     <MemberBottomNav tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} />
-    {tab === "profile" && <MemberProfile loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} now={now} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onNotice={setToast} openableTaskIds={new Set(activeTasks.map((task) => task.id))} onOpenTask={openTaskFromProfile} onOpenRanking={() => navigate("ranking")} onUnlinkTelegram={unlinkMemberTelegram} onClose={closeProfile} onLogout={logout} />}
+    {tab === "profile" && <MemberProfile loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} rank={currentRank} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onNotice={setToast} onOpenDone={openDoneTasks} onOpenRanking={() => navigate("ranking")} onUnlinkTelegram={unlinkMemberTelegram} onClose={closeProfile} onLogout={logout} />}
     {showLogin && <div className="modal-backdrop" onClick={() => setShowLogin(false)}><div className="simple-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}>×</button><p className="eyebrow">Нужна идентификация</p><h2>Сначала представься</h2><p>Войди или создай аккаунт, чтобы отправить работу.</p><button className="primary-button full" onClick={() => { setShowLogin(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Перейти ко входу</button></div></div>}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}<PullToRefresh onRefresh={refreshAll} /><CelebrationWatcher userId={user.id} submissions={store.submissions} rank={currentRank} />
   </main><WelcomeVideoGate user={user} /></>;

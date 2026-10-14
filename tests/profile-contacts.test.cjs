@@ -50,38 +50,33 @@ test('a password change checks the current password and saves a new hash', async
   assert.ok(await auth.verifyPassword('Новый1пароль', rpc[0][1].p_password_hash), 'the new password works');
 });
 
-test('profile history groups what was sent and what was missed, newest first', () => {
-  const { profileHistory } = loadTs('frontend/features/member/MemberProfile.tsx', {
+test('the profile shows four stat tiles and no programs, miles statement or task history', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const pass = ({ children }) => React.createElement(React.Fragment, null, children);
+  const { MemberProfile } = loadTs('frontend/features/member/MemberProfile.tsx', {
     './MemberProfile.module.css': new Proxy({}, { get: (_target, key) => key }),
-  });
-  const user = { id: 'me' };
-  const store = {
-    tasks: [{ id: 't1', title: 'Видео', isActive: true, publicationType: 'fixed', deadlineAt: '2026-09-01T00:00:00Z', createdAt: '2026-08-01T00:00:00Z' },
-      { id: 't2', title: 'Знакомство', isActive: true, publicationType: 'evergreen', createdAt: '2026-08-01T00:00:00Z' }],
-    submissions: [{ id: 's1', userId: 'me', taskId: 't2', status: 'revision', points: 0, comment: 'Добавь пример', submittedAt: '2026-10-05T10:00:00Z' },
-      { id: 's2', userId: 'other', taskId: 't2', status: 'accepted', points: 5, comment: '', submittedAt: '2026-10-06T10:00:00Z' }],
-  };
-  const history = profileHistory(user, store, Date.parse('2026-10-10T00:00:00Z'));
-  assert.deepEqual(history.map((item) => [item.taskId, item.status, item.fromMentor]), [['t2', 'revision', true], ['t1', 'missed', false]]);
-});
-
-test('«Откуда мои мили»: accepted work by month, games apart from tasks, stars apart from miles', () => {
-  const { milesStatement } = loadTs('frontend/features/member/MemberProfile.tsx', {
-    './MemberProfile.module.css': new Proxy({}, { get: (_target, key) => key }),
+    '@/frontend/shared/ModalSheet': { ModalSheet: pass },
+    '@/frontend/shared/SectionBoundary': { SectionBoundary: pass },
+    '@/frontend/features/telegram/TelegramConnect': { TelegramConnect: () => null },
+    '@/frontend/shared/api/profile-client': { loadProfileExtras: async () => ({}) },
   });
   const store = {
-    submissions: [
-      { userId: 'me', status: 'accepted', points: 10, source: 'telegram', submittedAt: '2026-10-02T10:00:00Z', reviewedAt: '2026-10-03T10:00:00Z' },
-      { userId: 'me', status: 'accepted', points: 2, source: 'interactive', submittedAt: '2026-10-05T10:00:00Z' },
-      { userId: 'me', status: 'pending', points: 0, source: 'telegram', submittedAt: '2026-10-06T10:00:00Z' },
-      { userId: 'me', status: 'accepted', points: 5, source: 'mentor', submittedAt: '2026-09-28T10:00:00Z', reviewedAt: '2026-09-29T10:00:00Z' },
-      { userId: 'other', status: 'accepted', points: 50, source: 'telegram', submittedAt: '2026-10-02T10:00:00Z' },
-    ],
-    starAwards: [{ userId: 'me', stars: 2, createdAt: '2026-10-07T10:00:00Z' }],
+    tasks: [], programs: [], programProgress: [], users: [], announcements: [],
+    submissions: [{ id: 's1', userId: 'me', taskId: 't1', status: 'accepted', points: 10, comment: '', submittedAt: '2026-10-05T10:00:00Z' },
+      { id: 's2', userId: 'me', taskId: 't2', status: 'pending', points: 0, comment: '', submittedAt: '2026-10-06T10:00:00Z' }],
+    starAwards: [{ id: 'a1', userId: 'me', stars: 2, comment: '', createdAt: '2026-10-07T10:00:00Z' }],
   };
-  const rows = milesStatement({ id: 'me' }, store);
-  assert.deepEqual(rows.map((row) => [row.tasks, row.games, row.stars]), [[10, 2, 2], [5, 0, 0]]);
-  assert.match(rows[0].title, /^Октябрь 2026$/);
+  const markup = renderToStaticMarkup(React.createElement(MemberProfile, {
+    user: { id: 'me', name: 'Алия Бекова', role: 'member', createdAt: '2026-01-01' }, store, rank: 78, points: 15, stars: 2,
+    telegramBusy: false, onLinkTelegram() {}, onRefreshTelegram() {}, inviteUrl: '', inviteBusy: false, onCreateInvite() {}, onCopyInvite() {},
+    onProfileSaved() {}, onNotice() {}, onOpenDone() {}, onOpenRanking() {}, onUnlinkTelegram() {}, onClose() {}, onLogout() {},
+  }));
+  assert.match(markup, /<strong>15<\/strong><span>миль<\/span>/);
+  assert.match(markup, /<strong>78<\/strong><span>место<\/span>/);
+  assert.match(markup, /<strong>1<\/strong><span>выполнено<\/span>/, 'only accepted work counts');
+  assert.match(markup, /<strong>2<\/strong><span>звезды<\/span>/);
+  assert.doesNotMatch(markup, /Мои программы|Откуда мои мили|История заданий/);
 });
 
 test('unlinking Telegram works only for the signed-in account', async () => {
