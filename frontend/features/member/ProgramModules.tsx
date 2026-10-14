@@ -62,7 +62,7 @@ export function ProgramModules({ modules, tasks, latest, selectedId, onSelect, r
             if (task) return <li key={step.id} className={styles.currentCard}><p className={styles.currentLabel}>Шаг {step.number} · сейчас</p>{renderTask(task)}</li>;
             const submission = latest.get(step.id);
             const expanded = state === "done" && openStep === step.id;
-            const note = state === "locked" ? " · закрыт" : state === "skipped" ? " · не пройден" : "";
+            const note = state === "locked" ? " · закрыт" : state === "skipped" ? (module.status === "active" ? " · откроется после текущего" : " · не пройден") : "";
             return <li key={step.id} className={`${styles.step} ${styles[state]}`}>
               <button type="button" className={styles.row} disabled={state !== "done"} aria-expanded={state === "done" ? expanded : undefined} onClick={() => setOpenStep(expanded ? null : step.id)}>
                 <span className={styles.mark} aria-hidden="true">{state === "done" ? "✓" : state === "locked" ? <LockIcon /> : step.number}</span>
