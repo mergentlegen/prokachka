@@ -57,6 +57,9 @@
 .tagHidden { background: #eef0f4; color: #737f92; }
 .here { background: #e8f0ff; color: #2f55a4; }
 .hereDone { background: #e3f4ec; color: #1f7a5c; }
+/* The row whose ⋯ menu is open sits above the rows below it, so the menu is never covered. */
+.step:has([aria-haspopup="menu"][aria-expanded="true"]) { z-index: 5; }
+.card:has(.cardMenu [aria-expanded="true"]) { position: relative; z-index: 5; }
 .stepHidden .stepNum { background: #b3bccb; }
 .stepHidden .stepBody > strong { color: #7a8597; }
 .stepDone .stepNum { background: var(--green); }
