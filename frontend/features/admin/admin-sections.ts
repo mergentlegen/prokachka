@@ -11,7 +11,7 @@ export const sectionDatasets: Record<AdminSection, readonly AdminDataset[]> = {
   history: ["users", "tasks", "submissions"],
   feedback: ["submissions", "users", "tasks"],
   requests: ["users"],
-  announcements: ["announcements"],
+  announcements: ["announcements", "users"],
   stars: ["users", "starAwards"],
   network: [],
   "welcome-video": [],

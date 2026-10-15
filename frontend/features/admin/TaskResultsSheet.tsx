@@ -19,11 +19,14 @@ const filterMatches: Record<Filter, (status: ParticipantStatus) => boolean> = {
 };
 
 // Who did a task and who did not, with the mentor's actions next to each person.
-export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNotice, onReview, onComplete, onClose }: {
+export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNotice, onReview, onComplete, onClose, initialQuery = "" }: {
   task: Task; store: Pick<Store, "users" | "submissions">; actorId?: string; footer?: ReactNode; canNudge?: boolean; onNotice?: (message: string) => void;
   onReview: (submission: Submission, status: "accepted" | "revision") => void; onComplete?: (task: Task, member: User) => void; onClose: () => void;
+  /** Opened from a participant's history: the list starts filtered to that person. */
+  initialQuery?: string;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState(initialQuery);
   const [views, setViews] = useState<Map<string, VideoView> | null>(null);
   // Who watched the task video; loaded only for tasks that have one.
   useEffect(() => {
@@ -34,7 +37,8 @@ export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNot
   }, [task.id, task.video?.playable]);
   const results = taskParticipantResults(task, store);
   const progress = taskProgress(results);
-  const shown = results.filter((result) => filterMatches[filter](result.status));
+  const search = query.trim().toLocaleLowerCase("ru");
+  const shown = results.filter((result) => filterMatches[filter](result.status) && (!search || result.user.name.toLocaleLowerCase("ru").includes(search)));
   // Only while the task can still be sent: after the deadline nobody is "not started", they are overdue.
   const nudgeable = canNudge && task.isActive && task.publicationType !== "sequential" && results.some((result) => result.status === "not_started");
   const chips: Array<[Filter, string, number]> = [["all", "Все", progress.total], ["sent", "Сдали", progress.accepted + progress.revision], ["pending", "На проверке", progress.pending], ["missing", "Не сдали", progress.missing]];
@@ -47,10 +51,11 @@ export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNot
         <span className={styles.legend}><b className={styles.accepted} />принято {progress.accepted}<b className={styles.waiting} />ждут решения или доработки {progress.pending + progress.revision}</span>
       </div>
       {nudgeable && <TaskNudge taskId={task.id} missing={progress.missing} onNotice={onNotice} />}
+      {results.length > 6 && <input id="task-results-search" type="search" className={styles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти участника по имени" aria-label="Найти участника по имени" />}
       <div className={styles.chips} role="group" aria-label="Кого показать">
         {chips.map(([id, label, count]) => <button type="button" key={id} className={filter === id ? styles.active : ""} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}<b>{count}</b></button>)}
       </div>
-      {shown.length === 0 ? <p className={styles.empty}>{results.length ? "В этой группе никого нет." : "В команде пока нет участников."}</p> : <ul className={styles.list}>
+      {shown.length === 0 ? <p className={styles.empty}>{!results.length ? "В команде пока нет участников." : search ? "Никого с таким именем." : "В этой группе никого нет."}</p> : <ul className={styles.list}>
         {shown.map((result) => <li key={result.user.id}>
           <Avatar className={styles.avatar} name={result.user.name} src={result.user.avatarUrl} />
           <div className={styles.person}>

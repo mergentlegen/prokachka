@@ -1414,7 +1414,7 @@ button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 
   .history-modal-backdrop .program-step-chip span { white-space:normal; overflow-wrap:anywhere; }
 }
 @media (max-width:560px) {
-  .history-kind-switch { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; margin-bottom:16px; overflow:visible; }
+  .history-kind-switch { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); width:100%; margin-bottom:0; overflow:visible; }
   .history-kind-switch button { min-width:0; padding:9px 3px; font-size:12px; }
 }
 

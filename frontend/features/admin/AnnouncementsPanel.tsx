@@ -2,11 +2,12 @@
 /* eslint-disable @next/next/no-img-element -- announcement photos are pre-optimized private Storage assets */
 
 import { useState } from "react";
-import { comparePublications } from "@/shared/domain/publication-order";
-import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
-import { formatDateTime } from "@/frontend/shared/lib/format";
 import { deleteAdminAnnouncement, saveAdminAnnouncementWithPhotos, updateAdminAnnouncement } from "@/frontend/shared/api/admin-client";
-import type { Announcement } from "@/shared/domain/types";
+import type { Announcement, User } from "@/shared/domain/types";
+import { Drawer } from "@/frontend/shared/Drawer";
+import { ActionsMenu, pinIcon, type MenuItem } from "./AdminTasksView";
+import { friendlyTime, sortAnnouncements } from "@/frontend/features/announcements/announcement-view";
+import styles from "./AnnouncementsPanel.module.css";
 import { FormSheet } from "@/frontend/shared/FormSheet";
 import { actionIcons } from "./AdminIcons";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
@@ -20,6 +21,8 @@ type Draft = { title: string; content: string; resourceUrl: string; notifyTelegr
 type PendingPhoto = { id: string; file: File; url: string };
 type Props = {
   announcements: Announcement[];
+  /** People of the team, to name the author of each announcement. */
+  users?: User[];
   actorId: string;
   canManageAll: boolean;
   onChange: (announcements: Announcement[]) => void;
@@ -36,7 +39,10 @@ export function telegramNotice(queued: number | undefined) {
   return `Объявление опубликовано. В Telegram получат ${queued} ${plural(queued, "участник", "участника", "участников")}${minutes > 1 ? ` — в течение ${minutes} мин.` : "."}`;
 }
 
-export function AnnouncementsPanel({ announcements, actorId, canManageAll, onChange, onError, onNotice = onError }: Props) {
+export function AnnouncementsPanel({ announcements, users = [], actorId, canManageAll, onChange, onError, onNotice = onError }: Props) {
+  const [hiddenOpen, setHiddenOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const [now] = useState(() => Date.now());
   const [draft, setDraft] = useState<Draft>({ title: "", content: "", resourceUrl: "" });
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -145,6 +151,41 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
     }
   }
 
+  const sorted = sortAnnouncements(announcements);
+  const published = sorted.filter((announcement) => announcement.isActive);
+  const hidden = sorted.filter((announcement) => !announcement.isActive);
+  const authorName = (announcement: Announcement) => announcement.authorId === actorId ? "Вы" : users.find((user) => user.id === announcement.authorId)?.name || "Наставник";
+  // One announcement: who and when, the start of the text, photo thumbnails; «Изменить» and the rest under ⋯.
+  const card = (announcement: Announcement) => {
+    const canManage = canManageAll || announcement.authorId === actorId;
+    const long = announcement.content.length > 180 || announcement.content.split("\n").length > 2;
+    const open = expandedIds.includes(announcement.id);
+    const photos = announcement.photos || [];
+    const items: MenuItem[] = [
+      { label: announcement.isPinned ? "Открепить" : "Закрепить сверху", icon: pinIcon, onSelect: () => void toggle(announcement, true) },
+      { label: announcement.isActive ? "Скрыть от участников" : "Показать участникам", icon: announcement.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => void toggle(announcement) },
+      { label: "Удалить", icon: actionIcons.remove, danger: true, onSelect: () => setDeleteTarget(announcement) },
+    ];
+    return <article key={announcement.id} className={`${styles.card} ${announcement.isPinned ? styles.pinned : ""} ${announcement.isActive ? "" : styles.hiddenCard}`}>
+      <div className={styles.top}>
+        <span className={`${styles.state} ${announcement.isActive ? styles.live : styles.off}`}>{announcement.isActive ? "Опубликовано" : "Скрыто"}</span>
+        {announcement.isPinned && <span className={styles.pin}>{pinIcon}Закреплено</span>}
+        {canManage && <div className={styles.actions}>
+          <button type="button" className={styles.edit} disabled={busy} onClick={() => openEdit(announcement)}>{actionIcons.edit}Изменить</button>
+          <ActionsMenu title={announcement.title} items={items} disabled={busy} />
+        </div>}
+      </div>
+      <h3 className={styles.title}>{announcement.title}</h3>
+      <p className={styles.byline}>{authorName(announcement)} · {friendlyTime(announcement.createdAt, now)}</p>
+      <p className={`${styles.text} ${long && !open ? styles.clamped : ""}`}>{announcement.content}</p>
+      {long && <button type="button" className={styles.more} onClick={() => setExpandedIds(open ? expandedIds.filter((id) => id !== announcement.id) : [...expandedIds, announcement.id])}>{open ? "Свернуть" : "Показать полностью"}</button>}
+      {photos.length > 0 && <div className={styles.thumbs} aria-label={`${photos.length} фото`}>
+        {photos.slice(0, 4).map((photo, index) => <span key={photo.id} className={styles.thumb}><img src={photo.thumbnailUrl} alt="" loading="lazy" />{index === 3 && photos.length > 4 && <b>+{photos.length - 4}</b>}</span>)}
+      </div>}
+      {announcement.resourceUrl && <a className={styles.link} href={announcement.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть ссылку ↗</a>}
+    </article>;
+  };
+
   return (
     <>
       <div className="announcement-admin-toolbar">
@@ -155,38 +196,13 @@ export function AnnouncementsPanel({ announcements, actorId, canManageAll, onCha
         <button type="button" className="admin-create-button" onClick={openCreate}><span aria-hidden="true">+</span>Новое объявление</button>
       </div>
 
-      <div className="admin-panel announcement-admin-list">
-        {announcements.length === 0 ? (
-          <div className="empty-admin"><span>✦</span><p>Пока нет объявлений. Создай первое для команды.</p></div>
-        ) : (
-          [...announcements].sort(comparePublications).map((announcement) => {
-            const canManage = canManageAll || announcement.authorId === actorId;
-            return <article className="announcement-admin-row" key={announcement.id}>
-              <div className="announcement-admin-copy">
-                <div className="announcement-admin-meta">
-                  <span className={announcement.isActive ? "announcement-live" : "announcement-hidden"}>
-                    {announcement.isActive ? "Опубликовано" : "Скрыто"}
-                  </span>
-                  <time>{formatDateTime(announcement.createdAt)}</time>
-                </div>
-                {announcement.isPinned && <PinBadge />}
-                <h3>{announcement.title}</h3>
-                <p>{announcement.content}</p>
-                {!!announcement.photos?.length && <span className="announcement-photo-count">📷 {announcement.photos.length} фото</span>}
-                {announcement.resourceUrl && <a className="admin-resource-link" href={announcement.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть ссылку ↗</a>}
-              </div>
-              {canManage && <div className="announcement-admin-actions">
-                <PinButton pinned={announcement.isPinned} title={announcement.title} disabled={busy} onClick={() => void toggle(announcement, true)} />
-                <button className="button button-edit" disabled={busy} onClick={() => openEdit(announcement)}>{actionIcons.edit}Изменить</button>
-                <button className="button button-warning" disabled={busy} onClick={() => void toggle(announcement)}>
-                  {announcement.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}
-                </button>
-                <button className="button button-danger" disabled={busy} onClick={() => setDeleteTarget(announcement)}>{actionIcons.remove}Удалить</button>
-              </div>}
-            </article>
-          })
-        )}
-      </div>
+      {announcements.length === 0 ? <div className="admin-panel"><div className="empty-admin"><span>✦</span><p>Пока нет объявлений. Создай первое для команды.</p></div></div> : <div className={styles.view}>
+        {published.length ? <div className={styles.list}>{published.map(card)}</div> : <p className={styles.empty}>Опубликованных объявлений нет. Покажите скрытое или создайте новое.</p>}
+        {hidden.length > 0 && <>
+          <button type="button" className={styles.fold} aria-expanded={hiddenOpen} onClick={() => setHiddenOpen(!hiddenOpen)}>Скрытые <span>{hidden.length}</span><i aria-hidden="true" /></button>
+          <Drawer open={hiddenOpen}><div className={styles.list}>{hidden.map(card)}</div></Drawer>
+        </>}
+      </div>}
 
       {editorOpen && <FormSheet title={editing ? "Изменить объявление" : "Новое объявление"} busy={busy || preparing} busyLabel={preparing ? "Подготавливаем фото…" : "Сохраняем…"}
         submitLabel={editing ? "Сохранить" : "Опубликовать"} onClose={closeEditor} onSubmit={() => void save()}>
