@@ -121,4 +121,17 @@ test('the bottom menu has five tabs with an unread badge on feedback', () => {
   assert.ok(!markup.includes('Профиль'));
   assert.match(markup, /aria-current="page"[^>]*>.*?Задания/);
   assert.match(markup, />9\+</);
+  assert.match(markup, />Ещё</);
+  assert.doesNotMatch(markup, />Сеть</, 'the network moved under «Ещё»');
+  const network = renderToStaticMarkup(React.createElement(MemberBottomNav, { tab: 'network', onChange() {}, feedbackUnread: 0 }));
+  assert.match(network, /aria-current="page"[^>]*>.*?Ещё/, 'a section opened from «Ещё» keeps «Ещё» lit');
+});
+
+test('«Ещё» lists the network and profile, and the sections still to come', () => {
+  const { MoreMenu } = loadTs('frontend/features/member/MoreMenu.tsx');
+  const opened = [];
+  const markup = renderToStaticMarkup(React.createElement(MoreMenu, { onOpen: (target) => opened.push(target) }));
+  for (const title of ['Моя сеть', 'Профиль', 'Наставники', 'Отзывы']) assert.match(markup, new RegExp('<strong>' + title + '</strong>'));
+  assert.equal((markup.match(/>скоро</g) || []).length, 2);
+  assert.equal((markup.match(/<button/g) || []).length, 2, 'only sections that exist can be opened');
 });
