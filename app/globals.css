@@ -922,19 +922,22 @@ html, body { width:100%; max-width:100%; overflow-x:clip; }
 .member-shell.member-tab-feedback .member-section-feedback,
 .member-shell.member-tab-ranking .member-section-ranking,
 .member-shell.member-tab-network .member-section-network,
-.member-shell.member-tab-more .member-section-more { display:block; }
+.member-shell.member-tab-more .member-section-more,
+.member-shell.member-tab-reviews .member-section-reviews { display:block; }
 .member-shell:not(.member-tab-home) .welcome-section { display:none; }
 .member-shell.member-tab-home .content-grid,
 .member-shell.member-tab-tasks .content-grid,
 .member-shell.member-tab-feedback .content-grid,
 .member-shell.member-tab-ranking .content-grid,
 .member-shell.member-tab-network .content-grid,
-.member-shell.member-tab-more .content-grid { display:block; }
+.member-shell.member-tab-more .content-grid,
+.member-shell.member-tab-reviews .content-grid { display:block; }
 .member-shell.member-tab-home .main-column,
 .member-shell.member-tab-tasks .main-column,
 .member-shell.member-tab-feedback .main-column,
 .member-shell.member-tab-network .main-column,
-.member-shell.member-tab-more .main-column { max-width:840px; }
+.member-shell.member-tab-more .main-column,
+.member-shell.member-tab-reviews .main-column { max-width:840px; }
 .member-shell.member-tab-ranking .main-column { display:none; }
 .member-shell.member-tab-ranking .side-column { max-width:840px; padding-left:0; }
 .member-shell.member-tab-home .side-column,

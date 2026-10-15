@@ -13,6 +13,7 @@ const titles: Record<string, string> = {
   "program.create": "Опубликована программа", "program.rename": "Переименована программа", "program.delete": "Удалена программа",
   "announcement.create": "Опубликовано объявление", "announcement.delete": "Удалено объявление",
   "star.award": "Выданы звёзды", "star.revoke": "Отменена выдача звёзд",
+  "review.delete": "Удалён отзыв",
 };
 
 export function roleName(role: string) { return roleNames[role] || role; }

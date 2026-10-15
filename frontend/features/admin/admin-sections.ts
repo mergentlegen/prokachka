@@ -1,7 +1,7 @@
 import type { AdminDataset } from "@/frontend/shared/api/admin-client";
 import type { AuthUser } from "@/shared/domain/types";
 
-export type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "feedback" | "requests" | "announcements" | "stars" | "network" | "welcome-video";
+export type AdminSection = "dashboard" | "tasks" | "programs" | "review" | "history" | "feedback" | "requests" | "announcements" | "stars" | "network" | "welcome-video" | "reviews";
 
 export const sectionDatasets: Record<AdminSection, readonly AdminDataset[]> = {
   dashboard: ["users", "tasks", "submissions"],
@@ -15,6 +15,7 @@ export const sectionDatasets: Record<AdminSection, readonly AdminDataset[]> = {
   stars: ["users", "starAwards"],
   network: [],
   "welcome-video": [],
+  reviews: [],
 };
 
 type SectionViewer = Pick<AuthUser, "role" | "canPublishTasks" | "canReview">;

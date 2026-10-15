@@ -8,7 +8,8 @@ export type AuditAction =
   | "request.approve" | "request.reject"
   | "task.create" | "task.delete" | "task.nudge" | "task.video" | "task.reward" | "program.create" | "program.rename" | "program.delete"
   | "announcement.create" | "announcement.delete"
-  | "star.award" | "star.revoke";
+  | "star.award" | "star.revoke"
+  | "review.delete";
 
 export type AuditEntry = { action: AuditAction; targetId?: string; targetLabel?: string; teamId?: string | null; details?: Record<string, unknown> };
 

@@ -84,8 +84,8 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 
 type NotificationJob = {
   id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null;
-  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount";
-  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number }; summary_sent: boolean; attempts: number; lock_token: string;
+  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount" | "review";
+  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number; reviewId?: string }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
 // Mass mailings go out at this pace: one worker run a minute, personal notifications first.
@@ -123,6 +123,16 @@ export function milesRecountText(title: string, from: number, to: number, link: 
     "🔄 Изменён вес задания «" + (title.trim().slice(0, 200) || "Задание") + "»: теперь оно даёт " + to + " " + milesUnit(to) + ".",
     "Ваши мили за него пересчитаны: было " + from + ", стало " + to + ".",
     link ? "Открыть сайт: " + link : "",
+  ].filter(Boolean).join("\n");
+}
+
+/** A participant left a review: the mentor sees who, the stars and the beginning of the text. */
+export function reviewNoticeText(author: string, rating: number, body: string, link: string) {
+  const text = body.trim();
+  return [
+    "⭐ Новый отзыв от " + author.trim().slice(0, 120) + ": " + "★".repeat(Math.max(1, Math.min(5, rating))),
+    "«" + (text.length > 300 ? text.slice(0, 300).trimEnd() + "…" : text) + "»",
+    link ? "Открыть отзывы: " + link : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -223,6 +233,13 @@ export async function deliverTelegramNotifications() {
         if (profile.error || !profile.data) throw new Error("Cannot load reminder recipient");
         const team = Array.isArray(profile.data.teams) ? profile.data.teams[0] : profile.data.teams;
         delivery = await sendTelegramMessage(chatId, startReminderText(Number(job.payload.step || 1), String(profile.data.first_name || ""), String(team?.name || ""), appUrl() ? appUrl() + "/?tab=tasks" : ""));
+      } else if (job.kind === "review") {
+        // The review may have been deleted while the message waited in the queue.
+        const review = await supabase.from("reviews").select("rating,body,users(name)").eq("id", String(job.payload.reviewId || "")).maybeSingle();
+        if (review.error) throw new Error("Cannot load review");
+        if (!review.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const author = Array.isArray(review.data.users) ? review.data.users[0] : review.data.users;
+        delivery = await sendTelegramMessage(chatId, reviewNoticeText(String(author?.name || "Участник"), Number(review.data.rating || 0), String(review.data.body || ""), appUrl() ? appUrl() + "/admin?section=reviews" : ""));
       } else if (job.kind === "miles-recount") {
         delivery = await sendTelegramMessage(chatId, milesRecountText(String(job.payload.title || ""), Number(job.payload.from || 0), Number(job.payload.to || 0), appUrl() ? appUrl() + "/" : ""));
       } else if (job.kind === "permissions") {

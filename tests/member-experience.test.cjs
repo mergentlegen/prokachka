@@ -132,6 +132,7 @@ test('«Ещё» lists the network and profile, and the sections still to come',
   const opened = [];
   const markup = renderToStaticMarkup(React.createElement(MoreMenu, { onOpen: (target) => opened.push(target) }));
   for (const title of ['Моя сеть', 'Профиль', 'Наставники', 'Отзывы']) assert.match(markup, new RegExp('<strong>' + title + '</strong>'));
-  assert.equal((markup.match(/>скоро</g) || []).length, 2);
-  assert.equal((markup.match(/<button/g) || []).length, 2, 'only sections that exist can be opened');
+  assert.equal((markup.match(/>скоро</g) || []).length, 1, 'only the mentors are still to come');
+  assert.equal((markup.match(/<button/g) || []).length, 3, 'only sections that exist can be opened');
+  assert.ok(markup.indexOf('Отзывы') < markup.indexOf('Наставники'), 'ready sections first');
 });

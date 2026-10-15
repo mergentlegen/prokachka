@@ -66,6 +66,12 @@ export type Submission = {
   commentOmitted?: boolean; quizScore?: number; quizTotal?: number;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
+/** A participant's review: everyone sees it; the author, their mentors above and the team leader may delete it. */
+export type Review = {
+  id: string; userId: string; authorName: string; authorAvatarUrl?: string; teamName?: string; rating: number; body: string;
+  photos: AnnouncementPhoto[]; createdAt: string; editedAt?: string; canDelete: boolean; isMine: boolean;
+};
+export type ReviewSummary = { count: number; average: number; stars: Record<1 | 2 | 3 | 4 | 5, number> };
 export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number };
 export type Store = {
   users: User[]; tasks: Task[]; programs: TaskProgram[]; programProgress: MemberProgramProgress[]; programModules?: ProgramModule[];

@@ -22,6 +22,7 @@ import { ProgramEditorModal } from "./ProgramEditorModal";
 import { ReadyProgramsPanel, readyPublications } from "./ReadyProgramsPanel";
 import { READY_PROGRAMS } from "@/shared/domain/ready-programs";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
+import { ReviewsPanel } from "@/frontend/features/reviews/ReviewsPanel";
 import { TaskOrderDialog } from "./TaskOrderDialog";
 import { NetworkPanel } from "@/frontend/features/admin/NetworkPanel";
 import { WelcomeVideoSettingsPanel } from "@/frontend/features/admin/WelcomeVideoSettingsPanel";
@@ -584,7 +585,7 @@ export function AdminApp() {
   const canReview = authUser.role === "admin" || Boolean(authUser.canReview);
   const sections: Array<[AdminSection, string]> = [
     ["dashboard", "Обзор"], ["review", "Проверка работ"], ["feedback", "Обратная связь"], ["tasks", "Задания"], ["programs", "Программы"],
-    ["announcements", "Объявления"], ["stars", "Звёзды"], ["network", "Структура сети"], ["history", "История проверок"], ["welcome-video", "Приветственное видео"],
+    ["announcements", "Объявления"], ["stars", "Звёзды"], ["network", "Структура сети"], ["history", "История проверок"], ["reviews", "Отзывы"], ["welcome-video", "Приветственное видео"],
   ];
   const queue = reviewQueue(store.submissions);
   const sectionCount = (id: AdminSection) => id === "review" ? counts.pending : id === "feedback" ? feedbackNeedsReply : id === "requests" ? counts.requests : 0;
@@ -600,7 +601,7 @@ export function AdminApp() {
       </nav>
         <div className="admin-sidebar-footer"><TelegramConnect telegramId={authUser.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /><button type="button" className="logout-button" onClick={logout}><span>{logoutIcon}</span>Выйти</button></div>
       </aside>
-      <section className={`admin-content${section === "feedback" ? " admin-content-feedback" : ""}`}><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "feedback" ? "Обратная связь" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit admin-secondary-button" onClick={() => setTaskOrderOpen(true)}>↕ Порядок</button><button type="button" className="admin-create-button" onClick={() => openTaskModal()}><span aria-hidden="true">+</span>Создать задание</button></>}{section === "programs" && canPublishContent && <button type="button" className="admin-create-button" onClick={() => setProgramEditorOpen(true)}><span aria-hidden="true">+</span>Создать программу</button>}</div></div>
+      <section className={`admin-content${section === "feedback" ? " admin-content-feedback" : ""}`}><div className="admin-heading"><div><p className="eyebrow">Панель наставника</p><h1>{section === "dashboard" ? `Добрый день, ${authUser.name || "наставник"}` : section === "tasks" ? "Задания" : section === "review" ? "Проверка работ" : section === "feedback" ? "Обратная связь" : section === "history" ? "История проверок" : section === "announcements" ? "Объявления" : section === "programs" ? "Программы" : section === "welcome-video" ? "Приветственное видео" : section === "stars" ? "Звёзды" : section === "network" ? "Структура сети" : section === "reviews" ? "Отзывы" : "Заявки в команду"}</h1></div><div className="admin-heading-actions">{section === "tasks" && canPublishContent && <><button type="button" className="button button-edit admin-secondary-button" onClick={() => setTaskOrderOpen(true)}>↕ Порядок</button><button type="button" className="admin-create-button" onClick={() => openTaskModal()}><span aria-hidden="true">+</span>Создать задание</button></>}{section === "programs" && canPublishContent && <button type="button" className="admin-create-button" onClick={() => setProgramEditorOpen(true)}><span aria-hidden="true">+</span>Создать программу</button>}</div></div>
         <SectionBoundary key={section} loading={dataLoading} error={dataError} onRetry={() => void refreshData()}>
         {section === "dashboard" && <AdminDashboard store={store} queue={queue} feedbackNeedsReply={feedbackNeedsReply} requests={counts.requests} canReview={canReview} now={now} onNavigate={setSection} />}
         {section === "tasks" && <div className="programs-panel">
@@ -617,6 +618,7 @@ export function AdminApp() {
         {section === "requests" && <RequestsPanel requests={pendingRequests} users={store.users} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
         {section === "welcome-video" && canPublishContent && <WelcomeVideoSettingsPanel user={authUser} />}
+        {section === "reviews" && <ReviewsPanel canWrite={Boolean(authUser.teamId)} onNotice={setToast} heading={false} />}
         </SectionBoundary>
       </section>
     </div>
