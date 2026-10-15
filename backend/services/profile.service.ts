@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
+import { rasterFormat } from "@/shared/domain/image-bytes";
 import { AVATAR_BUCKET, AVATAR_SIZE, AVATAR_UPLOAD_MAX_BYTES, AVATAR_STORED_MAX_BYTES } from "@/shared/domain/profile";
 
 export async function normalizeAvatar(bytes: Uint8Array) {
   if (!bytes.length || bytes.length > AVATAR_UPLOAD_MAX_BYTES) throw new Error("invalid_avatar_size");
+  // The browser converts other formats first; anything else here is refused before the image library opens it.
+  if (!rasterFormat(bytes)) throw new Error("invalid_avatar_format");
   const image = sharp(bytes, { limitInputPixels: 4_000_000, failOn: "warning" });
   const metadata = await image.metadata();
   if (!["jpeg", "png", "webp"].includes(metadata.format || "") || (metadata.pages || 1) !== 1) throw new Error("invalid_avatar_format");

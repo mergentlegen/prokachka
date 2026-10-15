@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { ANNOUNCEMENT_PHOTO_LIMIT } from "@/shared/domain/announcement-photos";
+import { rasterFormat } from "@/shared/domain/image-bytes";
 
 export const ANNOUNCEMENT_PHOTO_BUCKET = "announcement-photos";
 export const ANNOUNCEMENT_PHOTO_INPUT_MAX_BYTES = 3 * 1024 * 1024;
@@ -74,6 +75,8 @@ export async function uploadAnnouncementPhotos(announcementId: string, files: Fi
   try {
     for (const file of files) {
       const bytes = Buffer.from(await file.arrayBuffer());
+      // Only real JPG, PNG or WebP bytes go to the image library, whatever the file claims to be.
+      if (!rasterFormat(bytes)) return { validationError: "Не удалось прочитать фотографию. Выберите JPG, PNG или WebP." };
       const source = sharp(bytes, { limitInputPixels: 60_000_000, failOn: "warning" });
       const metadata = await source.metadata();
       if (!["jpeg", "png", "webp"].includes(metadata.format || "") || (metadata.pages || 1) !== 1) return { validationError: "Не удалось прочитать фотографию. Выберите JPG, PNG или WebP." };
