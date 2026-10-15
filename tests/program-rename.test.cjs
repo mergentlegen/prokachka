@@ -24,9 +24,10 @@ test('a mentor renames a program from its card; the journal notes the old and ne
     onChange(programs) { props = { ...props, programs }; harness.render(props); } };
   let tree = harness.mount(ProgramsPanel, props);
   try {
-    nodes(tree, (node) => node.type === 'button' && node.props['aria-expanded'] === false)[0].props.onClick();
-    tree = await harness.settle();
-    nodes(tree, (node) => node.type === 'button' && text(node.props.children).includes('Переименовать'))[0].props.onClick();
+    // «Переименовать» lives in the program's ⋯ menu.
+    const menu = nodes(tree, (node) => Array.isArray(node.props?.items) && node.props.title === 'Программа 1')[0];
+    assert.deepEqual(menu.props.items.map((item) => item.label), ['Переименовать', 'Закрепить сверху', 'Скрыть от участников', 'Удалить программу']);
+    menu.props.items[0].onSelect();
     tree = await harness.settle();
     let form = nodes(tree, (node) => node.type === FormSheet)[0];
     assert.ok(form, 'the rename form did not open');
@@ -48,4 +49,29 @@ test('a mentor renames a program from its card; the journal notes the old and ne
   assert.equal(line.title, 'Переименована программа');
   assert.deepEqual(line.lines, ['Название: Программа 1 → Скрипты продаж']);
   assert.equal(line.category, 'content');
+});
+
+test('program steps keep one ⋯ menu; arrows appear only in «Изменить порядок»; hidden programs are folded', async () => {
+  const harness = hookHarness();
+  const ActionsMenu = () => null;
+  const { ProgramsPanel } = loadTs('frontend/features/admin/ProgramsPanel.tsx', {
+    react: harness.react,
+    './AdminTasksView': { ActionsMenu, pinIcon: null },
+    '@/frontend/shared/api/admin-client': {},
+  });
+  const program = (id, title, extra = {}) => ({ id, title, deadlineHours: 24, isActive: true, publisherId: 'mentor', createdAt: '2026-10-01', updatedAt: '2026-10-01', ...extra });
+  const step = (id, position) => ({ id, title: 'Шаг ' + id, programId: 'p1', position, maxPoints: 5, isActive: true, publisherId: 'mentor', publicationType: 'sequential', createdAt: '2026-10-01' });
+  let tree = harness.mount(ProgramsPanel, { programs: [program('p1', 'Старт'), program('p2', 'Архив', { isActive: false })], tasks: [step('a', 1), step('b', 2)],
+    actorId: 'mentor', canManageAll: false, onChange() {}, onError() {}, onEditTask() {}, onToggleTask() {}, onRemoveTask() {}, onAddStep() {} });
+  try {
+    const stepMenus = () => nodes(tree, (node) => node.type === ActionsMenu && node.props.title.startsWith('Шаг'));
+    assert.deepEqual(stepMenus().map((node) => node.props.items.map((item) => item.label)), [['Изменить', 'Скрыть от участников', 'Удалить шаг'], ['Изменить', 'Скрыть от участников', 'Удалить шаг']]);
+    assert.equal(nodes(tree, (node) => node.type === 'button' && /Поднять/.test(node.props['aria-label'] || '')).length, 0, 'no arrows outside the order mode');
+    nodes(tree, (node) => node.type === 'button' && text(node.props.children).includes('Изменить порядок'))[0].props.onClick();
+    tree = await harness.settle();
+    assert.equal(stepMenus().length, 0);
+    assert.equal(nodes(tree, (node) => node.type === 'button' && /Поднять/.test(node.props['aria-label'] || '')).length, 2);
+    const fold = nodes(tree, (node) => node.type === 'button' && text(node.props.children).startsWith('Скрытые'))[0];
+    assert.equal(fold.props['aria-expanded'], false, 'hidden programs start folded');
+  } finally { harness.unmount(); }
 });

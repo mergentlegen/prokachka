@@ -59,13 +59,13 @@ test('programs are blocks with progress; a tap opens passed steps with miles, th
   const closed = render(null);
   assert.match(closed, /<strong>Старт<\/strong><small>Пройдено 1 из 3 · сейчас шаг 2<\/small><em>Пригласи гостя<\/em>/, 'a closed block shows progress and the next step');
   assert.match(closed, /<strong>Тест<\/strong><small>Пройдена · 2 мили<\/small>/, 'a passed program stays as a block');
-  assert.equal((closed.match(/aria-expanded="false"/g) || []).length, 2, 'every block starts closed');
-  assert.doesNotMatch(closed, /КАРТОЧКА/);
+  assert.equal((closed.match(/data-program="p\d" aria-expanded="false"/g) || []).length, 2, 'every block starts closed');
+  assert.doesNotMatch(closed, /aria-hidden="false"/, 'nothing inside a closed block can be seen or reached');
   const open = render('p1');
   assert.match(open, /Видео-приветствие[\s\S]*\+5 миль/, 'a passed step keeps its miles');
   assert.match(open, /Шаг 2 · сейчас[\s\S]*КАРТОЧКА Пригласи гостя/);
   assert.match(open, /Шаг 3 · закрыт[\s\S]*Разбор встречи/, 'a closed step shows its title');
-  assert.doesNotMatch(open, /Запиши видео/, 'a passed step opens its text on tap');
+  assert.match(open, /aria-hidden="true"[^>]*>(?:(?!aria-hidden)[\s\S])*Запиши видео/, 'a passed step keeps its text folded until tapped');
   const waiting = render(null, new Map([...latest, ['b', { ...accepted('b', 0), status: 'pending' }]]));
   assert.match(waiting, /шаг 2 на проверке/);
   const empty = renderToStaticMarkup(React.createElement(ProgramModules, { modules: [], tasks, latest, selectedId: null, onSelect() {}, onFeedback() {}, renderTask: () => null }));

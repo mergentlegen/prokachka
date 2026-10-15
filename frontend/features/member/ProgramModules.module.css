@@ -2,8 +2,8 @@
 /* The program parts use the brand font, like the headings; the task card inside keeps the font of every task card. */
 .modules { --program-font:'Manrope',system-ui,sans-serif; }
 
-.block { min-width:0; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 4px 16px #17274404; transition:border-color .15s, box-shadow .15s; }
-.block.open { border-color:#c9d5ea; background:#f8fafd; box-shadow:0 8px 24px #1727440d; }
+.block { min-width:0; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 4px 16px #17274404; transition:border-color .25s, box-shadow .25s, background-color .25s, transform .25s; }
+.block.open { border-color:#c9d5ea; background:#f8fafd; box-shadow:0 12px 30px #17274414; transform:translateY(-1px); }
 .head { position:relative; display:grid; grid-template-columns:48px minmax(0,1fr) 20px; align-items:center; gap:14px; width:100%; padding:16px 18px 22px; border:0; border-radius:16px; background:transparent; color:inherit; font:inherit; font-family:var(--program-font); text-align:left; cursor:pointer; }
 .head:hover .headText strong { color:var(--blue); }
 .head:focus-visible,.row:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
@@ -15,10 +15,12 @@
 .headText small { color:#66758d; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
 .finished .headText small { color:#23866b; }
 .headText em { overflow:hidden; color:#8a96aa; font-size:13px; font-style:normal; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
-.chevron { width:10px; height:10px; justify-self:center; border-right:2px solid #8a97ad; border-bottom:2px solid #8a97ad; transform:translateY(-3px) rotate(45deg); transition:transform .2s; }
+.chevron { width:10px; height:10px; justify-self:center; border-right:2px solid #8a97ad; border-bottom:2px solid #8a97ad; transform:translateY(-3px) rotate(45deg); transition:transform .32s cubic-bezier(.2,.8,.2,1), border-color .2s; }
+.open .chevron { border-color:var(--blue); }
 .open .chevron { transform:translateY(2px) rotate(-135deg); }
 .bar { position:absolute; left:18px; right:18px; bottom:10px; display:block; height:4px; overflow:hidden; border-radius:2px; background:#e8edf5; }
-.bar::before { content:""; display:block; width:var(--progress); height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--blue),#5b7fd6); transition:width .3s ease; }
+.bar::before { content:""; display:block; width:var(--progress); height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--blue),#5b7fd6); transition:width .3s ease; animation:bar-fill .7s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes bar-fill { from { width:0; } }
 .finished .bar::before { background:#3aa57f; }
 
 .steps { display:grid; gap:8px; margin:0; padding:4px 14px 16px; list-style:none; }
@@ -58,4 +60,4 @@
   .mark { width:28px; height:28px; }
   .details { padding:0 12px 14px; }
 }
-@media (prefers-reduced-motion:reduce) { .block,.chevron,.bar::before,.headText strong { transition:none; } }
+@media (prefers-reduced-motion:reduce) { .block,.chevron,.bar::before,.headText strong { transition:none; animation:none; } }

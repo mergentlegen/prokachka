@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import type { ProgramModule, Submission, Task } from "@/shared/domain/types";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { orderedProgramModules, programStepStates } from "./member-progress";
+import { Drawer, staggerStyle } from "@/frontend/shared/Drawer";
 import styles from "./ProgramModules.module.css";
 
 type Props = {
@@ -31,7 +32,9 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
   useEffect(() => {
     if (!opened.current) { opened.current = true; return; }
     const head = openId ? list.current?.querySelector<HTMLElement>(`[data-program="${openId}"]`) : null;
-    if (head && head.getBoundingClientRect().top < 0) head.scrollIntoView({ block: "start" });
+    // Measured once the folds have finished moving, otherwise the old block is still collapsing.
+    const timer = window.setTimeout(() => { if (head && head.getBoundingClientRect().top < 0) head.scrollIntoView({ block: "start", behavior: "smooth" }); }, 340);
+    return () => window.clearTimeout(timer);
   }, [openId]);
   if (!ordered.length) return <div className="empty-state"><span>◌</span><p>Пока нет программ.</p></div>;
   return <div ref={list} className={styles.modules}>
@@ -57,30 +60,29 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
           <span className={styles.chevron} aria-hidden="true" />
           <i className={styles.bar} style={{ "--progress": `${Math.round((done / module.steps.length) * 100)}%` } as CSSProperties} />
         </button>
-        {open && <ol className={styles.steps}>
+        <Drawer open={open}><ol className={styles.steps}>
           {module.steps.map((step, index) => {
             const state = states[index];
             const task = state === "current" ? tasks.find((item) => item.id === step.id) : undefined;
-            if (task) return <li key={step.id} className={styles.currentCard}><p className={styles.currentLabel}>Шаг {step.number} · сейчас</p>{renderTask(task)}</li>;
+            if (task) return <li key={step.id} className={styles.currentCard} data-stagger style={staggerStyle(index)}><p className={styles.currentLabel}>Шаг {step.number} · сейчас</p>{renderTask(task)}</li>;
             const submission = latest.get(step.id);
             const expanded = state === "done" && openStep === step.id;
             const note = state === "locked" ? " · закрыт" : state === "skipped" ? (module.status === "active" ? " · откроется после текущего" : " · не пройден") : "";
-            return <li key={step.id} className={`${styles.step} ${styles[state]}`}>
+            return <li key={step.id} className={`${styles.step} ${styles[state]}`} data-stagger style={staggerStyle(index)}>
               <button type="button" className={styles.row} disabled={state !== "done"} aria-expanded={state === "done" ? expanded : undefined} onClick={() => setOpenStep(expanded ? null : step.id)}>
                 <span className={styles.mark} aria-hidden="true">{state === "done" ? "✓" : state === "locked" ? <LockIcon /> : step.number}</span>
                 <span className={styles.text}><small>Шаг {step.number}{note}</small><strong>{step.title}</strong></span>
                 <span className={styles.miles}>{state === "done" ? `+${formatMiles(submission?.points || 0)}` : formatMiles(step.maxPoints)}</span>
               </button>
-              {expanded && passedTasks.some((item) => item.id === step.id) && <div className={styles.passedCard}>{renderTask(passedTasks.find((item) => item.id === step.id)!)}</div>}
-              {expanded && !passedTasks.some((item) => item.id === step.id) && <div className={styles.details}>
+              {state === "done" && <Drawer open={expanded}>{passedTasks.some((item) => item.id === step.id) ? <div className={styles.passedCard}>{renderTask(passedTasks.find((item) => item.id === step.id)!)}</div> : <div className={styles.details}>
                 {step.description ? <p className={styles.description}>{step.description}</p> : step.interactiveKind ? <p className={styles.description}>Игра пройдена.</p> : null}
                 {step.resourceUrl && <a className={styles.link} href={step.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть материал ↗</a>}
                 {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
                 {!step.interactiveKind && <button type="button" className={styles.link} onClick={() => onFeedback(step.id)}>Открыть переписку с наставником →</button>}
-              </div>}
+              </div>}</Drawer>}
             </li>;
           })}
-        </ol>}
+        </ol></Drawer>
       </section>;
     })}
   </div>;

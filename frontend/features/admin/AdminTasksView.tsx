@@ -26,10 +26,10 @@ export function deadlineLine(task: Task, now = Date.now()): { text: string; tone
   return info ? { text: info.text, tone: info.tone === "expired" ? "past" : info.tone } : { text: "", tone: "none" };
 }
 
-type MenuItem = { label: string; icon: ReactNode; danger?: boolean; onSelect: () => void };
+export type MenuItem = { label: string; icon: ReactNode; danger?: boolean; onSelect: () => void };
 
 // "⋯": the rarer actions of a task, so the card keeps one visible button.
-function ActionsMenu({ title, items, disabled }: { title: string; items: MenuItem[]; disabled?: boolean }) {
+export function ActionsMenu({ title, items, disabled }: { title: string; items: MenuItem[]; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -51,7 +51,7 @@ function ActionsMenu({ title, items, disabled }: { title: string; items: MenuIte
   </div>;
 }
 
-const pinIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m16 3 5 5-4 1-3 5 1 3-3-1-5 3 1-4-5-5 4 1 5-3 1-4Z" /><path d="m8 16-5 5" /></svg>;
+export const pinIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m16 3 5 5-4 1-3 5 1 3-3-1-5 3 1-4-5-5 4 1 5-3 1-4Z" /><path d="m8 16-5 5" /></svg>;
 
 type CardProps = {
   task: Task; users: User[]; submissions: Submission[]; now: number; canManage: boolean; busy: boolean;

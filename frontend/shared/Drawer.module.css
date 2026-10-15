@@ -1,0 +1,16 @@
+.drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .32s cubic-bezier(.2, .8, .2, 1), opacity .22s ease; }
+.drawer.open { grid-template-rows: 1fr; opacity: 1; }
+.inner { min-height: 0; overflow: hidden; }
+/* Once fully open, pop-up menus inside (the ⋯ of the last step) may reach past the edge; while moving it clips.
+   Only this drawer's own box: a closed drawer nested inside keeps clipping. */
+.open > .inner { animation: unclip 0s .34s forwards; }
+@keyframes unclip { to { overflow: visible; } }
+/* Children marked data-stagger come in one after another each time their drawer opens
+   (not while they sit inside a drawer that is still closed). */
+.open > .inner [data-stagger]:not(.drawer:not(.open) *) { animation: stagger-in .38s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--stagger, 0) * 40ms + 60ms); }
+@keyframes stagger-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .drawer { transition: none; }
+  .open > .inner [data-stagger]:not(.drawer:not(.open) *) { animation: none; }
+  .open > .inner { animation: none; overflow: visible; }
+}

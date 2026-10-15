@@ -6,6 +6,8 @@ import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { PROGRAM_GAMES, type ProgramGame } from "@/shared/domain/program-games";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { FormSheet } from "@/frontend/shared/FormSheet";
+import { Drawer, staggerStyle } from "@/frontend/shared/Drawer";
+import { ActionsMenu, pinIcon, type MenuItem } from "./AdminTasksView";
 import { actionIcons } from "./AdminIcons";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { formatMiles } from "@/frontend/shared/lib/format";
@@ -34,6 +36,9 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProgram | null>(null);
   const [gamePicker, setGamePicker] = useState<TaskProgram | null>(null);
+  const [ordering, setOrdering] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [hiddenOpen, setHiddenOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<TaskProgram | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
@@ -96,93 +101,99 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     finally { setBusyId(""); }
   }
 
+  // One program as a card: a short header with its own ⋯ menu, and the steps folding out below it.
+  const programCard = (program: TaskProgram, position: number) => {
+    const canManage = canManageAll || program.publisherId === actorId;
+    const steps = tasks.filter((task) => task.programId === program.id).sort((a, b) => (a.position || 0) - (b.position || 0) || a.id.localeCompare(b.id));
+    const isExpanded = expanded === program.id;
+    const progress = history.find((item) => item.id === program.id);
+    const funnel = programFunnel(progress, steps);
+    const busy = Boolean(taskBusyId || busyId);
+    const reordering = ordering === program.id;
+    const programItems: MenuItem[] = canManage ? [
+      { label: "Переименовать", icon: actionIcons.edit, onSelect: () => { setRenameValue(program.title); setRenameTarget(program); } },
+      { label: program.isPinned ? "Открепить" : "Закрепить сверху", icon: pinIcon, onSelect: () => void update(program, { isPinned: !program.isPinned }) },
+      { label: program.isActive ? "Скрыть от участников" : "Показать участникам", icon: program.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => void update(program, { isActive: !program.isActive }) },
+      { label: "Удалить программу", icon: actionIcons.remove, danger: true, onSelect: () => setDeleteTarget(program) },
+    ] : [];
+    return <section key={program.id} className={[styles.card, program.isActive ? "" : styles.cardHidden, isExpanded ? styles.cardOpen : ""].join(" ")} data-stagger style={staggerStyle(position)}>
+      <div className={styles.cardTop}>
+        <button type="button" className={styles.cardHead} aria-expanded={isExpanded} aria-controls={"program-steps-" + program.id} onClick={() => { setOrdering(null); setAdding(null); setExpanded(isExpanded ? null : program.id); }}>
+          <span className={styles.headMain}>
+            <span className={styles.badges}>
+              <span className={program.isActive ? styles.badgeOn : styles.badgeOff}>{program.isActive ? "Активна" : "Скрыта"}</span>
+              {program.isPinned && <span className={styles.badgePin}>{pinIcon}Закреплена</span>}
+            </span>
+            <strong className={styles.cardTitle}>{program.title}</strong>
+            <span className={styles.facts}>{steps.length} {plural(steps.length, "шаг", "шага", "шагов")} · {program.deadlineHours} ч на шаг · до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>
+            {progress && <span className={styles.people}>{funnel.total ? `${funnel.total} ${plural(funnel.total, "участник", "участника", "участников")} в программе · ${funnel.completed} ${plural(funnel.completed, "прошёл", "прошли", "прошли")} до конца` : "Пока никто не начал"}</span>}
+          </span>
+          <span className={styles.chevron} aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></span>
+        </button>
+        {programItems.length > 0 && <div className={styles.cardMenu}><ActionsMenu title={program.title} items={programItems} disabled={busy} /></div>}
+      </div>
+      <Drawer open={isExpanded} id={"program-steps-" + program.id}><div className={styles.body}>
+        <div className={styles.bodyHead}>
+          <strong>Шаги по порядку</strong>
+          {canManage && steps.length > 1 && <button type="button" className={`${styles.orderToggle} ${reordering ? styles.orderOn : ""}`} aria-pressed={reordering} disabled={busy && !reordering} onClick={() => setOrdering(reordering ? null : program.id)}>{reordering ? "Готово" : "↕ Изменить порядок"}</button>}
+        </div>
+        {steps.length === 0 ? <p className={styles.emptySteps}>В программе пока нет шагов.</p> : <ol className={styles.timeline}>
+          {steps.map((task, index) => {
+            const count = funnel.rows[index]?.count || 0;
+            const canEditStep = canManageAll || task.publisherId === actorId;
+            const stepItems: MenuItem[] = [
+              ...(!task.interactiveKind ? [{ label: "Изменить", icon: actionIcons.edit, onSelect: () => onEditTask(task) }] : []),
+              { label: task.isActive ? "Скрыть от участников" : "Показать участникам", icon: task.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => onToggleTask(task.id) },
+              { label: "Удалить шаг", icon: actionIcons.remove, danger: true, onSelect: () => onRemoveTask(task) },
+            ];
+            return <li key={task.id} className={[styles.step, task.isActive ? "" : styles.stepHidden].join(" ")} data-stagger style={staggerStyle(index)}>
+              <span className={styles.stepNum} aria-hidden="true">{index + 1}</span>
+              <div className={styles.stepBody}>
+                <strong>{task.title}</strong>
+                <span className={styles.stepMeta}>
+                  <span>до {formatMiles(task.maxPoints)}</span>
+                  {task.interactiveKind && <span className={styles.tagGame}>игра · без срока</span>}
+                  {task.video && <span className={styles.tag}>видео</span>}
+                  {task.quiz && <span className={styles.tag}>тест</span>}
+                  {Boolean(task.attachments?.length) && <span className={styles.tag}>PDF</span>}
+                  {!task.isActive && <span className={styles.tagHidden}>скрыт</span>}
+                  {progress && count > 0 && <span className={styles.here}>сейчас здесь: {count}</span>}
+                </span>
+              </div>
+              {canEditStep && (reordering
+                ? <span className={styles.moveGroup}>
+                  <button type="button" className={styles.tool} disabled={busy || index === 0} onClick={() => void move(program, steps, task, -1)} aria-label={`Поднять «${task.title}» выше`}>↑</button>
+                  <button type="button" className={styles.tool} disabled={busy || index === steps.length - 1} onClick={() => void move(program, steps, task, 1)} aria-label={`Опустить «${task.title}» ниже`}>↓</button>
+                </span>
+                : <ActionsMenu title={task.title} items={stepItems} disabled={busy} />)}
+            </li>;
+          })}
+          {progress && funnel.total > 0 && <li className={`${styles.step} ${styles.stepDone}`} data-stagger style={staggerStyle(steps.length)}>
+            <span className={styles.stepNum} aria-hidden="true">✓</span>
+            <div className={styles.stepBody}><strong>Прошли программу</strong><span className={styles.stepMeta}><span className={styles.hereDone}>{funnel.completed} из {funnel.total}</span></span></div>
+          </li>}
+        </ol>}
+        {canManage && !reordering && <div className={styles.addArea}>
+          <button type="button" className={styles.addStep} disabled={busy} aria-expanded={adding === program.id} onClick={() => setAdding(adding === program.id ? null : program.id)}>＋ Добавить шаг</button>
+          <Drawer open={adding === program.id}><div className={styles.addChoices}>
+            {onAddStep && <button type="button" className={styles.addChoice} disabled={busy} onClick={() => { setAdding(null); onAddStep(program); }}><strong>Обычное задание</strong><small>Текст, ссылка, видео, PDF или тест</small></button>}
+            <button type="button" className={styles.addChoice} disabled={busy} onClick={() => { setAdding(null); setGamePicker(program); }}><strong>Готовая игра</strong><small>Мили начисляются сразу после прохождения</small></button>
+          </div></Drawer>
+        </div>}
+      </div></Drawer>
+    </section>;
+  };
+  const activePrograms = customPrograms.filter((program) => program.isActive);
+  const hiddenPrograms = customPrograms.filter((program) => !program.isActive);
+
   return <>
     <p className="admin-muted">Участник проходит шаги по порядку: следующий открывается, когда предыдущий принят. Нажмите на программу, чтобы увидеть шаги и кто на каком шаге.</p>
     {customPrograms.length === 0 ? <div className="admin-panel"><div className="empty-admin"><p>Программ пока нет. Создайте первую программу.</p></div></div> : <div className={styles.list}>
-      {customPrograms.map((program) => {
-        const canManage = canManageAll || program.publisherId === actorId;
-        const steps = tasks.filter((task) => task.programId === program.id).sort((a, b) => (a.position || 0) - (b.position || 0) || a.id.localeCompare(b.id));
-        const isExpanded = expanded === program.id;
-        const progress = history.find((item) => item.id === program.id);
-        const funnel = programFunnel(progress, steps);
-        const busy = Boolean(taskBusyId || busyId);
-        return <section key={program.id} className={[styles.card, program.isActive ? "" : styles.cardHidden, isExpanded ? styles.cardOpen : ""].join(" ")}>
-          <button type="button" className={styles.cardHead} aria-expanded={isExpanded} aria-controls={"program-steps-" + program.id} onClick={() => setExpanded(isExpanded ? null : program.id)}>
-            <span className={styles.headMain}>
-              <span className={styles.badges}>
-                <span className={program.isActive ? styles.badgeOn : styles.badgeOff}>{program.isActive ? "Активна" : "Скрыта"}</span>
-                {program.isPinned && <span className={styles.badgePin}>Закреплена</span>}
-              </span>
-              <strong className={styles.cardTitle}>{program.title}</strong>
-              <span className={styles.facts}>{steps.length} {plural(steps.length, "шаг", "шага", "шагов")} · {program.deadlineHours} ч на шаг · до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>
-              {progress && <span className={styles.people}>{funnel.total ? `${funnel.total} ${plural(funnel.total, "участник", "участника", "участников")} в программе · ${funnel.completed} ${plural(funnel.completed, "прошёл", "прошли", "прошли")} до конца` : "Пока никто не начал"}</span>}
-            </span>
-            <span className={styles.chevron} aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></span>
-          </button>
-          {isExpanded && <div id={"program-steps-" + program.id} className={styles.body}>
-            <div className={styles.bodyHead}><strong>Шаги по порядку</strong>{progress && funnel.total > 0 && <span>полоска — сколько участников сейчас на шаге</span>}</div>
-            {steps.length === 0 ? <p className={styles.emptySteps}>В программе пока нет шагов.</p> : <ol className={styles.timeline}>
-              {steps.map((task, index) => {
-                const count = funnel.rows[index]?.count || 0;
-                const max = Math.max(1, funnel.completed, ...funnel.rows.map((row) => row.count));
-                const canEditStep = canManageAll || task.publisherId === actorId;
-                return <li key={task.id} className={[styles.step, task.isActive ? "" : styles.stepHidden].join(" ")}>
-                  <span className={styles.stepNum} aria-hidden="true">{index + 1}</span>
-                  <div className={styles.stepBody}>
-                    <strong>{task.title}</strong>
-                    <span className={styles.stepMeta}>
-                      <span>до {formatMiles(task.maxPoints)}</span>
-                      {task.interactiveKind && <span className={styles.tagGame}>игра · без срока</span>}
-                      {task.video && <span className={styles.tag}>видео</span>}
-                      {task.quiz && <span className={styles.tag}>вопросы</span>}
-                      {Boolean(task.attachments?.length) && <span className={styles.tag}>PDF</span>}
-                      {!task.isActive && <span className={styles.tagHidden}>скрыт от участников</span>}
-                    </span>
-                    {progress && funnel.total > 0 && <span className={styles.stepNow}>
-                      <i className={styles.bar} aria-hidden="true"><i style={{ width: `${(count / max) * 100}%` }} /></i>
-                      <span>{count ? `сейчас здесь ${count}` : "сейчас никого"}</span>
-                    </span>}
-                  </div>
-                  {canEditStep && <div className={styles.tools}>
-                    {canManage && <span className={styles.moveGroup}>
-                      <button type="button" className={styles.tool} disabled={busy || index === 0} onClick={() => void move(program, steps, task, -1)} aria-label={`Поднять «${task.title}» выше`} title="Выше">↑</button>
-                      <button type="button" className={styles.tool} disabled={busy || index === steps.length - 1} onClick={() => void move(program, steps, task, 1)} aria-label={`Опустить «${task.title}» ниже`} title="Ниже">↓</button>
-                    </span>}
-                    <span className={styles.actionGroup}>
-                      {!task.interactiveKind && <button type="button" className={`${styles.tool} ${styles.toolEdit}`} disabled={busy} onClick={() => onEditTask(task)} aria-label={`Изменить «${task.title}»`}>{actionIcons.edit}<span>Изменить</span></button>}
-                      <button type="button" className={`${styles.tool} ${styles.toolLabel}`} disabled={busy} onClick={() => onToggleTask(task.id)} aria-label={`${task.isActive ? "Скрыть" : "Показать"} «${task.title}»`} title={task.isActive ? "Скрыть от участников" : "Показать участникам"}>{task.isActive ? actionIcons.hide : actionIcons.show}<span>{task.isActive ? "Скрыть" : "Показать"}</span></button>
-                      <button type="button" className={`${styles.tool} ${styles.toolLabel} ${styles.toolDanger}`} disabled={busy} onClick={() => onRemoveTask(task)} aria-label={`Удалить «${task.title}»`} title="Удалить шаг">{actionIcons.remove}<span>Удалить</span></button>
-                    </span>
-                  </div>}
-                </li>;
-              })}
-              {progress && funnel.total > 0 && <li className={`${styles.step} ${styles.stepDone}`}>
-                <span className={styles.stepNum} aria-hidden="true">✓</span>
-                <div className={styles.stepBody}>
-                  <strong>Прошли программу</strong>
-                  <span className={styles.stepNow}>
-                    <i className={styles.bar} aria-hidden="true"><i style={{ width: `${(funnel.completed / Math.max(1, funnel.completed, ...funnel.rows.map((row) => row.count))) * 100}%` }} /></i>
-                    <span>{funnel.completed} из {funnel.total}</span>
-                  </span>
-                </div>
-              </li>}
-            </ol>}
-            {canManage && <div className={styles.addRow}>
-              {onAddStep && <button type="button" className={styles.addStep} disabled={busy} onClick={() => onAddStep(program)}>＋ Добавить шаг</button>}
-              <button type="button" className={styles.addGame} disabled={busy} onClick={() => setGamePicker(program)}>＋ Добавить готовую игру</button>
-            </div>}
-            {canManage && <div className={styles.programActions}>
-              <span>Вся программа</span>
-              <div>
-                <button type="button" className={styles.programAction} disabled={busy} onClick={() => { setRenameValue(program.title); setRenameTarget(program); }}>{actionIcons.edit}Переименовать</button>
-                <button type="button" className={styles.programAction} disabled={busy} onClick={() => void update(program, { isPinned: !program.isPinned })} aria-pressed={Boolean(program.isPinned)}>{program.isPinned ? "Открепить" : "Закрепить сверху"}</button>
-                <button type="button" className={styles.programAction} disabled={busy} onClick={() => void update(program, { isActive: !program.isActive })}>{program.isActive ? <>{actionIcons.hide}Скрыть</> : <>{actionIcons.show}Показать</>}</button>
-                <button type="button" className={`${styles.programAction} ${styles.toolDanger}`} disabled={busy} onClick={() => setDeleteTarget(program)}>{actionIcons.remove}Удалить</button>
-              </div>
-            </div>}
-          </div>}
-        </section>;
-      })}
+      {activePrograms.length ? activePrograms.map(programCard) : <p className={styles.emptySteps}>Активных программ нет. Покажите скрытую или создайте новую.</p>}
+      {hiddenPrograms.length > 0 && <>
+        <button type="button" className={styles.fold} aria-expanded={hiddenOpen} onClick={() => setHiddenOpen(!hiddenOpen)}>Скрытые <span>{hiddenPrograms.length}</span><i aria-hidden="true" /></button>
+        <Drawer open={hiddenOpen}><div className={styles.list}>{hiddenPrograms.map(programCard)}</div></Drawer>
+      </>}
     </div>}
     {gamePicker && <ModalSheet title="Готовая игра в программу" onClose={() => { if (!busyId) setGamePicker(null); }}>
       <div className={styles.gameCatalog}>
