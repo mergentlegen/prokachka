@@ -168,6 +168,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/reviews.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261105-review-mile.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/review-mile.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261106-feedback-inbox.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/feedback-inbox.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

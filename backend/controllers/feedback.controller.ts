@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { isUuid } from "@/backend/http/security";
-import { countFeedback, getFeedback, listFeedback, listFeedbackForTask, listFeedbackTaskGroups, markFeedbackRead, sendFeedback, type FeedbackScope } from "@/backend/services/feedback.service";
+import { countFeedback, dismissFeedbackReply, getFeedback, listFeedback, listFeedbackForTask, listFeedbackTaskGroups, listMentorThreads, markFeedbackRead, sendFeedback, type FeedbackScope } from "@/backend/services/feedback.service";
 import type { AuthUser } from "@/shared/domain/types";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 
@@ -30,12 +30,15 @@ export async function feedbackList(request: Request) {
   const taskKey = params.get("taskKey");
   if (taskKey && !isUuid(taskKey)) return failure("Некорректное задание.", 400);
   const view = params.get("view");
-  if (view && view !== "tasks") return failure("Некорректный вид списка.", 400);
+  if (view && view !== "tasks" && view !== "inbox") return failure("Некорректный вид списка.", 400);
   if ((view || taskKey) && scope !== "mentor") return denied();
   const onlyReply = params.get("filter") === "reply";
+  const query = (params.get("q") || "").trim();
+  if (query.length > 80) return failure("Слишком длинный поиск.", 400);
   const result = view === "tasks" ? await listFeedbackTaskGroups(user, offset, onlyReply)
-    : taskKey ? await listFeedbackForTask(user, taskKey, offset, onlyReply)
-      : await listFeedback(user, scope, offset, onlyReply);
+    : view === "inbox" ? await listMentorThreads(user, query, offset, onlyReply)
+      : taskKey ? await listFeedbackForTask(user, taskKey, offset, onlyReply)
+        : await listFeedback(user, scope, offset, onlyReply);
   if ("unavailable" in result || "error" in result) return unavailable();
   return ok(view === "tasks" ? { groups: result.data } : { threads: result.data });
 }
@@ -83,4 +86,16 @@ export async function feedbackRead(request: Request, id: string) {
   if ("unavailable" in result || "error" in result) return unavailable();
   if (!result.data) return denied();
   return ok({ read: true });
+}
+
+// «Ответ не нужен» is a mentor action only.
+export async function feedbackDismiss(request: Request, id: string) {
+  const user = await getCurrentUser(request);
+  if (!user) return failure("Войдите в аккаунт.", 401);
+  if (scopeFor(request, user) !== "mentor") return denied();
+  if (!isUuid(id)) return failure("Некорректная переписка.", 400);
+  const result = await dismissFeedbackReply(id, user);
+  if ("unavailable" in result || "error" in result) return unavailable();
+  if (!result.data) return denied();
+  return ok({ dismissed: true });
 }
