@@ -1,4 +1,5 @@
--- Reviews: every participant can leave one review (stars, text, up to 6 photos), seen by everyone on the site.
+-- Reviews: every participant can leave one review (stars, text, up to 6 photos), seen by everyone in their team.
+-- Each team has its own reviews; the CEO sees every team's, with the team name.
 -- It is published at once; the author, the team leader, the mentors above the author and the CEO can delete it.
 -- A new review is announced in Telegram to the author's nearest mentor and the team leader.
 -- Photos live in the private announcement-photos bucket under the review id, so the existing cleanup worker serves both.
@@ -59,12 +60,14 @@ returns boolean language sql stable security definer set search_path = public as
         and viewer.id in (select a.id from public.tg_ancestor_ids(author.id) a))));
 $$;
 
--- Every review, newest first, with the summary over all of them; the server adds photo and avatar links.
+-- The viewer's team reviews (every team's for the CEO, who has no account id), newest first, with the summary over them.
+-- The server adds photo and avatar links.
 create or replace function public.app_reviews(p_viewer uuid, p_limit integer default 300)
 returns jsonb language sql stable security definer set search_path = public as $$
   with base as (
     select r.*, u.name as author_name, u.avatar_path, t.name as team_name
     from public.reviews r join public.users u on u.id = r.user_id left join public.teams t on t.id = u.team_id
+    where p_viewer is null or u.team_id = (select viewer.team_id from public.users viewer where viewer.id = p_viewer)
   ), shown as (
     select * from base order by created_at desc, id desc limit greatest(1, least(coalesce(p_limit, 300), 500))
   )
@@ -73,7 +76,9 @@ returns jsonb language sql stable security definer set search_path = public as $
       'stars', jsonb_build_object('5', count(*) filter (where rating = 5), '4', count(*) filter (where rating = 4),
         '3', count(*) filter (where rating = 3), '2', count(*) filter (where rating = 2), '1', count(*) filter (where rating = 1))) from base),
     'reviews', coalesce((select jsonb_agg(jsonb_build_object(
-      'id', id, 'user_id', user_id, 'author_name', author_name, 'avatar_path', avatar_path, 'team_name', team_name,
+      'id', id, 'user_id', user_id, 'author_name', author_name, 'avatar_path', avatar_path,
+      -- Inside a team its name says nothing; the CEO needs it to tell teams apart.
+      'team_name', case when p_viewer is null then team_name end,
       'rating', rating, 'body', body, 'photos', photos, 'created_at', created_at, 'edited_at', edited_at,
       'can_delete', p_viewer is not null and public.app_review_can_delete(p_viewer, user_id)
     ) order by created_at desc, id desc) from shown), '[]'::jsonb));

@@ -39,11 +39,15 @@ begin
   assert (select count(*) from public.telegram_notification_jobs where kind = 'review') = 2, 'an edit sent messages again';
   assert exists (select 1 from public.announcement_photo_cleanup_queue where storage_path = review || '/' || photo || '-full.webp'), 'a removed photo was not queued for cleanup';
 
-  -- Everyone sees it; only the right people may delete it.
-  list := public.app_reviews(stranger, 300);
+  -- The team sees it, another team does not, the CEO sees every team with its name; only the right people may delete it.
+  list := public.app_reviews(helper, 300);
   assert (list->'summary'->>'count')::int = 1 and (list->'summary'->>'average')::numeric = 4 and (list->'summary'->'stars'->>'4')::int = 1, 'wrong summary: ' || list::text;
-  assert list->'reviews'->0->>'author_name' = 'Алия' and list->'reviews'->0->>'team_name' = 'reviews-' || team, 'author not shown';
-  assert not (list->'reviews'->0->>'can_delete')::boolean, 'another team may delete';
+  assert list->'reviews'->0->>'author_name' = 'Алия' and list->'reviews'->0->>'team_name' is null, 'author not shown or team name repeated';
+  list := public.app_reviews(stranger, 300);
+  assert (list->'summary'->>'count')::int = 0 and jsonb_array_length(list->'reviews') = 0, 'another team sees the review';
+  assert public.app_reviews(teamless, 300)->'reviews' = '[]'::jsonb, 'someone without a team sees reviews';
+  list := public.app_reviews(null, 300);
+  assert (list->'reviews'->0->>'team_name') = 'reviews-' || team and (list->'reviews'->0->>'can_delete')::boolean is false, 'the CEO list lacks the team';
   assert (public.app_reviews(leader, 300)->'reviews'->0->>'can_delete')::boolean, 'the team leader may not delete';
   assert (public.app_reviews(mentor, 300)->'reviews'->0->>'can_delete')::boolean, 'the mentor above may not delete';
   assert not (public.app_reviews(helper, 300)->'reviews'->0->>'can_delete')::boolean, 'a member without review rights may delete';

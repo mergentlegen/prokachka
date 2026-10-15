@@ -14,7 +14,7 @@ const entries: Entry[] = [
     icon: icon(<><circle cx="12" cy="6" r="2.5" /><circle cx="5.5" cy="17.5" r="2.5" /><circle cx="18.5" cy="17.5" r="2.5" /><path d="M12 8.5v3M12 11.5l-5 4M12 11.5l5 4" /></>) },
   { key: "profile", title: "Профиль", hint: "Данные, Telegram, пароль", tone: "green", open: "profile",
     icon: icon(<><circle cx="12" cy="8" r="3.5" /><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" /></>) },
-  { key: "reviews", title: "Отзывы", hint: "Что говорят участники клуба", tone: "violet", open: "reviews",
+  { key: "reviews", title: "Отзывы", hint: "Что говорят участники команды", tone: "violet", open: "reviews",
     icon: icon(<><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 17h-7l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5Z" /><path d="m12 8.2.8 1.6 1.8.3-1.3 1.2.3 1.8-1.6-.9-1.6.9.3-1.8-1.3-1.2 1.8-.3.8-1.6Z" /></>) },
   { key: "mentors", title: "Наставники", hint: "Кто ведёт команду и как связаться", tone: "gold",
     icon: icon(<><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6" /><path d="m17.5 6 .9 1.8 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3.9-1.8Z" /></>) },

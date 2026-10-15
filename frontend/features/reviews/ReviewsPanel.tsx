@@ -107,7 +107,7 @@ function ReviewEditor({ review, onClose, onSaved }: { review?: Review; onClose: 
   }
 
   return <FormSheet title={review ? "Мой отзыв" : "Новый отзыв"} submitLabel={review ? "Сохранить" : "Опубликовать"} busy={busy || preparing} busyLabel={preparing ? "Готовим фото…" : "Сохраняем…"}
-    submitDisabled={!rating || text.length < 10} intro="Отзыв сразу увидят все участники клуба." onClose={onClose} onSubmit={() => void save()}>
+    submitDisabled={!rating || text.length < 10} intro="Отзыв сразу увидят участники вашей команды." onClose={onClose} onSubmit={() => void save()}>
     <fieldset className={styles.picker}>
       <legend>Оценка</legend>
       <div role="radiogroup" aria-label="Оценка">
@@ -166,7 +166,7 @@ export function ReviewsPanel({ canWrite, onNotice, heading = true }: { canWrite:
   const mine = data?.reviews.find((review) => review.isMine);
   const shown = (data?.reviews || []).filter((review) => filter === "all" || review.photos.length > 0);
   return <section className={styles.panel} aria-label="Отзывы">
-    {heading && <div className="section-heading"><div><p className="eyebrow">Клуб</p><h2>Отзывы</h2></div></div>}
+    {heading && <div className="section-heading"><div><p className="eyebrow">Команда</p><h2>Отзывы</h2></div></div>}
     {error && !data ? <div className={styles.empty}><p>{error}</p><button type="button" className="button button-edit" onClick={() => void reload()}>Повторить</button></div>
       : !data ? <p className={styles.loading}>Загружаем отзывы…</p> : <>
       {data.summary.count > 0 && <SummaryCard summary={data.summary} />}
