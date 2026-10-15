@@ -110,3 +110,11 @@ test('the summary and a review card show stars, the author, «изменён» a
   const other = renderToStaticMarkup(React.createElement(panel.ReviewCard, { review: { ...review, isMine: false, canDelete: false }, now: Date.now(), onEdit() {}, onDelete() {} }));
   assert.doesNotMatch(other, />Изменить<|>Удалить</);
 });
+
+test('writing or deleting a review makes the open page read the rating again (the review mile)', () => {
+  const { mutationTopics, resourceTopics } = loadTs('shared/domain/live-updates.ts');
+  for (const method of ['POST', 'DELETE']) {
+    const topics = mutationTopics('/api/reviews' + (method === 'DELETE' ? '/' + reviewId : ''), method);
+    assert.ok(topics.some((topic) => resourceTopics('/api/ranking').includes(topic)), method + ' does not refresh the rating');
+  }
+});

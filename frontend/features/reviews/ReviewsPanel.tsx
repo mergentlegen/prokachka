@@ -107,7 +107,7 @@ function ReviewEditor({ review, onClose, onSaved }: { review?: Review; onClose: 
   }
 
   return <FormSheet title={review ? "Мой отзыв" : "Новый отзыв"} submitLabel={review ? "Сохранить" : "Опубликовать"} busy={busy || preparing} busyLabel={preparing ? "Готовим фото…" : "Сохраняем…"}
-    submitDisabled={!rating || text.length < 10} intro="Отзыв сразу увидят участники вашей команды." onClose={onClose} onSubmit={() => void save()}>
+    submitDisabled={!rating || text.length < 10} intro={review ? "Изменения сразу увидят участники вашей команды." : "Отзыв сразу увидят участники вашей команды. За отзыв начисляется 1 миля."} onClose={onClose} onSubmit={() => void save()}>
     <fieldset className={styles.picker}>
       <legend>Оценка</legend>
       <div role="radiogroup" aria-label="Оценка">
@@ -170,7 +170,7 @@ export function ReviewsPanel({ canWrite, onNotice, heading = true }: { canWrite:
     {error && !data ? <div className={styles.empty}><p>{error}</p><button type="button" className="button button-edit" onClick={() => void reload()}>Повторить</button></div>
       : !data ? <p className={styles.loading}>Загружаем отзывы…</p> : <>
       {data.summary.count > 0 && <SummaryCard summary={data.summary} />}
-      {canWrite && <button type="button" className={styles.write} onClick={() => setEditing(mine || "new")}>{mine ? "Мой отзыв" : "Написать отзыв"}</button>}
+      {canWrite && <button type="button" className={styles.write} onClick={() => setEditing(mine || "new")}>{mine ? "Мой отзыв" : <>Написать отзыв <small>+1 миля</small></>}</button>}
       {data.reviews.some((review) => review.photos.length > 0) && <div className={styles.filters} role="group" aria-label="Показать отзывы">
         {([["all", "Все"], ["photos", "С фото"]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} className={filter === value ? styles.filterOn : ""} onClick={() => setFilter(value)}>{label}</button>)}
       </div>}
@@ -178,8 +178,8 @@ export function ReviewsPanel({ canWrite, onNotice, heading = true }: { canWrite:
         : <div className={styles.list}>{shown.map((review) => <ReviewCard key={review.id} review={review} now={now} onEdit={() => setEditing(review)} onDelete={() => setRemoving(review)} />)}</div>}
     </>}
     {editing && <ReviewEditor review={editing === "new" ? undefined : editing} onClose={() => setEditing(null)}
-      onSaved={(created) => { setEditing(null); onNotice(created ? "Спасибо! Отзыв опубликован." : "Отзыв сохранён."); void reload(); }} />}
-    {removing && <ConfirmModal title={removing.isMine ? "Удалить ваш отзыв?" : "Удалить отзыв?"} description={removing.isMine ? "Отзыв пропадёт у всех. Потом можно будет написать новый." : <>Отзыв {removing.authorName} пропадёт у всех. Это действие нельзя отменить.</>}
+      onSaved={(created) => { setEditing(null); onNotice(created ? "Спасибо! Отзыв опубликован, +1 миля." : "Отзыв сохранён."); void reload(); }} />}
+    {removing && <ConfirmModal title={removing.isMine ? "Удалить ваш отзыв?" : "Удалить отзыв?"} description={removing.isMine ? "Отзыв пропадёт у всех, и снимется миля за него. Потом можно будет написать новый." : <>Отзыв {removing.authorName} пропадёт у всех, и у автора снимется миля за отзыв. Это действие нельзя отменить.</>}
       confirmLabel="Удалить отзыв" busy={busy} onClose={() => { if (!busy) setRemoving(null); }} onConfirm={() => void confirmDelete()} />}
   </section>;
 }

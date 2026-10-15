@@ -45,6 +45,8 @@ export function mutationTopics(url: string, method: string): ChangeTopic[] {
   if (url.startsWith("/api/tasks")) return ["tasks", "submissions"];
   if (url.startsWith("/api/stars")) return ["stars"];
   if (url.startsWith("/api/announcements")) return ["announcements"];
+  // A review adds (or, deleted, takes back) a mile, so the rating is read again.
+  if (url.startsWith("/api/reviews")) return ["submissions"];
   if (url.startsWith("/api/ready-programs/")) return ["submissions", "tasks", "programs"];
   if (url === "/api/ready-programs") return ["tasks", "programs"];
   // Preparing a Telegram answer does not yet create a submission.

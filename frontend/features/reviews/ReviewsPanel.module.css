@@ -19,6 +19,7 @@
 .bars b { text-align: right; color: #8a96aa; }
 
 .write { justify-self: start; min-height: 48px; padding: 0 22px; border: 0; border-radius: 14px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px #2f55a42e; }
+.write small { margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: #ffffff2e; font-size: 13px; font-weight: 800; }
 .write:focus-visible, .filters button:focus-visible, .action:focus-visible, .more:focus-visible, .picker button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .filters { display: flex; gap: 8px; }

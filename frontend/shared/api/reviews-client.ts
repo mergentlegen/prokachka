@@ -1,5 +1,7 @@
 import type { AnnouncementPhoto, Review, ReviewSummary } from "@/shared/domain/types";
 import { ApiError, authFetch, request } from "@/frontend/shared/api/client";
+import { announceMutation } from "@/frontend/shared/api/data-cache";
+import { mutationTopics } from "@/shared/domain/live-updates";
 
 type ApiRow = Record<string, unknown>;
 
@@ -40,6 +42,7 @@ export async function saveOwnReview(input: { rating: number; body: string; files
   const response = await authFetch("/api/reviews", { method: "POST", body: form }, 90_000);
   const body = await response.json().catch(() => ({})) as { message?: string; created?: boolean };
   if (!response.ok) throw new ApiError(body.message || "Не удалось сохранить отзыв.", response.status);
+  announceMutation(mutationTopics("/api/reviews", "POST"));
   return { created: body.created === true };
 }
 
