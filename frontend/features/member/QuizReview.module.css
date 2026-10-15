@@ -1,0 +1,21 @@
+.review { display: grid; gap: 12px; margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcfe; }
+.note { margin: 14px 0 0; color: var(--muted); font-size: 14px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.head strong { color: var(--navy); font-size: 16px; }
+.head span { padding: 2px 10px; border-radius: 99px; background: #e3f4ec; color: #1f7a5c; font-size: 13px; font-weight: 800; }
+.questions { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.prompt { margin: 0 0 8px; color: var(--navy); font-size: 15px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.prompt b { color: #6b7a91; }
+.prompt em { margin-left: 8px; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-style: normal; font-weight: 800; white-space: nowrap; }
+.okMark { background: #e3f4ec; color: #1f7a5c; }
+.badMark { background: #fdeeee; color: #b23e4d; }
+.text { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3e9f3; color: #2f3e58; font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.options { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.options li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 8px 12px; border: 1px solid #e3e9f3; border-radius: 10px; background: #fff; color: #2f3e58; font-size: 15px; overflow-wrap: anywhere; }
+.options li > span:nth-child(2) { flex: 1; min-width: 0; }
+.options small { color: inherit; font-size: 12px; font-weight: 700; }
+.mark { display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #eef1f6; font-size: 13px; font-weight: 800; }
+.correct { border-color: #b9e2cf !important; background: #f0faf5 !important; color: #1f6d52 !important; }
+.correct .mark { background: #2f9b75; color: #fff; }
+.wrong { border-color: #f1c9ce !important; background: #fdf3f4 !important; color: #9c2f3d !important; }
+.wrong .mark { background: #c94a59; color: #fff; }

@@ -10,7 +10,7 @@ type ApiResponse<T> = { ok: boolean; message?: string } & T;
 import type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 export type { ProgramHistory, PublicationHistoryItem } from "@/shared/domain/history";
 
-export type AdminDataset = Exclude<keyof Store, "programProgress" | "programModules">;
+export type AdminDataset = Exclude<keyof Store, "programProgress" | "programModules" | "passedTasks">;
 const datasetLoaders: { [K in AdminDataset]: () => Promise<Store[K]> } = {
   tasks: async () => (await request<ApiResponse<{ tasks: ApiRow[] }>>("/api/tasks")).tasks.map(mapTask),
   users: async () => (await request<ApiResponse<{ users: ApiRow[] }>>("/api/users")).users.map(mapUser),

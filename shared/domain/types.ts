@@ -75,5 +75,7 @@ export type ReviewSummary = { count: number; average: number; stars: Record<1 | 
 export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number };
 export type Store = {
   users: User[]; tasks: Task[]; programs: TaskProgram[]; programProgress: MemberProgramProgress[]; programModules?: ProgramModule[];
+  /** Program steps the participant has passed, whole, to read again. */
+  passedTasks?: Task[];
   announcements: Announcement[]; starAwards: StarAward[]; submissions: Submission[];
 };

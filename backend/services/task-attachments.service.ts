@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
-import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
+import { feedShowsTask, getMemberTaskFeed } from "@/backend/services/member-progress.service";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 import type { AuthUser, TaskAttachment } from "@/shared/domain/types";
 
@@ -48,7 +48,7 @@ export async function mayViewTaskAttachment(taskId: string, user: AuthUser) {
   if (user.role === "admin") return true;
   if (!user.canReview && !user.canPublishTasks) {
     const feed = await getMemberTaskFeed(user.id, user.teamId, user.teamJoinedAt);
-    return "data" in feed && Boolean(feed.data?.some((item) => item.id === taskId));
+    return feedShowsTask(feed, taskId);
   }
   const network = await findTeamNetwork(user.teamId);
   if (!("data" in network) || !network.data) return false;

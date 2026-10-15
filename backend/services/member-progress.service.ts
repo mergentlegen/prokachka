@@ -98,7 +98,11 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
       group.slice(1).forEach((task) => excluded.add(String(task.id)));
     }
   }
-  return { programs: programModules(programs, tasks, existing), data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
+  const modules = programModules(programs, tasks, existing);
+  // Passed program steps stay open for reading: their text, video, files and the test with its answers.
+  const passedIds = new Set(modules.flatMap((module) => module.steps.filter((step) => "description" in step).map((step) => step.id)));
+  const passed = tasks.filter((task) => passedIds.has(String(task.id))).map((task) => ({ ...task, program_title: programsById.get(String(task.program_id))?.title }));
+  return { programs: modules, passed, data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
     const program = programsById.get(String(task.program_id));
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;
@@ -106,4 +110,10 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     // A game step has no deadline.
     return { ...publication, unlocked_at: progress?.unlocked_at, due_at: task.interactive_kind ? undefined : progress?.due_at, program_title: program?.title, program_steps: programSteps.get(String(task.program_id)) };
   }) };
+}
+
+/** A participant may open a task's materials when it is in their feed now or is a program step they have passed. */
+export function feedShowsTask(feed: Awaited<ReturnType<typeof getMemberTaskFeed>>, taskId: string) {
+  if (!("data" in feed) || !feed.data) return false;
+  return feed.data.some((task) => String(task.id) === taskId) || Boolean("passed" in feed && feed.passed?.some((task) => String(task.id) === taskId));
 }

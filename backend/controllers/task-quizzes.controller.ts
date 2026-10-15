@@ -3,7 +3,7 @@ import { failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
-import { getQuizForEditing, getQuizForMember, saveQuiz, saveQuizDraft, submitQuiz, taskVideoViews } from "@/backend/services/task-quizzes.service";
+import { getQuizForEditing, getQuizForMember, getQuizReview, saveQuiz, saveQuizDraft, submitQuiz, taskVideoViews } from "@/backend/services/task-quizzes.service";
 
 async function signedIn(request: Request, taskId: string) {
   if (!isUuid(taskId)) return { response: failure("Некорректное задание.", 400) };
@@ -22,6 +22,14 @@ export async function readTaskQuiz(request: Request, taskId: string) {
     if ("forbidden" in result) return failure("Изменять вопросы может автор задания или руководитель команды.", 403);
     if ("error" in result) return failure("Не удалось загрузить вопросы.", 503);
     return ok({ questions: result.data });
+  }
+  if (new URL(request.url).searchParams.get("review") === "1") {
+    const review = await getQuizReview(user, taskId);
+    if ("unavailable" in review) return failure("База данных не настроена.", 503);
+    if ("notFound" in review) return failure("У задания нет вопросов.", 404);
+    if ("forbidden" in review) return failure("Ответы откроются, когда наставник примет работу.", 403);
+    if ("error" in review) return failure("Не удалось загрузить ответы.", 503);
+    return ok({ review: review.data });
   }
   const result = await getQuizForMember(user, taskId);
   if ("unavailable" in result) return failure("База данных не настроена.", 503);

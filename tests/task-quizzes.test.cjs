@@ -104,3 +104,30 @@ test('quiz endpoints: the editor copy is for managers, sending wakes the mentor 
   actor = null;
   assert.equal((await controller.readTaskQuiz(req('GET'), task)).status, 401);
 });
+
+test('a passed test shows the questions, the participant’s answers and the correct ones; before acceptance they stay hidden', async () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const questions = [{ id: 'q1', kind: 'single', prompt: 'Сколько стран?', options: ['100', '193'], correct: [1] }, { id: 'q2', kind: 'text', prompt: 'Что понравилось?' }];
+  let accepted = null;
+  const table = (name) => ({ select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
+    async maybeSingle() { return name === 'task_quizzes' ? { data: { questions, tasks: { team_id: 'team' } } } : { data: accepted }; } });
+  const service = loadTs('backend/services/task-quizzes.service.ts', {
+    '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => ({ from: table }) },
+    '@/backend/services/task-access.service': { canOpenTaskMaterials: async () => true },
+    '@/backend/services/task-videos.service': { canManageTaskMaterials: async () => false },
+  });
+  const user = { id: 'me', role: 'member', teamId: 'team' };
+  assert.ok((await service.getQuizReview(user, 'task')).forbidden, 'no answers before the mentor accepts the work');
+  accepted = { quiz_answers: { q1: { choice: [0] }, q2: { text: 'Каюта' } }, quiz_score: 0, quiz_total: 1 };
+  const review = (await service.getQuizReview(user, 'task')).data;
+  assert.deepEqual(review.questions[0].correct, [1]);
+  assert.deepEqual(review.answers, { q1: { choice: [0] }, q2: { text: 'Каюта' } });
+  const { QuizReviewList } = loadTs('frontend/features/member/QuizReview.tsx');
+  const html = renderToStaticMarkup(React.createElement(QuizReviewList, { review }));
+  assert.match(html, /0 из 1 верно/);
+  assert.match(html, /ошибка/);
+  assert.match(html, /100<\/span><small>ваш ответ, неверно/);
+  assert.match(html, /193<\/span><small>правильный ответ/);
+  assert.match(html, /Каюта/);
+});

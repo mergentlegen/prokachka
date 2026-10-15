@@ -71,3 +71,34 @@ test('programs are blocks with progress; a tap opens passed steps with miles, th
   const empty = renderToStaticMarkup(React.createElement(ProgramModules, { modules: [], tasks, latest, selectedId: null, onSelect() {}, onFeedback() {}, renderTask: () => null }));
   assert.match(empty, /Пока нет программ/);
 });
+
+test('passed steps come whole with the feed, and their materials open for the participant', () => {
+  const progress = loadTs('backend/services/member-progress.service.ts', {
+    '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => null },
+    '@/backend/infrastructure/supabase/read-pages': { readPages: async () => ({ data: [] }) },
+    '@/backend/services/network.service': { ancestors: () => [], findTeamNetwork: async () => ({ data: [] }), isAudienceVisible: () => true },
+  });
+  const feed = { data: [{ id: 'current' }], passed: [{ id: 'done' }], programs: [] };
+  assert.equal(progress.feedShowsTask(feed, 'current'), true);
+  assert.equal(progress.feedShowsTask(feed, 'done'), true, 'a passed step stays open');
+  assert.equal(progress.feedShowsTask(feed, 'locked'), false, 'a closed step does not open');
+  assert.equal(progress.feedShowsTask({ error: 'x' }, 'done'), false);
+});
+
+test('tapping a passed step opens its full task card', async () => {
+  const hookHarness = require('./helpers/hook-harness.cjs');
+  const harness = hookHarness();
+  const { ProgramModules: Modules } = loadTs('frontend/features/member/ProgramModules.tsx', { react: harness.react });
+  const program = { id: 'p1', title: 'Старт', isPinned: false, status: 'active', currentTaskId: 'b', steps: [
+    { id: 'a', number: 1, title: 'Тест по продукту', maxPoints: 5, description: 'Ответь на вопросы' }, { id: 'b', number: 2, title: 'Звонок', maxPoints: 5 }] };
+  const rendered = [];
+  const nodes = (tree, predicate) => Array.isArray(tree) ? tree.flatMap((item) => nodes(item, predicate)) : !tree || typeof tree !== 'object' ? [] : [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
+  let tree = harness.mount(Modules, { modules: [program], tasks: [{ id: 'b', title: 'Звонок' }], passedTasks: [{ id: 'a', title: 'Тест по продукту', quiz: { questions: 3 } }],
+    latest: new Map([['a', accepted('a', 5)]]), selectedId: 'p1', onSelect() {}, onFeedback() {}, renderTask: (task) => { rendered.push(task.id); return 'card ' + task.id; } });
+  try {
+    const row = nodes(tree, (node) => node.type === 'button' && node.props['aria-expanded'] === false && !node.props['data-program'])[0];
+    row.props.onClick();
+    tree = await harness.settle();
+    assert.ok(rendered.includes('a'), 'the passed step is shown as the usual task card');
+  } finally { harness.unmount(); }
+});

@@ -30,6 +30,9 @@
 .returnHint { margin-top:14px; padding:14px 16px; border:1px solid #cfe0f7; border-left:4px solid #3157a4; border-radius:12px; background:#f2f7ff; color:#34496a; font-size:14px; line-height:1.55; }
 .returnHint strong { color:#1f3b6e; }
 .returnHint p { margin:4px 0 0; }
+.answer { margin-top:18px; padding:14px 16px; border:1px solid #e3e9f3; border-radius:12px; background:#fbfcfe; color:#2f3e58; font-size:15px; line-height:1.6; }
+.answer strong { color:var(--navy); font-size:14px; }
+.answer p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .comment { margin-top:20px; padding:16px; border-radius:12px; background:#f4f6fb; color:#4b5e7b; font-size:14px; line-height:1.65; }
 .comment p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 .detailAction { display:flex; justify-content:flex-end; margin-top:24px; padding-top:16px; border-top:1px solid var(--line); }

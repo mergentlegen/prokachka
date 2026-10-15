@@ -166,10 +166,10 @@ export async function loadMemberData(userId: string, keys: readonly MemberDatase
   const read = <T,>(key: MemberDataset, url: string, empty: T): Promise<T> => keys.includes(key)
     ? request<T>(url) : Promise.resolve(dataCache.peek<T>(url) ?? empty);
   const [tasksResponse, submissionsResponse, rankingResponse, announcementsResponse, starsResponse, networkResponse] = await Promise.all([
-    read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[], programs: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
+    read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[], programs: [] as ApiRow[], passedTasks: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
     read("ranking", "/api/ranking", { ranking: [] as RankEntry[], starRanking: [] as RankEntry[] }), read("announcements", "/api/announcements", { announcements: [] as ApiRow[] }), read("stars", "/api/stars", { awards: [] as ApiRow[] }), read("network", "/api/network", { users: [] as ApiRow[] }),
   ]);
-  return { store: { tasks: tasksResponse.tasks.map(mapTask), programModules: (tasksResponse.programs || []).map(mapProgramModule), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapNetworkMember) };
+  return { store: { tasks: tasksResponse.tasks.map(mapTask), programModules: (tasksResponse.programs || []).map(mapProgramModule), passedTasks: (tasksResponse.passedTasks || []).map(mapTask), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], network: networkResponse.users.map(mapNetworkMember) };
 }
 export async function createMemberSubmission(taskId: string): Promise<string> {
   const response = await request<ApiResponse<{ url: string }>>("/api/submissions", { method: "POST", body: JSON.stringify({ taskId }) });

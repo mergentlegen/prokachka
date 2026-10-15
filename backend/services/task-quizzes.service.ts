@@ -77,6 +77,26 @@ export async function getQuizForMember(user: AuthUser, taskId: string) {
   } satisfies MemberQuiz };
 }
 
+export type QuizReview = { questions: QuizQuestion[]; answers: QuizAnswers; score?: number; total?: number };
+
+/** After the work is accepted the participant may look back: the questions, their answers and the correct ones. */
+export async function getQuizReview(user: AuthUser, taskId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const quiz = await loadQuiz(taskId);
+  if (!("data" in quiz)) return quiz;
+  if (!(await canOpenTaskMaterials(user, taskId, quiz.data.teamId))) return { forbidden: true as const };
+  const accepted = await supabase.from("submissions").select("quiz_answers,quiz_score,quiz_total").eq("user_id", user.id).eq("task_id", taskId)
+    .eq("status", "accepted").order("submitted_at", { ascending: false }).limit(1).maybeSingle();
+  if (accepted.error) return { error: accepted.error };
+  // Before acceptance the correct answers stay hidden, so a test sent back for revision cannot be copied.
+  if (!accepted.data) return { forbidden: true as const };
+  return { data: {
+    questions: quiz.data.questions, answers: cleanAnswers(publicQuiz(quiz.data.questions), accepted.data.quiz_answers ?? {}),
+    score: typeof accepted.data.quiz_score === "number" ? accepted.data.quiz_score : undefined, total: typeof accepted.data.quiz_total === "number" ? accepted.data.quiz_total : undefined,
+  } satisfies QuizReview };
+}
+
 export async function saveQuizDraft(user: AuthUser, taskId: string, input: unknown) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };

@@ -8,6 +8,8 @@ import styles from "./ProgramModules.module.css";
 
 type Props = {
   modules: ProgramModule[]; tasks: Task[]; latest: ReadonlyMap<string, Submission>;
+  /** Passed steps, whole: opening one shows the usual task card with its video, files and test answers. */
+  passedTasks?: Task[];
   /** The open program; null when every block is closed. */
   selectedId: string | null; onSelect: (programId: string | null) => void;
   renderTask: (task: Task) => ReactNode; onFeedback: (taskId: string) => void;
@@ -19,7 +21,7 @@ function LockIcon() {
 
 // Programs as modules: a block per program with its progress; a tap opens every step in order. Passed steps stay
 // with their miles, the current one is the usual task card, the next ones show only their title until the previous step is accepted.
-export function ProgramModules({ modules, tasks, latest, selectedId, onSelect, renderTask, onFeedback }: Props) {
+export function ProgramModules({ modules, tasks, passedTasks = [], latest, selectedId, onSelect, renderTask, onFeedback }: Props) {
   const [openStep, setOpenStep] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
@@ -69,7 +71,8 @@ export function ProgramModules({ modules, tasks, latest, selectedId, onSelect, r
                 <span className={styles.text}><small>Шаг {step.number}{note}</small><strong>{step.title}</strong></span>
                 <span className={styles.miles}>{state === "done" ? `+${formatMiles(submission?.points || 0)}` : formatMiles(step.maxPoints)}</span>
               </button>
-              {expanded && <div className={styles.details}>
+              {expanded && passedTasks.some((item) => item.id === step.id) && <div className={styles.passedCard}>{renderTask(passedTasks.find((item) => item.id === step.id)!)}</div>}
+              {expanded && !passedTasks.some((item) => item.id === step.id) && <div className={styles.details}>
                 {step.description ? <p className={styles.description}>{step.description}</p> : step.interactiveKind ? <p className={styles.description}>Игра пройдена.</p> : null}
                 {step.resourceUrl && <a className={styles.link} href={step.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть материал ↗</a>}
                 {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}

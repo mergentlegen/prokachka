@@ -39,6 +39,7 @@
 .locked .mark { background:#f0f3f8; color:#9aa6b8; }
 .skipped .text strong { color:#6d7a90; }
 
+.passedCard { padding:0 10px 10px; }
 .details { display:grid; gap:12px; padding:2px 16px 16px 58px; }
 .description { margin:0; color:#354661; font-size:15px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
 .link { justify-self:start; padding:0; border:0; background:transparent; color:var(--blue); font:inherit; font-family:var(--program-font); font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; }

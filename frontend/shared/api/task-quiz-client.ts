@@ -17,6 +17,11 @@ export async function saveTaskQuiz(taskId: string, questions: QuizQuestion[]): P
 export async function loadMemberQuiz(taskId: string): Promise<MemberQuiz> {
   return (await request<Api<{ quiz: MemberQuiz }>>(base(taskId), { cache: "no-store" })).quiz;
 }
+export type QuizReview = { questions: QuizQuestion[]; answers: QuizAnswers; score?: number; total?: number };
+/** The passed test: questions with the correct choices and the participant's answers (only after acceptance). */
+export async function loadQuizReview(taskId: string): Promise<QuizReview> {
+  return (await request<Api<{ review: QuizReview }>>(`${base(taskId)}?review=1`, { cache: "no-store" })).review;
+}
 export async function saveQuizDraft(taskId: string, answers: QuizAnswers) {
   await request<Api<{ saved: boolean }>>(`${base(taskId)}/draft`, { method: "PUT", body: JSON.stringify({ answers }) });
 }

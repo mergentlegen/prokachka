@@ -20,6 +20,7 @@ import { SafetyWatchGame } from "./SafetyWatchGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
 import { QuizSentNotice, TaskQuiz } from "./TaskQuiz";
+import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
 
@@ -96,6 +97,8 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.video?.playable && <ProtectedVideo taskId={task.id} onCompleted={() => setVideoWatched(true)} />}
         {quizSent ? <QuizSentNotice score={quizSent.score} total={quizSent.total} />
           : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
+        {isQuiz && status === "accepted" && <QuizReview taskId={task.id} />}
+        {!isQuiz && !isInteractive && submission?.answerText && <div className={styles.answer}><strong>Ваш ответ</strong><p>{submission.answerText}</p></div>}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} onOpen={openedResource} />}
         {linkOpened && canSubmit && !isQuiz && <div className={styles.returnHint} role="status"><strong>Уже выполнили?</strong><p>Нажмите «{submitLabel}» ниже. Без этого наставник не увидит работу, не даст обратную связь и не начислит мили.</p></div>}
