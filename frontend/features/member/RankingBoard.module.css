@@ -16,6 +16,12 @@
 .place3 .step { height: 48px; background: linear-gradient(180deg, #d1a083, #b07b5c); }
 .mine .step { box-shadow: 0 0 0 3px #3151a355; }
 
+.formula { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.totals { display: block; color: #6b7a91; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.place > .totals { margin-top: -4px; }
+.rowName { display: grid; gap: 2px; min-width: 0; }
+.unit { color: var(--muted); font-size: 11px; font-weight: 600; }
+
 .me { position: sticky; bottom: 16px; z-index: 4; display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 12px 16px; border-radius: 16px; background: var(--navy-2); color: #fff; box-shadow: 0 12px 28px #10203a40; animation: rise .4s ease backwards .2s; }
 .mePlace { display: grid; place-items: center; flex: 0 0 52px; height: 52px; border-radius: 14px; background: #ffffff1a; }
 .mePlace b { font: 800 20px/1 'Manrope', sans-serif; color: var(--gold); }

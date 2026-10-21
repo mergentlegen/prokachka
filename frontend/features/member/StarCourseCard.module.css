@@ -1,0 +1,18 @@
+:global(.member-shell) .course { flex-basis: 330px; }
+.course { display: grid; gap: 8px; }
+.course :global(.score-value) { margin: 4px 0 0; }
+.bar { display: flex; height: 8px; overflow: hidden; border-radius: 99px; background: #edf1f7; }
+.bar span { width: var(--part); height: 100%; transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+.milesPart { background: linear-gradient(90deg, #3151a3, #5a78c8); }
+.starsPart { background: linear-gradient(90deg, #e7b85b, #d69a2c); }
+.fuel { display: grid; gap: 4px; margin: 2px 0 0; padding: 0; list-style: none; }
+.fuel li { display: flex; justify-content: space-between; gap: 10px; color: #4f5f78; font-size: 13px; font-variant-numeric: tabular-nums; }
+.fuel li span { display: inline-flex; align-items: center; gap: 6px; }
+.fuel li i { font-style: normal; }
+.fuel li b { color: var(--navy); font-weight: 700; white-space: nowrap; }
+.hint { margin: 0; color: #7b879c; font-size: 12px; line-height: 1.45; }
+.rank { justify-self: start; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.rank:hover { color: var(--blue); }
+.rank:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.done :global(.score-label) { color: #a8741a; }
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }

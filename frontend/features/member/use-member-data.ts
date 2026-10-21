@@ -12,7 +12,7 @@ const datasets: Record<MemberTab, MemberDataset[]> = {
   home: ["announcements", "ranking", "tasks", "submissions"], tasks: ["tasks", "submissions"], ranking: ["ranking"],
   network: ["network"], more: [], reviews: [], feedback: [], profile: ["tasks", "submissions", "stars", "ranking"],
 };
-const empty = (): MemberData => ({ store: { users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] }, ranking: [], starRanking: [], network: [] });
+const empty = (): MemberData => ({ store: { users: [], tasks: [], programs: [], programProgress: [], announcements: [], starAwards: [], submissions: [] }, ranking: [], network: [] });
 const initial = () => ({ scope: "", data: empty(), loaded: {} as Partial<Record<MemberTab, boolean>>, errors: {} as Partial<Record<MemberTab, string>> });
 export function useMemberData(user: AuthUser | null, tab: MemberTab) {
   const epoch = useSyncExternalStore(dataCache.subscribe, dataCache.getEpoch, dataCache.getEpoch);

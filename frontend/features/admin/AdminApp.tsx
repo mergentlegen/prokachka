@@ -392,7 +392,7 @@ export function AdminApp() {
       setStore((current) => ({ ...current, submissions: current.submissions.map((item) => item.id === updated.id ? updated : item) }));
       await refreshData();
       setModal(null);
-      setToast(modal.status === "accepted" ? "Работа принята, рейтинг обновлён." : "Работа возвращена на доработку.");
+      setToast(modal.status === "accepted" ? "Работа принята, мили начислены." : "Работа возвращена на доработку.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Произошла ошибка при проверке.");
     } finally {

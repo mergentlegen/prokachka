@@ -60,20 +60,27 @@ test('celebration: the first visit remembers history; later visits celebrate onl
   const old = submission('old', { status: 'accepted', points: 20, reviewedAt: at(-3 * DAY), taskTitle: 'Старое' });
   const first = newMoment([old], 'me', 5, null, at(0));
   assert.equal(first.moment, null);
-  assert.deepEqual(first.seen, { reviewedAt: old.reviewedAt, rank: 5 });
+  assert.deepEqual(first.seen, { reviewedAt: old.reviewedAt, rank: 5, metric: 'course', courseDone: false });
 
   const fresh = submission('new', { status: 'accepted', points: 30, reviewedAt: at(-HOUR), taskTitle: 'Новое' });
   const second = newMoment([old, fresh], 'me', 3, first.seen);
   assert.deepEqual(second.moment, { miles: 30, titles: ['Новое'], rank: 3 });
-  assert.deepEqual(second.seen, { reviewedAt: fresh.reviewedAt, rank: 3 });
+  assert.deepEqual(second.seen, { reviewedAt: fresh.reviewedAt, rank: 3, metric: 'course', courseDone: false });
   assert.equal(newMoment([old, fresh], 'me', 3, second.seen).moment, null, 'the same moment is shown only once');
 
-  assert.equal(newMoment([old], 'me', 0, { reviewedAt: old.reviewedAt, rank: 4 }).moment, null, 'an unloaded rating is not a rank change');
-  assert.equal(newMoment([old], 'me', 0, { reviewedAt: old.reviewedAt, rank: 4 }).seen.rank, 4);
-  assert.deepEqual(newMoment([old], 'me', 2, { reviewedAt: old.reviewedAt, rank: 4 }).moment, { miles: 0, titles: [], rank: 2 });
-  assert.equal(newMoment([old], 'me', 6, { reviewedAt: old.reviewedAt, rank: 4 }).moment, null, 'dropping places is never celebrated');
+  const course = { reviewedAt: old.reviewedAt, rank: 4, metric: 'course' };
+  assert.equal(newMoment([old], 'me', 0, course).moment, null, 'an unloaded rating is not a rank change');
+  assert.equal(newMoment([old], 'me', 0, course).seen.rank, 4);
+  assert.deepEqual(newMoment([old], 'me', 2, course).moment, { miles: 0, titles: [], rank: 2 });
+  assert.equal(newMoment([old], 'me', 6, course).moment, null, 'dropping places is never celebrated');
   const someoneElse = submission('x', { userId: 'other', status: 'accepted', points: 9, reviewedAt: at(0) });
-  assert.equal(newMoment([someoneElse], 'me', 4, { reviewedAt: old.reviewedAt, rank: 4 }).moment, null);
+  assert.equal(newMoment([someoneElse], 'me', 4, course).moment, null);
+  assert.equal(newMoment([old], 'me', 1, { reviewedAt: old.reviewedAt, rank: 4 }).moment, null, 'a place counted by miles is not compared with the course place');
+
+  const done = newMoment([old], 'me', 4, course, undefined, true);
+  assert.deepEqual(done.moment, { miles: 0, titles: [], rank: 0, course: true }, 'the finished course is celebrated');
+  assert.equal(newMoment([old], 'me', 4, done.seen, undefined, true).moment, null, 'only once');
+  assert.equal(newMoment([old], 'me', 4, null, undefined, true).moment, null, 'a new device only remembers it');
 });
 
 test('home overview tiles show tasks waiting, unread replies, place and weekly miles', () => {
@@ -90,7 +97,7 @@ test('home overview tiles show tasks waiting, unread replies, place and weekly m
   assert.match(markup, /<strong>2<\/strong><span[^>]*>задания ждут/);
   assert.match(markup, /осталось 4 ч/, 'the nearest deadline is visible on the tile');
   assert.match(markup, /новых ответа/);
-  assert.match(markup, /<strong>71<\/strong><span[^>]*>миля до 1-го места/);
+  assert.match(markup, /<strong>71<\/strong><span[^>]*>курса до 1-го места/);
   assert.match(markup, /сейчас 2-е место/);
   assert.match(markup, /\+30/);
   const calm = renderToStaticMarkup(React.createElement(HomeOverview, { userId: 'me', now, feedbackUnread: 0, tasks: [], submissions: [], ranking: [{ id: 'me', name: 'B', points: 5 }], onOpen() {} }));
@@ -101,16 +108,18 @@ test('home overview tiles show tasks waiting, unread replies, place and weekly m
 
 test('ranking shows a podium for the top three and pins the participant’s own place', () => {
   const { RankingBoard } = loadTs('frontend/features/member/RankingBoard.tsx');
-  const ranking = ['Анна', 'Борис', 'Вера', 'Гоша', 'Даша'].map((name, index) => ({ id: `u${index}`, name, points: 100 - index * 10 }));
-  const markup = renderToStaticMarkup(React.createElement(RankingBoard, { ranking, metric: 'points', onMetric() {}, userId: 'u4' }));
+  const ranking = ['Анна', 'Борис', 'Вера', 'Гоша', 'Даша'].map((name, index) => ({ id: `u${index}`, name, points: 100 - index * 10, miles: 60 - index * 10, stars: 2 }));
+  const markup = renderToStaticMarkup(React.createElement(RankingBoard, { ranking, userId: 'u4' }));
   const podium = markup.slice(markup.indexOf('Первая тройка'), markup.indexOf('</ol>'));
   assert.ok(podium.indexOf('Борис') < podium.indexOf('Анна') && podium.indexOf('Анна') < podium.indexOf('Вера'), 'second, first, third like a real podium');
   assert.equal((markup.match(/class="rank-row/g) || []).length, 2);
-  assert.match(markup, /До 4-го места: 11 миль/);
-  const leader = renderToStaticMarkup(React.createElement(RankingBoard, { ranking, metric: 'stars', onMetric() {}, userId: 'u0' }));
+  assert.match(markup, /До 4-го места — 11 курса: 11 миль или 1 звезда/);
+  assert.match(markup, /⭐ 2 · ✈️ 20/, 'stars and miles under the name');
+  assert.doesNotMatch(markup, />Мили<|>Звёзды</, 'no separate miles and stars ratings');
+  const leader = renderToStaticMarkup(React.createElement(RankingBoard, { ranking, userId: 'u0' }));
   assert.match(leader, /на первом месте/);
-  assert.match(leader, /100 звёзд/);
-  const small = renderToStaticMarkup(React.createElement(RankingBoard, { ranking: ranking.slice(0, 2), metric: 'points', onMetric() {}, userId: 'u1' }));
+  assert.match(leader, /100 из 300 курса/);
+  const small = renderToStaticMarkup(React.createElement(RankingBoard, { ranking: ranking.slice(0, 2), userId: 'u1' }));
   assert.ok(!small.includes('Первая тройка'), 'no podium for fewer than three people');
 });
 
