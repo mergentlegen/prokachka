@@ -3,7 +3,8 @@
 .modules { --program-font:'Manrope',system-ui,sans-serif; }
 
 .block { min-width:0; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 4px 16px #17274404; transition:border-color .25s, box-shadow .25s, background-color .25s, transform .25s; }
-.block.open { border-color:#c9d5ea; background:#f8fafd; box-shadow:0 12px 30px #17274414; transform:translateY(-1px); }
+/* No transform here: it would become the frame of the task sheet opened inside the block. */
+.block.open { border-color:#c9d5ea; background:#f8fafd; box-shadow:0 12px 30px #17274414; }
 .head { position:relative; display:grid; grid-template-columns:48px minmax(0,1fr) 20px; align-items:center; gap:14px; width:100%; padding:16px 18px 22px; border:0; border-radius:16px; background:transparent; color:inherit; font:inherit; font-family:var(--program-font); text-align:left; cursor:pointer; }
 .head:hover .headText strong { color:var(--blue); }
 .head:focus-visible,.row:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }

@@ -27,7 +27,7 @@ export function VoicePendingNotice({ url, expiresAt, onExpired }: { url: string;
   }, [expiresAt, onExpired]);
   const until = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(expiresAt));
   return <div className={styles.pending} role="status">
-    <span aria-hidden="true">🎙</span>
+    <span aria-hidden="true">🎙️</span>
     <div>
       <strong>Осталось записать голосовое</strong>
       <p>Ответы на тест сохранены. Запишите голосовое в Telegram до {until} — без него задание не отправится.</p>
@@ -118,7 +118,7 @@ export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onV
       })}
     </ol>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? (voice ? "Открываем Telegram…" : "Отправляем…") : voice ? "🎙 Ответить и записать голосовое" : "Отправить наставнику"}</button>
+    <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? (voice ? "Открываем Telegram…" : "Отправляем…") : voice ? "🎙️ Ответить и записать голосовое" : "Отправить наставнику"}</button>
     {voice && <p className={styles.muted}>После ответов откроется Telegram: запишите голосовое в течение 30 минут — работа уйдёт наставнику вместе с ответами.</p>}
   </section>;
 }

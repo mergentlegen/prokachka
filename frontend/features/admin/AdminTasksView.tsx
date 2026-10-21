@@ -73,7 +73,7 @@ function TaskCard({ task, users, submissions, now, canManage, busy, onOpenResult
       <span className={`${styles.state} ${styles[state]}`}>{stateLabels[state]}</span>
       {task.isPinned && <span className={styles.pinned}>{pinIcon}Закреплено</span>}
       {(task.level ?? 1) > 1 && <span className={styles.level}>Уровень {task.level}</span>}
-      {task.voiceAnswer && <span className={styles.voice}>🎙 Голосовое</span>}
+      {task.voiceAnswer && <span className={styles.voice}>🎙️ Голосовое</span>}
       {canManage && <div className={styles.actions}>
         <button type="button" className={styles.edit} disabled={busy} onClick={() => onEdit(task)}>{actionIcons.edit}Изменить</button>
         <ActionsMenu title={task.title} items={items} disabled={busy} />

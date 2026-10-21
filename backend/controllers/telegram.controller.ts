@@ -24,7 +24,7 @@ export function selectedTaskText(selected: { voice?: boolean; quiz?: boolean; ti
   const until = untilTime(selected.expiresAt);
   const time = until ? `На отправку 30 минут — до ${until}. Если ничего не придёт, задание останется неотправленным.` : "На отправку 30 минут.";
   if (selected.voice) return [
-    `🎙 Задание ${task} выбрано. Ответ — голосовое сообщение.`.replace("  ", " "),
+    `🎙️ Задание ${task} выбрано. Ответ — голосовое сообщение.`.replace("  ", " "),
     "Как записать: нажмите и удерживайте микрофон 🎤 справа внизу, скажите ответ и отпустите — сообщение уйдёт само.",
     selected.quiz ? "Ответы на тест уже сохранены и уйдут наставнику вместе с голосовым." : "",
     time,

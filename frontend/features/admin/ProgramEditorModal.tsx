@@ -148,7 +148,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
                 if (task.files.length + valid.length > 10) { onError("К шагу можно прикрепить не больше 10 PDF."); event.target.value = ""; return; }
                 updateTask(task.id, "files", [...task.files, ...valid]); event.target.value = "";
               }} /></label>
-              <label className="toggle-row"><span><strong>🎙 Ответ голосовым в Telegram</strong><small>{task.voiceAnswer ? "Бот примет только голосовое сообщение" : "Ответ текстом, фото, видео или файлом"}</small></span>
+              <label className="toggle-row"><span><strong>🎙️ Ответ голосовым в Telegram</strong><small>{task.voiceAnswer ? "Бот примет только голосовое сообщение" : "Ответ текстом, фото, видео или файлом"}</small></span>
                 <input type="checkbox" role="switch" className="toggle-switch" checked={task.voiceAnswer} onChange={(event) => updateTask(task.id, "voiceAnswer", event.target.checked)} /></label>
               <TaskVideoField file={task.video} removing={false} disabled={busy} onFile={(file) => updateTask(task.id, "video", file)} onRemove={() => undefined} onError={onError} />
               <QuizEditor questions={task.questions} loading={false} disabled={busy} onChange={(questions) => updateTask(task.id, "questions", questions)} />

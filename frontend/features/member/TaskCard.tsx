@@ -48,7 +48,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const canSubmit = !readOnly && task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   // A voice task opens Telegram for one voice message.
   const submitLabel = task.voiceAnswer
-    ? status === "revision" ? "🎙 Записать голосовое заново" : expired ? "🎙 Записать голосовое с опозданием" : "🎙 Записать голосовое"
+    ? status === "revision" ? "🎙️ Записать голосовое заново" : expired ? "🎙️ Записать голосовое с опозданием" : "🎙️ Записать голосовое"
     : status === "revision" ? "Отправить повторно" : expired ? "Отправить с опозданием" : "Отправить ответ";
   function openedResource() {
     if (!canSubmit || isInteractive) return;
@@ -79,7 +79,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
       <h3><button className={styles.title} onClick={() => setOpen(true)} aria-haspopup="dialog">{task.title}</button></h3>
       <p className={styles.preview}>{task.description}</p>
       {isQuiz && <p className={styles.videoHint}><span aria-hidden="true">?</span>Вопросы · {task.quiz?.questions}</p>}
-      {task.voiceAnswer && !isInteractive && <p className={styles.videoHint}><span aria-hidden="true">🎙</span>Ответ — голосовое сообщение в Telegram</p>}
+      {task.voiceAnswer && !isInteractive && <p className={styles.videoHint}><span aria-hidden="true">🎙️</span>Ответ — голосовое сообщение в Telegram</p>}
       {task.video?.playable && <p className={styles.videoHint}><span aria-hidden="true">▶</span>Видео{task.video.durationSeconds ? ` · ${formatVideoTime(task.video.durationSeconds)}` : ""}</p>}
       {Boolean(task.attachments?.length) && <p className={styles.attachmentHint}>PDF-материалы · {task.attachments?.length} {task.attachments?.length === 1 ? "файл" : "файла"}</p>}
       {deadline && (countdown && canSubmit && !captainPending && !surveyInProgress

@@ -21,7 +21,7 @@ test('the bot says what to send, how to record a voice, that the test is kept an
   const { selectedTaskText } = telegramController();
   const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
   const voice = selectedTaskText({ voice: true, quiz: true, title: 'Тест и рассказ', expiresAt });
-  assert.match(voice, /🎙 Задание «Тест и рассказ» выбрано\. Ответ — голосовое сообщение\./);
+  assert.match(voice, /🎙️ Задание «Тест и рассказ» выбрано\. Ответ — голосовое сообщение\./);
   assert.match(voice, /удерживайте микрофон 🎤/);
   assert.match(voice, /Ответы на тест уже сохранены/);
   assert.ok(voice.includes('до ' + almaty(expiresAt)), 'the deadline time in Almaty');
@@ -49,7 +49,7 @@ test('after 30 minutes without an answer the participant hears the task was not 
   assert.match(quiz, /задание не отправлено/);
   assert.match(quiz, /«Ответить и записать голосовое»/);
   assert.match(quiz, /Ответы на тест сохранены/);
-  assert.match(submissionTimeoutText('Видео', true, false, ''), /«🎙 Записать голосовое»/);
+  assert.match(submissionTimeoutText('Видео', true, false, ''), /«🎙️ Записать голосовое»/);
   assert.match(submissionTimeoutText('Гайд', false, false, ''), /«Отправить ответ»/);
 });
 

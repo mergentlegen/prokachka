@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import styles from "./ModalSheet.module.css";
 
@@ -15,7 +16,25 @@ type ModalSheetProps = {
   tall?: boolean;
 };
 
-export function ModalSheet({ title, children, onClose, variant = "default", footer, tall = false }: ModalSheetProps) {
+/** The root of the app the sheet belongs to: its styles still apply, but no card around the opener can move the sheet. */
+const SHEET_ROOT = ".member-shell, .admin-shell, .ceo-shell";
+
+/**
+ * A sheet over the whole screen. It is moved to the app's root element: a card that animates or is lifted with
+ * `transform` would otherwise become the frame of the fixed sheet and squeeze it inside that card.
+ */
+export function ModalSheet(props: ModalSheetProps) {
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [root, setRoot] = useState<Element | null>(null);
+  useLayoutEffect(() => {
+    setRoot(anchor.current?.closest(SHEET_ROOT) || document.body);
+  }, []);
+  // Rendered on the server (and in tests) in place; in the browser always in the app root.
+  if (typeof document === "undefined") return <Sheet {...props} />;
+  return root ? createPortal(<Sheet {...props} />, root) : <span ref={anchor} hidden />;
+}
+
+function Sheet({ title, children, onClose, variant = "default", footer, tall = false }: ModalSheetProps) {
   const panel = useRef<HTMLElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);

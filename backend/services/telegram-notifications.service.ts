@@ -131,7 +131,7 @@ export function milesRecountText(title: string, from: number, to: number, link: 
 export function submissionTimeoutText(title: string, voice: boolean, quiz: boolean, link: string) {
   return [
     "⏰ Прошло 30 минут, а ответ по заданию «" + (title.trim().slice(0, 200) || "Задание") + "» так и не пришёл — задание не отправлено.",
-    "Откройте его на сайте и нажмите «" + (quiz ? "Ответить и записать голосовое" : voice ? "🎙 Записать голосовое" : "Отправить ответ") + "» ещё раз." + (quiz ? " Ответы на тест сохранены — заново отвечать не нужно." : ""),
+    "Откройте его на сайте и нажмите «" + (quiz ? "Ответить и записать голосовое" : voice ? "🎙️ Записать голосовое" : "Отправить ответ") + "» ещё раз." + (quiz ? " Ответы на тест сохранены — заново отвечать не нужно." : ""),
     link ? "Открыть задания: " + link : "",
   ].filter(Boolean).join("\n\n");
 }
@@ -360,7 +360,7 @@ export async function deliverTelegramNotifications() {
         const participant = Array.isArray(voice.users) ? voice.users[0] : voice.users;
         const task = Array.isArray(voice.tasks) ? voice.tasks[0] : voice.tasks;
         if (!job.summary_sent) {
-          const summary = await sendTelegramMessage(chatId, ["🎙 Голосовое участника по заданию", "Участник: " + String(participant?.name || "Участник").slice(0, 200), "Задание: " + String(task?.title || "Готовое задание").slice(0, 200), "Мили за прохождение уже начислены. Голосовое — для обратной связи, не для повторной оценки."].join("\n"));
+          const summary = await sendTelegramMessage(chatId, ["🎙️ Голосовое участника по заданию", "Участник: " + String(participant?.name || "Участник").slice(0, 200), "Задание: " + String(task?.title || "Готовое задание").slice(0, 200), "Мили за прохождение уже начислены. Голосовое — для обратной связи, не для повторной оценки."].join("\n"));
           if (!summary.ok) throw new Error(summary.error);
           await save({ summary_sent: true });
         }

@@ -9,7 +9,7 @@ const task = { id: 't', title: 'Расскажи о себе', description: 'Г�
 test('a voice task asks the participant to record a voice message in Telegram', () => {
   const { TaskCard } = loadTs('frontend/features/member/TaskCard.tsx');
   const voice = renderToStaticMarkup(React.createElement(TaskCard, { task: { ...task, voiceAnswer: true }, onSubmit: async () => undefined }));
-  assert.match(voice, /🎙 Записать голосовое/);
+  assert.match(voice, /🎙️ Записать голосовое/);
   assert.match(voice, /Ответ — голосовое сообщение в Telegram/);
   const again = renderToStaticMarkup(React.createElement(TaskCard, { task: { ...task, voiceAnswer: true }, onSubmit: async () => undefined,
     submission: { id: 's', userId: 'm', taskId: 't', status: 'revision', points: 0, comment: 'Подробнее', submittedAt: '2026-09-02', reviewVersion: 1 } }));
