@@ -118,7 +118,7 @@ function eventsRoute(user) {
   const route = load('app/api/events/route.ts', {
     [currentKey]: { getCurrentUser: async () => user },
     [authKey]: { getSessionToken: () => 'signed', readSession: () => user },
-    [hubKey]: { liveEvents: { subscribe(value) { listener = value; value.status(true); return () => removed++; } } },
+    [hubKey]: { trackLiveStream: () => () => {}, liveEvents: { subscribe(value) { listener = value; value.status(true); return () => removed++; } } },
   });
   return { ...route, listener: () => listener, removed: () => removed };
 }

@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/backend/http/current-user";
 import { getSessionToken, readSession } from "@/backend/services/auth.service";
-import { liveEvents } from "@/backend/services/live-events.service";
+import { liveEvents, trackLiveStream } from "@/backend/services/live-events.service";
 import { topicsForViewer } from "@/shared/domain/live-updates";
 import { acquireLiveConnection } from "@/backend/http/connection-limit";
 import { enforceRequestSecurity } from "@/backend/http/security";
@@ -25,15 +25,18 @@ export async function GET(request: Request) {
       let unsubscribe = () => {};
       let heartbeat: ReturnType<typeof setInterval> | undefined;
       let lifetime: ReturnType<typeof setTimeout> | undefined;
+      let untrack = () => {};
       const finish = () => {
         if (closed) return;
         closed = true;
-        release();
+        release(); untrack();
         clearInterval(heartbeat); clearTimeout(lifetime); unsubscribe();
         request.signal.removeEventListener("abort", finish);
         try { controller.close(); } catch { /* Already cancelled by the client. */ }
       };
       cleanup = finish;
+      // A stopping server closes this stream at once instead of waiting for it.
+      untrack = trackLiveStream(finish);
       const send = (frame: string) => {
         if (closed) return;
         // Slow/disconnected consumers must not build an unbounded server queue.

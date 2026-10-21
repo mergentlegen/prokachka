@@ -1,3 +1,5 @@
+import { Agent } from "undici";
+
 // Requests slower than this are written to the server log, so we speed up what is really slow.
 export const SLOW_REQUEST_MS = 800;
 
@@ -18,14 +20,22 @@ export function supabaseStep(url: string) {
   return service || "?";
 }
 
-/** fetch for the Supabase clients: optional timeout plus a log line for slow requests. */
+/**
+ * Connections to Supabase stay open for a minute between requests (Node's default is 4 seconds).
+ * The database is far away, and a new connection costs about 0.3 s before the query even starts.
+ */
+export const KEEP_ALIVE_MS = 60_000;
+export const supabaseAgent = new Agent({ keepAliveTimeout: KEEP_ALIVE_MS, keepAliveMaxTimeout: 10 * 60_000, connect: { timeout: 10_000 } });
+
+/** fetch for the Supabase clients: kept-alive connections, optional timeout and a log line for slow requests. */
 export function timedFetch(timeoutMs?: number): typeof fetch {
   return async (input, init) => {
     const signal = timeoutMs ? (init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs)) : init?.signal;
     const started = performance.now();
     let status = 0;
     try {
-      const response = await fetch(input, { ...init, signal });
+      // `dispatcher` is Node's (undici) extension of fetch: it picks the connection pool.
+      const response = await fetch(input, { ...init, signal, dispatcher: supabaseAgent } as RequestInit);
       status = response.status;
       return response;
     } finally {

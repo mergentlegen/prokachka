@@ -184,7 +184,7 @@ test('SSE rejects the sixth connection and releases the slot when a stream is ca
   const route = load('app/api/events/route.ts', {
     [currentKey]: { getCurrentUser: async () => ({ id: uuid, role: 'member' }) },
     [authKey]: { getSessionToken: () => 'token', readSession: () => ({ id: uuid }) },
-    '@/backend/services/live-events.service': { liveEvents: { subscribe: () => () => {} } },
+    '@/backend/services/live-events.service': { trackLiveStream: () => () => {}, liveEvents: { subscribe: () => () => {} } },
   });
   const responses = [];
   try {

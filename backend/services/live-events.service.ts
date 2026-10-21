@@ -2,6 +2,37 @@ import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client
 import { isChangeTopic, type DatabaseChange } from "@/shared/domain/live-updates";
 
 type Listener = { change: (change: DatabaseChange) => void; status: (ready: boolean) => void };
+
+/**
+ * Live streams never end by themselves, and on a restart Next.js waits for every open connection:
+ * the old server hung for 30 seconds until systemd killed it. On SIGTERM they all close at once;
+ * browsers reconnect to the new server by themselves.
+ */
+const openStreams = new Set<() => void>();
+let stopHooked = false;
+/** How long anything else may still hold the stopping server. */
+export const STOP_GRACE_MS = 10_000;
+
+export function trackLiveStream(close: () => void) {
+  openStreams.add(close);
+  if (!stopHooked && typeof process !== "undefined" && typeof process.once === "function") {
+    stopHooked = true;
+    process.once("SIGTERM", () => {
+      closeLiveStreams();
+      setTimeout(() => process.exit(143), STOP_GRACE_MS).unref();
+    });
+  }
+  return () => { openStreams.delete(close); };
+}
+
+export function closeLiveStreams() {
+  const streams = [...openStreams];
+  openStreams.clear();
+  for (const close of streams) {
+    try { close(); } catch { /* The client may already be gone. */ }
+  }
+  return streams.length;
+}
 class LiveEventHub {
   private listeners = new Set<Listener>();
   private client: ReturnType<typeof getSupabaseAdmin> = null;

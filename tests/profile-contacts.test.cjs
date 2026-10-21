@@ -104,7 +104,7 @@ test('the invite QR code is drawn from the link itself', () => {
 test('the mentor list is kept until the team changes, read once for parallel requests', async () => {
   let listener;
   const cache = loadTs('backend/services/mentor-list-cache.service.ts', {
-    '@/backend/services/live-events.service': { liveEvents: { subscribe: (value) => { listener = value; value.status(true); return () => {}; } } },
+    '@/backend/services/live-events.service': { trackLiveStream: () => () => {}, liveEvents: { subscribe: (value) => { listener = value; value.status(true); return () => {}; } } },
   });
   let reads = 0;
   const read = async () => { reads++; await new Promise((resolve) => setTimeout(resolve, 5)); return { data: [{ id: 'w' + reads }] }; };
