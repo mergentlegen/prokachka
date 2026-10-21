@@ -23,3 +23,11 @@ export function levelUpMessage(level: number) {
   if (level === 2) return { title: "Ты на безоплатном членстве", text: "Теперь ты не только игрок — ты капитан своей команды", action: "Посмотреть мою команду" };
   return { title: `Ты на уровне ${level}!`, text: "Новый уровень открыт: новые задания, новые мили и новый рейтинг", action: "Посмотреть мою команду" };
 }
+
+/** Profile badges earned by moving up: «Капитан» for level 2, then level 3. */
+export function levelBadges(level: number) {
+  return [
+    ...(level >= 2 ? [{ key: "captain", icon: "⚓", title: "Капитан", note: "за пройденный Звёздный курс уровня 1" }] : []),
+    ...(level >= 3 ? [{ key: "level-3", icon: "★", title: "Уровень 3", note: "за пройденный Звёздный курс уровня 2" }] : []),
+  ];
+}

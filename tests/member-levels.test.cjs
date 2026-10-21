@@ -18,6 +18,9 @@ test('levels: names and the congratulation of level 2', () => {
   assert.equal(levels.parseLevel('2'), 2);
   assert.equal(levels.parseLevel(4), null);
   assert.equal(levels.levelLabel(2), 'Уровень 2 · Капитан');
+  assert.deepEqual(levels.levelBadges(1), [], 'no badge before level 2');
+  assert.deepEqual(levels.levelBadges(2).map((badge) => badge.title), ['Капитан']);
+  assert.deepEqual(levels.levelBadges(3).map((badge) => badge.title), ['Капитан', 'Уровень 3']);
   assert.deepEqual(levels.levelUpMessage(2), { title: 'Ты на безоплатном членстве', text: 'Теперь ты не только игрок — ты капитан своей команды', action: 'Посмотреть мою команду' });
 });
 

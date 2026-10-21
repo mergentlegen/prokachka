@@ -32,8 +32,11 @@
 @media (prefers-reduced-motion: reduce) { .stats button { transition: none; } }
 
 .badges { padding: 14px 16px; border: 1px dashed #cfd9ea; border-radius: 14px; background: #fafbfe; }
-.badgeRow { display: flex; gap: 10px; }
-.badgeRow span { display: grid; place-items: center; width: 44px; height: 44px; border: 2px dashed #d3dbe8; border-radius: 50%; color: #b4bfcf; font-weight: 800; }
+.badgeRow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
+.slot { display: grid; place-items: center; width: 44px; height: 44px; border: 2px dashed #d3dbe8; border-radius: 50%; color: #b4bfcf; font-weight: 800; }
+.earned { display: grid; justify-items: center; gap: 4px; margin: 0; }
+.earned > span { display: grid; place-items: center; width: 52px; height: 52px; margin-top: -4px; border: 2px solid #f3d48e; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6dc, #f0c86a); color: #7a4f05; font-size: 24px; box-shadow: 0 6px 16px #d69a2c40; }
+.earned figcaption { color: #8a5d12; font-size: 11px; font-weight: 800; }
 .badges p { margin: 10px 0 0; color: #6f7c92; font-size: 12px; line-height: 1.5; }
 
 .stars { padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; scroll-margin: 12px; }

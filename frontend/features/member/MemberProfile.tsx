@@ -15,7 +15,9 @@ import { STAR_AWARD_OPTIONS } from "@/shared/domain/star-awards";
 import { formatDate, milesUnit } from "@/frontend/shared/lib/format";
 import { formatPhone } from "@/shared/domain/phone";
 import { plural } from "@/frontend/shared/lib/plural";
-import { levelLabel } from "@/shared/domain/levels";
+import { levelBadges, levelLabel } from "@/shared/domain/levels";
+
+const BADGE_SLOTS = 4;
 import styles from "./MemberProfile.module.css";
 
 type Mode = "view" | "edit" | "password";
@@ -52,6 +54,7 @@ export function MemberProfile({ loading, error, onRetry, user, store, rank, poin
   const [extrasKey, setExtrasKey] = useState(0);
   const [showQr, setShowQr] = useState(false);
   const starsRef = useRef<HTMLElement>(null);
+  const badges = levelBadges(level);
   const reveal = (section: { current: HTMLElement | null }) => section.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   async function share() {
@@ -108,9 +111,12 @@ export function MemberProfile({ loading, error, onRetry, user, store, rank, poin
       </div>
 
       <section className={styles.badges} aria-label="Значки">
-        <div className={styles.sectionHead}><h3>Значки</h3><span>скоро</span></div>
-        <div className={styles.badgeRow} aria-hidden="true">{[0, 1, 2, 3].map((slot) => <span key={slot}>?</span>)}</div>
-        <p>Скоро здесь появятся твои значки за достижения в команде.</p>
+        <div className={styles.sectionHead}><h3>Значки</h3><span>{badges.length ? `${badges.length} из ${BADGE_SLOTS}` : "скоро"}</span></div>
+        <div className={styles.badgeRow}>
+          {badges.map((badge) => <figure key={badge.key} className={styles.earned} title={badge.note}><span aria-hidden="true">{badge.icon}</span><figcaption>{badge.title}</figcaption></figure>)}
+          {Array.from({ length: Math.max(0, BADGE_SLOTS - badges.length) }, (_, slot) => <span key={slot} className={styles.slot} aria-hidden="true">?</span>)}
+        </div>
+        <p>{badges.length ? `${badges.map((badge) => `«${badge.title}» — ${badge.note}`).join(". ")}. Новые значки появятся за следующие достижения.` : "Скоро здесь появятся твои значки за достижения в команде."}</p>
       </section>
 
       <section className={styles.stars} ref={starsRef} aria-label="Мои звёзды">
