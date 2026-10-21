@@ -76,6 +76,8 @@ export async function sendTaskQuiz(request: Request, taskId: string) {
     if ("notFound" in result || "forbidden" in result) return failure("Задание недоступно.", 403);
     if ("validationError" in result) return failure(result.validationError || "Проверьте ответы.", 400);
     if ("error" in result) return failure("Не удалось отправить ответы. Попробуйте ещё раз.", 503);
+    // A voice task: the answers wait for the voice message in Telegram.
+    if ("voice" in result.data) return ok({ voice: result.data.voice, score: result.data.score, total: result.data.total });
     // Mentors were queued for a "new work" message by the database; deliver it now.
     scheduleTelegramDelivery();
     return ok({ submission: result.data.submission, score: result.data.score, total: result.data.total }, 201);

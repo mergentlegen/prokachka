@@ -239,7 +239,7 @@ export function MemberApp() {
     try {
       const url = await createMemberSubmission(taskId);
       window.location.assign(url);
-      setToast("Отправьте боту текст, фото или видео.");
+      setToast(task.voiceAnswer ? "Запишите боту голосовое — на это 30 минут." : "Отправьте боту текст, фото или видео — на это 30 минут.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Не удалось отправить работу. Попробуйте ещё раз.");
     }

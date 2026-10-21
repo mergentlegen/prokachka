@@ -22,3 +22,8 @@
 .sent > span { display: grid; flex: 0 0 36px; place-items: center; height: 36px; border-radius: 50%; background: #dff3ea; color: var(--green); font-weight: 800; }
 .locked strong, .sent strong { color: var(--navy); font-size: 15px; }
 .locked p, .sent p { margin: 3px 0 0; color: #5b6b85; font-size: 13px; line-height: 1.45; }
+.pending { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid #d9cdf6; border-radius: 14px; background: #f6f2ff; color: #3d2f6b; }
+.pending > span { font-size: 22px; line-height: 1; }
+.pending strong { display: block; color: #3d2f6b; font-size: 15px; }
+.pending p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; }
+.telegram { display: inline-flex; align-items: center; min-height: 40px; margin-top: 8px; padding: 0 14px; border-radius: 10px; background: #2aa3de; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; }

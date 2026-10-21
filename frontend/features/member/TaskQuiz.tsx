@@ -17,7 +17,28 @@ export function QuizSentNotice({ score, total }: { score: number; total: number 
   </div>;
 }
 
-export function TaskQuiz({ taskId, videoWatched, onSubmitted }: { taskId: string; videoWatched: boolean; onSubmitted: (result: { score: number; total: number }) => void }) {
+/** A voice task: the test is saved, the voice message is still to be recorded in Telegram before `expiresAt`. */
+/** When the 30 minutes pass, `onExpired` brings the test back so the participant can send it again. */
+export function VoicePendingNotice({ url, expiresAt, onExpired }: { url: string; expiresAt: string; onExpired?: () => void }) {
+  useEffect(() => {
+    if (!onExpired) return;
+    const timer = window.setTimeout(onExpired, Math.max(0, Date.parse(expiresAt) - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [expiresAt, onExpired]);
+  const until = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(expiresAt));
+  return <div className={styles.pending} role="status">
+    <span aria-hidden="true">🎙</span>
+    <div>
+      <strong>Осталось записать голосовое</strong>
+      <p>Ответы на тест сохранены. Запишите голосовое в Telegram до {until} — без него задание не отправится.</p>
+      <a className={styles.telegram} href={url}>Открыть Telegram ещё раз</a>
+    </div>
+  </div>;
+}
+
+export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onVoicePending }: { taskId: string; videoWatched: boolean;
+  /** The answer is the test plus a voice message: sending opens the bot, the test waits for the voice. */ voice?: boolean;
+  onSubmitted: (result: { score: number; total: number }) => void; onVoicePending?: (link: { url: string; expiresAt: string }) => void }) {
   const [quiz, setQuiz] = useState<MemberQuiz | null>(null);
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [error, setError] = useState("");
@@ -51,6 +72,11 @@ export function TaskQuiz({ taskId, videoWatched, onSubmitted }: { taskId: string
     setSending(true); setError("");
     try {
       const sent = await submitTaskQuiz(taskId, answers);
+      if (sent.voice) {
+        onVoicePending?.(sent.voice);
+        window.location.assign(sent.voice.url);
+        return;
+      }
       onSubmitted({ score: sent.score, total: sent.total });
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось отправить ответы. Попробуйте ещё раз."); }
     finally { setSending(false); }
@@ -92,6 +118,7 @@ export function TaskQuiz({ taskId, videoWatched, onSubmitted }: { taskId: string
       })}
     </ol>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? "Отправляем…" : "Отправить наставнику"}</button>
+    <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? (voice ? "Открываем Telegram…" : "Отправляем…") : voice ? "🎙 Ответить и записать голосовое" : "Отправить наставнику"}</button>
+    {voice && <p className={styles.muted}>После ответов откроется Telegram: запишите голосовое в течение 30 минут — работа уйдёт наставнику вместе с ответами.</p>}
   </section>;
 }

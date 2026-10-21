@@ -12,6 +12,45 @@ function botUsername() {
   return serverEnv.telegramBotUsername?.replace(/^@/, "");
 }
 
+/** «до 14:35» in Almaty time. */
+function untilTime(iso?: string) {
+  if (!iso || !Number.isFinite(Date.parse(iso))) return "";
+  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }).format(new Date(iso));
+}
+
+/** What the bot says when a task is chosen: what to send, how, and until when. */
+export function selectedTaskText(selected: { voice?: boolean; quiz?: boolean; title?: string; expiresAt?: string }) {
+  const task = selected.title ? `«${selected.title.trim().slice(0, 120)}»` : "";
+  const until = untilTime(selected.expiresAt);
+  const time = until ? `На отправку 30 минут — до ${until}. Если ничего не придёт, задание останется неотправленным.` : "На отправку 30 минут.";
+  if (selected.voice) return [
+    `🎙 Задание ${task} выбрано. Ответ — голосовое сообщение.`.replace("  ", " "),
+    "Как записать: нажмите и удерживайте микрофон 🎤 справа внизу, скажите ответ и отпустите — сообщение уйдёт само.",
+    selected.quiz ? "Ответы на тест уже сохранены и уйдут наставнику вместе с голосовым." : "",
+    time,
+  ].filter(Boolean).join("\n\n");
+  return [
+    `Задание ${task} выбрано. Отправьте ответ одним сообщением: текст, фото, видео или файл. Пояснение к файлу добавьте в подпись.`.replace("  ", " "),
+    time,
+  ].join("\n\n");
+}
+
+/** Messages the bot cannot take as an answer: an audio file, a round video, a sticker, a location… */
+export function unsupportedMessageText(kind: string) {
+  return [
+    `❌ ${kind} бот не принимает как ответ.`,
+    "Если задание просит голосовое — нажмите и удерживайте микрофон 🎤 справа внизу и запишите сообщение. Иначе отправьте текст, фото, видео или файл.",
+    "↻ Просто отправьте ещё раз сюда, пока не прошло 30 минут.",
+  ].join("\n\n");
+}
+
+/** The answer was saved. */
+export function savedAnswerText(answer: { media_type?: unknown; quiz_total?: unknown } | undefined) {
+  if (answer?.media_type === "voice" && answer.quiz_total !== null && answer.quiz_total !== undefined) return "✅ Голосовое и ответы на тест отправлены наставнику. Он проверит работу и начислит мили.";
+  if (answer?.media_type === "voice") return "✅ Голосовое получено и отправлено наставнику на проверку. Он послушает и начислит мили.";
+  return "✅ Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.";
+}
+
 const telegramLinkWelcomeMessage = [
   "Твой помощник в клубе inCruises.",
   "",
@@ -90,16 +129,19 @@ export async function receiveTelegramUpdate(request: Request) {
             ? "Запишите здесь одно голосовое на 30–60 секунд: расскажите о компании своими словами по плану с сайта. Нажмите на микрофон и отправьте сообщение. Наставник послушает его и начислит мили."
             : selected.purpose === "company-voice"
             ? "Запишите здесь одно голосовое на 30–60 секунд по заданию, которое выбрали на сайте. Нажмите на микрофон и отправьте сообщение. Бот передаст его наставникам вашей ветки. Мили за прохождение уже начислены — повторной оценки не будет."
-            : selected.voice
-            ? "Задание выбрано. Ответ — голосовое сообщение: нажмите на микрофон, запишите ответ и отправьте одно сообщение. Наставник послушает его и начислит мили."
-            : "Задание выбрано. Отправьте ответ одним сообщением: текст, фото, видео или файл. Пояснение к файлу добавьте в подпись."
+            : selectedTaskText(selected)
           : payload ? selected.validationError || "Откройте задание на сайте ещё раз."
           : "Выберите задание в своём аккаунте на сайте и нажмите «Отправить работу». После этого отправьте сюда ответ.");
       }
       return NextResponse.json({ ok: true });
     }
     if (message.media_group_id) {
-      await sendTelegramMessage(telegramId, "Альбом пока не поддерживается. Отправьте одно фото, видео или файл с пояснением в подписи.");
+      await sendTelegramMessage(telegramId, "❌ Альбом бот не принимает.\n\nОтправьте одно фото, видео или файл, пояснение добавьте в подпись.\n\n↻ Просто отправьте ещё раз сюда, пока не прошло 30 минут.");
+      return NextResponse.json({ ok: true });
+    }
+    const unsupported = message.audio ? "Аудиофайл" : message.video_note ? "Видеокружок" : message.sticker ? "Стикер" : message.animation ? "GIF" : message.location ? "Геолокацию" : message.contact ? "Контакт" : message.poll ? "Опрос" : "";
+    if (unsupported) {
+      await sendTelegramMessage(telegramId, unsupportedMessageText(unsupported));
       return NextResponse.json({ ok: true });
     }
     const photo = Array.isArray(message.photo) ? message.photo.at(-1) : undefined;
@@ -107,7 +149,7 @@ export async function receiveTelegramUpdate(request: Request) {
     const mediaType = media ? photo ? "photo" : message.video ? "video" : message.document ? "document" : "voice" : "text";
     const answerText = media ? (typeof message.caption === "string" ? message.caption : "") : text;
     if (!media && !answerText.trim()) {
-      await sendTelegramMessage(telegramId, "Отправьте текст, фото, видео или документ.");
+      await sendTelegramMessage(telegramId, unsupportedMessageText("Пустое сообщение"));
       return NextResponse.json({ ok: true });
     }
     const result = await attachTelegramSubmission({
@@ -124,7 +166,7 @@ export async function receiveTelegramUpdate(request: Request) {
         : result.purpose === "company-voice"
         ? "Голосовое сохранено и поставлено в очередь доставки наставникам вашей ветки. Начисленные мили не изменились."
         : result.purpose === "captain-screenshot" ? "Скриншот сохранён и поставлен в очередь доставки наставникам вашей ветки вместе с сообщением о круизе. Начислена ещё 1 миля — всего 20."
-        : "Ответ сохранён и доступен наставникам вашей ветки. Уведомления в Telegram отправляются автоматически.");
+        : savedAnswerText(result.data as { media_type?: unknown; quiz_total?: unknown }));
     } else {
       return failure("Не удалось подтвердить сохранение ответа.", 503);
     }

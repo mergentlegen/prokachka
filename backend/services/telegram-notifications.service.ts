@@ -85,8 +85,8 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 
 type NotificationJob = {
   id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null;
-  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount" | "review" | "level-up";
-  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number; reviewId?: string; level?: number; memberId?: string }; summary_sent: boolean; attempts: number; lock_token: string;
+  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount" | "review" | "level-up" | "submission-timeout";
+  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number; reviewId?: string; level?: number; memberId?: string; session?: string }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
 // Mass mailings go out at this pace: one worker run a minute, personal notifications first.
@@ -125,6 +125,15 @@ export function milesRecountText(title: string, from: number, to: number, link: 
     "Ваши мили за него пересчитаны: было " + from + ", стало " + to + ".",
     link ? "Открыть сайт: " + link : "",
   ].filter(Boolean).join("\n");
+}
+
+/** Nothing came within 30 minutes of choosing the task: it stays not sent. */
+export function submissionTimeoutText(title: string, voice: boolean, quiz: boolean, link: string) {
+  return [
+    "⏰ Прошло 30 минут, а ответ по заданию «" + (title.trim().slice(0, 200) || "Задание") + "» так и не пришёл — задание не отправлено.",
+    "Откройте его на сайте и нажмите «" + (quiz ? "Ответить и записать голосовое" : voice ? "🎙 Записать голосовое" : "Отправить ответ") + "» ещё раз." + (quiz ? " Ответы на тест сохранены — заново отвечать не нужно." : ""),
+    link ? "Открыть задания: " + link : "",
+  ].filter(Boolean).join("\n\n");
 }
 
 /** A new level: the participant gets the congratulation, their mentor learns who moved up. */
@@ -258,6 +267,20 @@ export async function deliverTelegramNotifications() {
         if (!review.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
         const author = Array.isArray(review.data.users) ? review.data.users[0] : review.data.users;
         delivery = await sendTelegramMessage(chatId, reviewNoticeText(String(author?.name || "Участник"), Number(review.data.rating || 0), String(review.data.body || ""), appUrl() ? appUrl() + "/admin?section=reviews" : ""));
+      } else if (job.kind === "submission-timeout") {
+        // Nothing to say if the answer came, the participant took a new link, or the task is gone.
+        const session = await supabase.from("telegram_submission_sessions").select("user_id,task_id,consumed_at,created_at,metadata,tasks(title,voice_answer)").eq("token_hash", String(job.payload.session || "")).maybeSingle();
+        if (session.error) throw new Error("Cannot load submission session");
+        let stale = !session.data || Boolean(session.data.consumed_at);
+        if (!stale && session.data) {
+          const newer = await supabase.from("telegram_submission_sessions").select("token_hash").eq("user_id", session.data.user_id).eq("task_id", session.data.task_id).gt("created_at", session.data.created_at).limit(1);
+          if (newer.error) throw new Error("Cannot check newer submission sessions");
+          stale = Boolean(newer.data?.length);
+        }
+        if (stale || !session.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        const task = (Array.isArray(session.data.tasks) ? session.data.tasks[0] : session.data.tasks) as { title?: string; voice_answer?: boolean } | null;
+        const metadata = (session.data.metadata || {}) as Record<string, unknown>;
+        delivery = await sendTelegramMessage(chatId, submissionTimeoutText(String(task?.title || ""), task?.voice_answer === true, Boolean(metadata.quiz), appUrl() ? appUrl() + "/?tab=tasks" : ""));
       } else if (job.kind === "level-up") {
         // A mentor may have returned the participant to the previous level while the message waited.
         const memberId = job.payload.memberId ? String(job.payload.memberId) : user.id;

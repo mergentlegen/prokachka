@@ -13,6 +13,10 @@ export type TelegramSubmissionResult = {
   review?: boolean;
   /** The selected task takes one voice message as its answer. */
   voice?: boolean;
+  title?: string;
+  expiresAt?: string;
+  /** Test answers are waiting for the voice message. */
+  quiz?: boolean;
 };
 
 export function telegramTokenHash(token: string) {
@@ -20,7 +24,11 @@ export function telegramTokenHash(token: string) {
 }
 
 /** Selecting a task is not a submission. Only the authenticated webhook can save an answer. */
-export async function prepareTelegramSubmission(userId: string, taskId: string, purpose: "answer" | "company-voice" | "captain-screenshot" = "answer") {
+/** How long a link to the bot works; after it the task stays not sent and the bot says so. */
+export const SUBMISSION_MINUTES = 30;
+
+/** `metadata.quiz` — test answers checked on the site; they become the work together with the voice message. */
+export async function prepareTelegramSubmission(userId: string, taskId: string, purpose: "answer" | "company-voice" | "captain-screenshot" = "answer", metadata?: Record<string, unknown>) {
   const supabase = getSupabaseAdmin();
   const username = serverEnv.telegramBotUsername?.replace(/^@/, "");
   if (!supabase || !username || !serverEnv.telegramBotToken) return { unavailable: true as const };
@@ -32,11 +40,12 @@ export async function prepareTelegramSubmission(userId: string, taskId: string, 
   if (target.error) return { error: target.error };
   if (target.data) return { validationError: String(target.data) };
   const token = randomBytes(24).toString("base64url");
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + SUBMISSION_MINUTES * 60 * 1000).toISOString();
   const saved = await supabase.from("telegram_submission_sessions").insert({
     token_hash: telegramTokenHash(token), user_id: userId, task_id: taskId,
     telegram_id: String(user.data.telegram_id), expires_at: expiresAt,
     ...(purpose !== "answer" ? { purpose } : {}),
+    ...(metadata ? { metadata } : {}),
   });
   if (saved.error) return { error: saved.error };
   return { url: `https://t.me/${username}?start=${purpose === "company-voice" ? "company_voice_" : purpose === "captain-screenshot" ? "captain_" : "submit_"}${token}`, expiresAt };

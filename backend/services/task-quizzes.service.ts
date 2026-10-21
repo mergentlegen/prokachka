@@ -3,24 +3,25 @@ import { canOpenTaskMaterials } from "@/backend/services/task-access.service";
 import { canManageTaskMaterials } from "@/backend/services/task-videos.service";
 import { cleanAnswers, firstUnanswered, gradeQuiz, publicQuiz, validateQuiz, type PublicQuizQuestion, type QuizAnswers, type QuizQuestion } from "@/shared/domain/task-quiz";
 import type { AuthUser } from "@/shared/domain/types";
+import { prepareTelegramSubmission } from "@/backend/services/telegram-submission.service";
 
 export type MemberQuiz = {
   questions: PublicQuizQuestion[]; answers: QuizAnswers;
   videoRequired: boolean; videoCompleted: boolean;
 };
 
-type LoadedQuiz = { unavailable: true } | { notFound: true } | { error: unknown } | { data: { questions: QuizQuestion[]; teamId: string } };
+type LoadedQuiz = { unavailable: true } | { notFound: true } | { error: unknown } | { data: { questions: QuizQuestion[]; teamId: string; voiceAnswer: boolean } };
 async function loadQuiz(taskId: string): Promise<LoadedQuiz> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const found = await supabase.from("task_quizzes").select("questions,tasks(team_id)").eq("task_id", taskId).maybeSingle();
+  const found = await supabase.from("task_quizzes").select("questions,tasks(team_id,voice_answer)").eq("task_id", taskId).maybeSingle();
   if (found.error) return { error: found.error };
   if (!found.data) return { notFound: true as const };
-  const task = (Array.isArray(found.data.tasks) ? found.data.tasks[0] : found.data.tasks) as { team_id?: string } | undefined;
+  const task = (Array.isArray(found.data.tasks) ? found.data.tasks[0] : found.data.tasks) as { team_id?: string; voice_answer?: boolean } | undefined;
   // Stored questions were validated on save; validate again so a damaged row can never break a page.
   const checked = validateQuiz(found.data.questions);
   if ("error" in checked) return { error: new Error("task_quiz_invalid") };
-  return { data: { questions: checked.questions, teamId: String(task?.team_id || "") } };
+  return { data: { questions: checked.questions, teamId: String(task?.team_id || ""), voiceAnswer: task?.voice_answer === true } };
 }
 
 /** How many questions each task has; the card shows it and the answer button changes. */
@@ -122,6 +123,19 @@ export async function submitQuiz(user: AuthUser, taskId: string, input: unknown)
   if (missing) return { validationError: `Ответьте на вопрос ${missing}.` };
   // Scored here with the correct choices the browser never sees.
   const graded = gradeQuiz(quiz.data.questions, answers);
+  if (quiz.data.voiceAnswer) {
+    // The work is the test plus a voice message: nothing is saved until the voice reaches the bot (30 minutes).
+    const checked = await supabase.rpc("app_task_quiz_check", { p_user: user.id, p_task: taskId, p_answer_text: graded.text });
+    if (checked.error) return { error: checked.error };
+    if (checked.data) return { validationError: String(checked.data) };
+    // The answers stay in the draft too, so a late or failed voice does not cost the participant their test.
+    await supabase.from("task_quiz_drafts").upsert({ user_id: user.id, task_id: taskId, answers, updated_at: new Date().toISOString() }, { onConflict: "user_id,task_id" });
+    const link = await prepareTelegramSubmission(user.id, taskId, "answer", { quiz: { text: graded.text, score: graded.score, total: graded.total, answers } });
+    if ("unavailable" in link) return { unavailable: true as const };
+    if ("validationError" in link) return { validationError: link.validationError || "Работу нельзя отправить." };
+    if ("error" in link) return { error: link.error };
+    return { data: { voice: { url: link.url, expiresAt: link.expiresAt }, score: graded.score, total: graded.total } };
+  }
   const result = await supabase.rpc("app_task_quiz_submit", { p_user: user.id, p_task: taskId, p_answer_text: graded.text, p_score: graded.score, p_total: graded.total, p_answers: answers });
   if (result.error) return { error: result.error };
   const payload = result.data as { data?: Record<string, unknown>; validationError?: string };

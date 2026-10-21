@@ -25,8 +25,9 @@ export async function loadQuizReview(taskId: string): Promise<QuizReview> {
 export async function saveQuizDraft(taskId: string, answers: QuizAnswers) {
   await request<Api<{ saved: boolean }>>(`${base(taskId)}/draft`, { method: "PUT", body: JSON.stringify({ answers }) });
 }
+/** For a voice task the answers wait for the voice message: `voice.url` opens the bot. */
 export async function submitTaskQuiz(taskId: string, answers: QuizAnswers) {
-  return request<Api<{ score: number; total: number }>>(`${base(taskId)}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
+  return request<Api<{ score: number; total: number; voice?: { url: string; expiresAt: string } }>>(`${base(taskId)}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
 }
 export async function loadTaskVideoViews(taskId: string): Promise<VideoView[]> {
   return (await request<Api<{ views: VideoView[] }>>(`/api/tasks/${encodeURIComponent(taskId)}/video/views`, { cache: "no-store" })).views;

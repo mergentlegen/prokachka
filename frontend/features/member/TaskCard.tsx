@@ -19,7 +19,7 @@ import { FirstYearGame } from "./FirstYearGame";
 import { SafetyWatchGame } from "./SafetyWatchGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
-import { QuizSentNotice, TaskQuiz } from "./TaskQuiz";
+import { QuizSentNotice, TaskQuiz, VoicePendingNotice } from "./TaskQuiz";
 import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
@@ -34,6 +34,8 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const isQuiz = Boolean(task.quiz) && !isInteractive;
   const [videoWatched, setVideoWatched] = useState(false);
   const [quizSent, setQuizSent] = useState<{ score: number; total: number } | null>(null);
+  // A voice task with a test: the answers are saved, the voice message is still to come in Telegram.
+  const [voicePending, setVoicePending] = useState<{ url: string; expiresAt: string } | null>(null);
   const surveyInProgress = isSurvey && submission?.interactiveCompleted === false;
   const captainPending = task.interactiveKind === "captain-cruise" && submission?.interactiveCompleted === false;
   const deadline = task.dueAt || task.deadlineAt;
@@ -102,7 +104,8 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}</>}
         {task.video?.playable && <ProtectedVideo taskId={task.id} onCompleted={() => setVideoWatched(true)} />}
         {quizSent ? <QuizSentNotice score={quizSent.score} total={quizSent.total} />
-          : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
+          : voicePending && canSubmit ? <VoicePendingNotice url={voicePending.url} expiresAt={voicePending.expiresAt} onExpired={() => setVoicePending(null)} />
+          : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} voice={task.voiceAnswer} onVoicePending={setVoicePending} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
         {isQuiz && status === "accepted" && <QuizReview taskId={task.id} />}
         {!isQuiz && !isInteractive && submission?.answerText && <div className={styles.answer}><strong>Ваш ответ</strong><p>{submission.answerText}</p></div>}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
