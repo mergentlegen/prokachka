@@ -1,4 +1,5 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
+import { parseLevel } from "@/shared/domain/levels";
 import { validMiles } from "@/shared/domain/miles";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
@@ -61,7 +62,9 @@ export async function postProgram(request: Request) {
     }
     const teamId = user.role === "ceo" ? typeof body.teamId === "string" ? body.teamId : undefined : user.teamId;
     if (!teamId || !isUuid(teamId)) return failure("Программа должна быть привязана к команде.", 400);
-    const result = await createProgram({ teamId, title: body.title.trim(), deadlineHours, tasks, publisherId: user.id === "ceo" ? undefined : user.id, audienceRootId: user.role === "member" ? user.id : null });
+    const level = body.level === undefined ? 1 : parseLevel(body.level);
+    if (!level) return failure("Уровень может быть от 1 до 3.", 400);
+    const result = await createProgram({ teamId, title: body.title.trim(), deadlineHours, tasks, publisherId: user.id === "ceo" ? undefined : user.id, audienceRootId: user.role === "member" ? user.id : null, level });
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if (result.error) return failure("Не удалось создать программу.");
     await recordAudit(user, { action: "program.create", targetId: String(result.data.program?.id || ""), targetLabel: body.title.trim(), teamId, details: { steps: tasks.length } });
@@ -79,8 +82,9 @@ export async function patchProgram(request: Request, id: string) {
     if (body.deadlineHours !== undefined && (!Number.isInteger(Number(body.deadlineHours)) || Number(body.deadlineHours) < 1 || Number(body.deadlineHours) > 720)) return failure("Интервал должен быть от 1 до 720 часов.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус.", 400);
     if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
+    if (body.level !== undefined && !parseLevel(body.level)) return failure("Уровень может быть от 1 до 3.", 400);
     const before = body.title !== undefined ? await auditRecord("task_programs", id) : null;
-    const result = await updateProgram(id, { title: body.title, deadlineHours: body.deadlineHours === undefined ? undefined : Number(body.deadlineHours), isActive: body.isActive, isPinned: body.isPinned }, user);
+    const result = await updateProgram(id, { title: body.title, deadlineHours: body.deadlineHours === undefined ? undefined : Number(body.deadlineHours), isActive: body.isActive, isPinned: body.isPinned, level: body.level === undefined ? undefined : parseLevel(body.level) ?? undefined }, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
     if (result.error) return failure("Не удалось обновить программу.");

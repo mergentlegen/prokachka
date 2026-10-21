@@ -93,3 +93,4 @@
   .addStep { justify-self: stretch; }
 }
 @media (prefers-reduced-motion: reduce) { .card, .chevron, .fold i, .addChoice { transition: none; } }
+.badgeLevel { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 10px; border-radius: 99px; background: #fff3d9; color: #a8741a; font-size: 12px; font-weight: 800; white-space: nowrap; }

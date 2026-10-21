@@ -7,7 +7,7 @@ import { removeAttachmentPaths } from "@/backend/services/task-attachments.servi
 
 type ProgramTaskInput = { title: string; description: string; maxPoints: number; resourceUrl?: string | null; publicationType?: TaskPublicationType; interactiveKind?: TaskInteractiveKind };
 type ProgramViewer = { id: string; role: string; teamId?: string; canPublishTasks?: boolean };
-export type ProgramInput = { teamId: string; title: string; deadlineHours: number; tasks: ProgramTaskInput[]; publisherId?: string; audienceRootId?: string | null; templateKey?: ReadyProgramKey };
+export type ProgramInput = { teamId: string; title: string; deadlineHours: number; tasks: ProgramTaskInput[]; publisherId?: string; audienceRootId?: string | null; templateKey?: ReadyProgramKey; level?: number };
 
 export async function findPrograms(teamId?: string, viewer?: ProgramViewer) {
   const supabase = getSupabaseAdmin();
@@ -26,7 +26,9 @@ export async function findPrograms(teamId?: string, viewer?: ProgramViewer) {
 export async function createProgram(input: ProgramInput) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const result = await supabase.rpc("app_create_program", { p_input: input });
+  const { level = 1, ...program } = input;
+  // A program above level 1 is created and moved in one transaction, so nobody sees it on the wrong level.
+  const result = level > 1 ? await supabase.rpc("app_create_program_level", { p_input: program, p_level: level }) : await supabase.rpc("app_create_program", { p_input: program });
   return result.error ? { error: result.error } : { data: result.data as { program: Record<string, unknown>; tasks: Record<string, unknown>[] } };
 }
 
@@ -83,10 +85,18 @@ export async function publishReadyProgram(input: { teamId: string; key: ReadyPro
   }
   return result;
 }
-export async function updateProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean }, actor?: ProgramViewer) {
+export async function updateProgram(id: string, changes: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean; level?: number }, actor?: ProgramViewer) {
   if (!actor || (actor.role !== "ceo" && !actor.teamId)) return { forbidden: true as const };
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
+  const { level, ...input } = changes;
+  if (level !== undefined) {
+    const moved = await supabase.rpc("app_set_program_level", { p_id: id, p_level: level, p_actor: actor.id === "ceo" ? null : actor.id, p_ceo: actor.role === "ceo" });
+    if (moved.error) return { error: moved.error };
+    const outcome = moved.data as { data?: Record<string, unknown>; forbidden?: boolean };
+    if (outcome.forbidden) return { forbidden: true as const };
+    if (!Object.values(input).some((value) => value !== undefined)) return { data: outcome.data };
+  }
   const result = await supabase.rpc("app_update_program", {
     p_id: id, p_patch: input, p_actor: actor.id === "ceo" ? null : actor.id, p_ceo: actor.role === "ceo",
   });

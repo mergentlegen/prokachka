@@ -1,0 +1,17 @@
+.screen { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; overflow-y: auto; padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% 30%, #2c4f9e 0%, #14254a 55%, #0c1731 100%); color: #fff; animation: appear .45s ease both; }
+/* Fixed and larger than the screen, so turning it never shows a corner or adds scrolling. */
+.rays { position: fixed; inset: -50%; pointer-events: none; background: repeating-conic-gradient(from 0deg at 50% 50%, #ffffff0a 0deg 8deg, transparent 8deg 22deg); animation: spin 60s linear infinite; }
+.close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 2; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #ffffff1a; color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
+.content { position: relative; display: grid; justify-items: center; gap: 14px; max-width: 520px; text-align: center; }
+.badge { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 18px; border-radius: 99px; background: linear-gradient(135deg, #f3d48e, #d69a2c); color: #3b2a07; font-family: 'Manrope', system-ui, sans-serif; font-size: 16px; font-weight: 800; box-shadow: 0 10px 30px #d69a2c55; animation: pop .6s cubic-bezier(.2, 1.4, .4, 1) .15s both; }
+.course { margin: 6px 0 0; color: #b9c8e8; font-size: 14px; font-weight: 600; }
+.content h2 { margin: 0; font-family: 'Manrope', system-ui, sans-serif; font-size: clamp(28px, 6vw, 40px); font-weight: 800; line-height: 1.15; letter-spacing: -.02em; text-wrap: balance; }
+.text { margin: 0; color: #e3eaf8; font-size: 18px; line-height: 1.5; text-wrap: balance; }
+.team { min-height: 54px; margin-top: 10px; padding: 0 28px; border: 0; border-radius: 14px; background: #fff; color: var(--navy); font-family: 'Manrope', system-ui, sans-serif; font-size: 17px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 32px #0006; }
+.team:hover { background: #f3f6fd; }
+.team:focus-visible, .close:focus-visible { outline: 3px solid #f3d48e; outline-offset: 3px; }
+.next { margin: 4px 0 0; color: #9fb0d2; font-size: 13px; line-height: 1.5; }
+@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .screen, .badge, .rays { animation: none; } }

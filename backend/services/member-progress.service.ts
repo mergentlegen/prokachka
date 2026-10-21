@@ -27,23 +27,42 @@ export function programModules(programs: Row[], tasks: Row[], progressByProgram:
   });
 }
 
-export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt?: string) {
+/** The participant's level and when each level started (level 1: joining the team). */
+function memberLevels(rows: Record<string, unknown>[], joinedAt?: string) {
+  const startedAt = new Map<number, string | undefined>([[1, joinedAt]]);
+  for (const row of rows) startedAt.set(Number(row.level), String(row.reached_at));
+  return { level: Math.max(1, ...startedAt.keys()), startedAt };
+}
+
+/**
+ * Tasks and programs of one level. Without `requestedLevel` it is the participant's current level;
+ * an earlier level is the read-only archive (nothing new starts there).
+ */
+export async function getMemberTaskFeed(userId: string, teamId: string, teamJoinedAt?: string, requestedLevel?: number) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  // The team structure is needed for every feed, so it travels together with the lists.
-  const [tasksResult, programsResult, progressResult, network] = await Promise.all([
+  // The team structure and the participant's levels are needed for every feed, so they travel together with the lists.
+  const [tasksResult, programsResult, progressResult, network, levelsResult] = await Promise.all([
     readPages(supabase.from("tasks").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
     readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
     readPages(supabase.from("member_program_progress").select("*").eq("user_id", userId).order("id")),
     findTeamNetwork(teamId),
+    readPages(supabase.from("member_levels").select("level,reached_at").eq("user_id", userId).is("revoked_at", null).order("level")),
   ]);
-  if (tasksResult.error || programsResult.error || progressResult.error) return { error: tasksResult.error || programsResult.error || progressResult.error };
+  if (tasksResult.error || programsResult.error || progressResult.error || levelsResult.error) return { error: tasksResult.error || programsResult.error || progressResult.error || levelsResult.error };
   if ("unavailable" in network) return network;
   if ("error" in network) return network;
-  const tasks = (tasksResult.data || []).filter((task) => isAudienceVisible(network.data, userId, task.audience_root_id));
-  const programs = (programsResult.data || []).filter((program) => isAudienceVisible(network.data, userId, program.audience_root_id));
+  const levels = memberLevels(levelsResult.data || [], teamJoinedAt);
+  const level = levels.level;
+  const viewLevel = requestedLevel && requestedLevel >= 1 && requestedLevel <= level ? requestedLevel : level;
+  const archive = viewLevel < level;
+  // Programs and dated tasks of a level count from the day the participant reached it.
+  const joinedAt = levels.startedAt.get(viewLevel) ?? teamJoinedAt;
+  const onLevel = (row: { level?: unknown }) => (Number(row.level) || 1) === viewLevel;
+  const tasks = (tasksResult.data || []).filter((task) => onLevel(task) && isAudienceVisible(network.data, userId, task.audience_root_id));
+  const programs = (programsResult.data || []).filter((program) => onLevel(program) && isAudienceVisible(network.data, userId, program.audience_root_id));
   const existing = new Map((progressResult.data || []).map((row) => [String(row.program_id), row]));
-  const missing = programs.filter((program) => !existing.has(String(program.id)));
+  const missing = archive ? [] : programs.filter((program) => !existing.has(String(program.id)));
   if (missing.length) {
     const firstTasks = tasks.filter((task) => task.publication_type === "sequential" && task.position === 1);
     const rows = missing.map((program) => {
@@ -102,7 +121,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
   // Passed program steps stay open for reading: their text, video, files and the test with its answers.
   const passedIds = new Set(modules.flatMap((module) => module.steps.filter((step) => "description" in step).map((step) => step.id)));
   const passed = tasks.filter((task) => passedIds.has(String(task.id))).map((task) => ({ ...task, program_title: programsById.get(String(task.program_id))?.title }));
-  return { programs: modules, passed, data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
+  return { level, viewLevel, programs: modules, passed, data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
     const program = programsById.get(String(task.program_id));
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;
@@ -110,6 +129,17 @@ export async function getMemberTaskFeed(userId: string, teamId: string, joinedAt
     // A game step has no deadline.
     return { ...publication, unlocked_at: progress?.unlocked_at, due_at: task.interactive_kind ? undefined : progress?.due_at, program_title: program?.title, program_steps: programSteps.get(String(task.program_id)) };
   }) };
+}
+
+/** Materials of the current level, then of earlier levels: those stay open as a read-only archive. */
+export async function memberFeedShowsTask(userId: string, teamId: string, teamJoinedAt: string | undefined, taskId: string) {
+  const feed = await getMemberTaskFeed(userId, teamId, teamJoinedAt);
+  if (feedShowsTask(feed, taskId)) return true;
+  const level = "level" in feed && typeof feed.level === "number" ? feed.level : 1;
+  for (let earlier = level - 1; earlier >= 1; earlier--) {
+    if (feedShowsTask(await getMemberTaskFeed(userId, teamId, teamJoinedAt, earlier), taskId)) return true;
+  }
+  return false;
 }
 
 /** A participant may open a task's materials when it is in their feed now or is a program step they have passed. */

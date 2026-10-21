@@ -107,14 +107,17 @@ async function findNetworkStats(teamId: string, mentorView: boolean) {
   if (!supabase) return null;
   const since = new Date(Date.now() - NETWORK_ACTIVITY_DAYS * 86_400_000).toISOString();
   const none = Promise.resolve({ data: [], error: null });
-  const [points, stars, activity, telegram] = await Promise.all([
+  const [points, stars, levels, activity, telegram] = await Promise.all([
     readPages<{ id: string; points: number | string }>(supabase.rpc("app_ranking", { p_team_id: teamId, p_metric: "points" }).order("id")),
     readPages<{ id: string; points: number | string }>(supabase.rpc("app_ranking", { p_team_id: teamId, p_metric: "stars" }).order("id")),
+    readPages<{ user_id: string; level: number | string }>(supabase.from("member_levels").select("user_id,level,users!inner(team_id)").eq("users.team_id", teamId).is("revoked_at", null).order("user_id").order("level")),
     mentorView ? readPages<{ id: string; user_id: string; submitted_at: string }>(supabase.from("submissions").select("id,user_id,submitted_at,users!inner(team_id)")
       .eq("users.team_id", teamId).gte("submitted_at", since).order("id")) : none,
     mentorView ? readPages<{ id: string }>(supabase.from("users").select("id").eq("team_id", teamId).not("telegram_id", "is", null).order("id")) : none,
   ]);
   const failed = [points, stars, activity, telegram].find((item) => item.error);
+  // Levels are a badge only: without them the rest of the card still shows.
+  if (levels.error) console.warn("Member levels are temporarily unavailable", { error: levels.error.message });
   if (failed) {
     console.warn("Network stats are temporarily unavailable", { error: failed.error?.message });
     return null;
@@ -123,6 +126,7 @@ async function findNetworkStats(teamId: string, mentorView: boolean) {
   const entry = (id: string) => { const key = String(id); let value = stats.get(key); if (!value) stats.set(key, value = {}); return value; };
   for (const row of points.data || []) entry(row.id).points = Number(row.points) || 0;
   for (const row of stars.data || []) entry(row.id).stars = Number(row.points) || 0;
+  for (const row of levels.error ? [] : levels.data || []) { const value = entry(row.user_id); value.level = Math.max(value.level || 1, Number(row.level) || 1); }
   if (mentorView) {
     for (const row of points.data || []) Object.assign(entry(row.id), { recentSubmissions: 0, hasTelegram: false });
     for (const row of activity.data || []) {
@@ -133,6 +137,18 @@ async function findNetworkStats(teamId: string, mentorView: boolean) {
     for (const row of telegram.data || []) entry(row.id).hasTelegram = true;
   }
   return stats;
+}
+
+// «Перевести на уровень» / «Вернуть на уровень»: the database checks that the actor is an admin of the participant's team.
+export async function setMemberLevel(actor: AuthUser, targetId: string, level: number) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const result = await supabase.rpc("app_set_member_level", { p_actor: actor.id, p_user: targetId, p_level: level });
+  if (result.error) return { error: result.error };
+  const outcome = result.data as { level?: number; forbidden?: boolean; validationError?: string };
+  if (outcome.forbidden) return { forbidden: true as const };
+  if (outcome.validationError) return { validationError: outcome.validationError };
+  return { data: Number(outcome.level) || 1 };
 }
 
 export async function updateNetworkUser(actor: AuthUser, targetId: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean }) {

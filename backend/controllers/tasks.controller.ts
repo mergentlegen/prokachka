@@ -10,6 +10,7 @@ import { validMiles } from "@/shared/domain/miles";
 import { taskVideoSummaries } from "@/backend/services/task-videos.service";
 import { taskQuizSummaries } from "@/backend/services/task-quizzes.service";
 import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
+import { parseLevel } from "@/shared/domain/levels";
 
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
@@ -27,14 +28,17 @@ function parseDeadline(value: unknown) {
 export async function listTasks(request: Request) {
   const user = await currentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
-  const memberView = new URL(request.url).searchParams.get("view") === "member";
+  const params = new URL(request.url).searchParams;
+  const memberView = params.get("view") === "member";
+  const requestedLevel = params.has("level") ? parseLevel(params.get("level")) : undefined;
+  if (requestedLevel === null) return failure("Некорректный уровень.", 400);
   if (user.role === "member" && (memberView || (!user.canReview && !user.canPublishTasks))) {
     const teamId = user.teamId;
     if (!teamId) return ok({ tasks: [] });
-    const result = await getMemberTaskFeed(user.id, teamId, user.teamJoinedAt);
+    const result = await getMemberTaskFeed(user.id, teamId, user.teamJoinedAt, requestedLevel);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("error" in result) return failure("Не удалось загрузить задания.");
-    return withTaskDetails(result.data, user, false, { programs: "programs" in result ? result.programs : [] }, "passed" in result ? result.passed : []);
+    return withTaskDetails(result.data, user, false, { programs: "programs" in result ? result.programs : [], level: "level" in result ? result.level : 1, viewLevel: "viewLevel" in result ? result.viewLevel : 1 }, "passed" in result ? result.passed : []);
   }
   if ((user.role === "admin" || user.role === "member") && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "ceo" ? undefined : user.teamId, user);
@@ -75,7 +79,9 @@ export async function createTask(request: Request) {
     if (body.maxPoints !== undefined && !validMiles(Number(body.maxPoints))) return failure("Некорректное количество миль.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус задания.", 400);
     if (body.publicationType !== undefined && !["evergreen", "fixed", "sequential"].includes(body.publicationType)) return failure("Некорректный тип публикации.", 400);
-    const result = await insertTask({
+    const level = body.level === undefined ? 1 : parseLevel(body.level);
+    if (!level) return failure("Уровень может быть от 1 до 3.", 400);
+    const result = await insertTask({ level,
       title: body.title.trim(), description: body.description.trim(), maxPoints: body.maxPoints, deadlineAt: deadline.value,
       isActive: body.isActive, teamId, publicationType: body.publicationType, programId: body.programId,
       position: body.position, deadlineHours: body.deadlineHours, resourceUrl: resourceUrl.value,
@@ -103,6 +109,7 @@ export async function updateTask(request: Request, id: string) {
     if (body.maxPoints !== undefined && !validMiles(Number(body.maxPoints))) return failure("Некорректное количество миль.", 400);
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус задания.", 400);
     if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
+    if (body.level !== undefined && !parseLevel(body.level)) return failure("Уровень может быть от 1 до 3.", 400);
     const deadline = Object.prototype.hasOwnProperty.call(body, "deadlineAt") ? parseDeadline(body.deadlineAt) : { value: undefined as string | null | undefined };
     if ("error" in deadline) return failure(deadline.error, 400);
     const resourceUrl = Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? parseExternalUrl(body.resourceUrl) : { value: undefined as string | null | undefined };

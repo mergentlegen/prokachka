@@ -38,3 +38,4 @@
 .actions :global(.button) { flex: 1 1 140px; min-height: 44px; }
 
 @media (prefers-reduced-motion: reduce) { .switch input, .switch input::after { transition: none; } }
+.levelButtons { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { AuthUser, NetworkMember } from "@/shared/domain/types";
-import { createNetworkInvitation, updateNetworkUser } from "@/frontend/shared/api/network-client";
+import { createNetworkInvitation, setNetworkMemberLevel, updateNetworkUser } from "@/frontend/shared/api/network-client";
 import { matchesNetworkFilter, NetworkTree, type NetworkFilter } from "@/frontend/shared/NetworkTree";
 import type { NetworkSort } from "@/frontend/shared/lib/network-tree";
 import { NetworkMemberSettings, type NetworkUserPatch } from "./NetworkMemberSettings";
@@ -41,6 +41,12 @@ export function NetworkPanel({ authUser, users, onChange: setUsers, onError }: {
     saving.current = true;
     setBusyId(id);
     try {
+      if (input.level !== undefined) {
+        const level = await setNetworkMemberLevel(id, input.level);
+        setUsers((current) => current.map((user) => user.id === id ? { ...user, level: level > 1 ? level : undefined } : user));
+        onError(`Уровень участника: ${level}.`);
+        return true;
+      }
       const saved = await updateNetworkUser(id, input);
       // The update response has no stats; keep the loaded miles and activity.
       setUsers((current) => current.map((user) => user.id === saved.id ? { ...user, ...saved } : user));

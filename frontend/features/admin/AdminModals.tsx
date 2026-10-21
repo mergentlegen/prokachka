@@ -7,21 +7,23 @@ import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { TaskFilePicker } from "./TaskFilePicker";
 import { TaskVideoField } from "./TaskVideoField";
 import { QuizEditor } from "./QuizEditor";
+import { LevelPicker } from "./LevelPicker";
 import type { QuizQuestion } from "@/shared/domain/task-quiz";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { MAX_MILES } from "@/shared/domain/miles";
-export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string };
+export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string; level: number };
 export type ReviewDraft = { points: string; comment: string };
 
 export function TaskEditorModal({ taskId, task, program, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, quiz, onChange, onClose, onSubmit }: { taskId?: string; task?: Task; program?: TaskProgram; draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
   video: { file: File | null; removing: boolean; onFile: (file: File | null) => void; onRemove: (removing: boolean) => void; onError: (message: string) => void };
   quiz: { questions: QuizQuestion[]; loading: boolean; onChange: (questions: QuizQuestion[]) => void };
-  onChange: (key: keyof TaskDraft, value: string | boolean) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  onChange: (key: keyof TaskDraft, value: string | boolean | number) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   // A program step takes its time from the program, so it has no date of its own.
   const programStep = Boolean(program) || task?.publicationType === "sequential";
   return <FormSheet title={editing ? "Изменить задание" : program ? "Новый шаг программы" : "Новое задание"} busy={busy} busyLabel={busyLabel}
     submitLabel={editing ? "Сохранить" : program ? "Добавить шаг" : "Создать задание"} onClose={onClose} onSubmit={onSubmit}
     intro={program && !editing ? <>Шаг встанет последним в программе «{program.title}», на него будет {program.deadlineHours} ч, как и на остальные шаги. Порядок можно поменять стрелками ↑ ↓. Тем, кто уже прошёл программу, новый шаг тоже откроется.</> : undefined}>
+    {!programStep && <LevelPicker value={draft.level} disabled={busy} onChange={(level) => onChange("level", level)} />}
     <label>Название задания<input value={draft.title} onChange={(event) => onChange("title", event.target.value)} placeholder="Например, записать короткое видео" autoFocus /></label>
     <label>Описание<textarea value={draft.description} onChange={(event) => onChange("description", event.target.value)} placeholder="Что нужно сделать участнику и как отправить ответ" rows={5} /></label>
     <label><span className="field-label">Ссылка на материал <span className="field-hint">необязательно</span></span><input type="url" value={draft.resourceUrl} onChange={(event) => onChange("resourceUrl", event.target.value)} placeholder="https://youtube.com/..." /></label>

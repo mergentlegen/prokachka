@@ -26,7 +26,7 @@ test('a mentor renames a program from its card; the journal notes the old and ne
   try {
     // «Переименовать» lives in the program's ⋯ menu.
     const menu = nodes(tree, (node) => Array.isArray(node.props?.items) && node.props.title === 'Программа 1')[0];
-    assert.deepEqual(menu.props.items.map((item) => item.label), ['Переименовать', 'Закрепить сверху', 'Скрыть от участников', 'Удалить программу']);
+    assert.deepEqual(menu.props.items.map((item) => item.label), ['Переименовать', 'Закрепить сверху', 'Скрыть от участников', 'Перенести на уровень 2', 'Перенести на уровень 3', 'Удалить программу']);
     menu.props.items[0].onSelect();
     tree = await harness.settle();
     let form = nodes(tree, (node) => node.type === FormSheet)[0];

@@ -15,6 +15,7 @@ import { STAR_AWARD_OPTIONS } from "@/shared/domain/star-awards";
 import { formatDate, milesUnit } from "@/frontend/shared/lib/format";
 import { formatPhone } from "@/shared/domain/phone";
 import { plural } from "@/frontend/shared/lib/plural";
+import { levelLabel } from "@/shared/domain/levels";
 import styles from "./MemberProfile.module.css";
 
 type Mode = "view" | "edit" | "password";
@@ -32,8 +33,8 @@ const statIcons = {
 
 const starKind = (kind?: string) => STAR_AWARD_OPTIONS.find((option) => option.kind === kind)?.label;
 
-export function MemberProfile({ loading, error, onRetry, user, store, rank, points, stars, telegramBusy, onLinkTelegram, onRefreshTelegram, inviteUrl, inviteBusy, onCreateInvite, onCopyInvite, onProfileSaved, onNotice, onOpenDone, onOpenRanking, onUnlinkTelegram, onClose, onLogout }: {
-  loading?: boolean; error?: string; onRetry?: () => void; user: User; store: Store; rank: number; points: number; stars: number;
+export function MemberProfile({ loading, error, onRetry, user, store, rank, points, stars, level = 1, telegramBusy, onLinkTelegram, onRefreshTelegram, inviteUrl, inviteBusy, onCreateInvite, onCopyInvite, onProfileSaved, onNotice, onOpenDone, onOpenRanking, onUnlinkTelegram, onClose, onLogout }: {
+  loading?: boolean; error?: string; onRetry?: () => void; user: User; store: Store; rank: number; points: number; stars: number; level?: number;
   telegramBusy: boolean; onLinkTelegram: () => void; onRefreshTelegram: () => void;
   inviteUrl: string; inviteBusy: boolean; onCreateInvite: () => void; onCopyInvite: (url: string) => void;
   onProfileSaved: (user: AuthUser) => void; onNotice: (message: string) => void;
@@ -86,6 +87,7 @@ export function MemberProfile({ loading, error, onRetry, user, store, rank, poin
         <Avatar className={styles.avatar} name={user.name} src={user.avatarUrl} eager />
         <div className={styles.who}>
           <h2>{user.name}</h2>
+          {level > 1 && <p className={styles.level}><span aria-hidden="true">★</span>{levelLabel(level)}</p>}
           <p>{extras?.teamName ? <>Участник команды «{extras.teamName}»</> : "Участник команды"}</p>
           <ul className={styles.facts}>
             {user.teamJoinedAt && <li><span aria-hidden="true">📅</span>В команде с {cleanYear(joinedFormat.format(new Date(user.teamJoinedAt)))}</li>}

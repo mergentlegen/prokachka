@@ -64,3 +64,4 @@
   .who h2 { font-size: 20px; }
   .security :global(.button) { width: 100%; }
 }
+.level { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; padding: 3px 10px; border-radius: 99px; background: #fff3d9; color: #a8741a; font-size: 12px; font-weight: 800; }

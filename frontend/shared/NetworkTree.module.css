@@ -36,6 +36,7 @@
 .you, .new { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
 .you { background: #eaf0ff; color: var(--blue); }
 .new { background: #e6f5ef; color: var(--green); }
+.level { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #fff3d9; color: #a8741a; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
 
 .score { display: grid; flex: 0 0 auto; justify-items: end; min-width: 48px; line-height: 1.15; text-align: right; }
 .score b { color: var(--navy); font: 800 15px 'Manrope', sans-serif; }

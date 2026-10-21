@@ -11,17 +11,12 @@ export function starCourse(miles: number, stars: number) {
   return Math.min(Math.max(miles, 0), COURSE_MILES) + Math.min(Math.max(stars, 0), COURSE_STARS) * STAR_VALUE;
 }
 
-type Totals = Pick<RankEntry, "id" | "name" | "avatarUrl" | "points">;
+type Standing = Pick<RankEntry, "id" | "name" | "avatarUrl"> & { miles: number; stars: number; level?: number };
 
 /** One row per participant: course first; on a tie more stars (all of them, also above 10), then the name. */
-export function courseRanking(milesRows: readonly Totals[], starRows: readonly Totals[]): RankEntry[] {
-  const stars = new Map(starRows.map((row) => [row.id, row.points]));
-  const people = new Map<string, Totals>([...starRows, ...milesRows].map((row) => [row.id, row]));
-  const miles = new Map(milesRows.map((row) => [row.id, row.points]));
-  return [...people.values()].map((person) => {
-    const personMiles = miles.get(person.id) ?? 0, personStars = stars.get(person.id) ?? 0;
-    return { id: person.id, name: person.name, avatarUrl: person.avatarUrl, points: starCourse(personMiles, personStars), miles: personMiles, stars: personStars };
-  }).sort((a, b) => b.points - a.points || b.stars - a.stars || a.name.localeCompare(b.name, "ru") || a.id.localeCompare(b.id));
+export function courseRanking(rows: readonly Standing[]): RankEntry[] {
+  return rows.map((row) => ({ id: row.id, name: row.name, avatarUrl: row.avatarUrl, points: starCourse(row.miles, row.stars), miles: row.miles, stars: row.stars, ...(row.level ? { level: row.level } : {}) }))
+    .sort((a, b) => b.points - a.points || b.stars - a.stars || a.name.localeCompare(b.name, "ru") || a.id.localeCompare(b.id));
 }
 
 /**

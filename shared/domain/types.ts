@@ -29,16 +29,17 @@ export type TeamJoinRequest = {
   invitedByUserId?: string; userAvatarUrl?: string;
 };
 export type User = {
+  /** Present from level 2 on. */ level?: number;
   id: string; name: string; firstName?: string; lastName?: string; avatarUrl?: string; profileVersion?: string; login?: string; telegramId?: string; role: UserRole; teamId?: string; teamJoinedAt?: string;
   parentUserId?: string; canReview?: boolean; canPublishTasks?: boolean; canInviteMembers?: boolean; createdAt: string;
 };
 // Stats are omitted when they could not be loaded or the viewer may not see them.
-export type NetworkStats = { points?: number; stars?: number; lastSubmittedAt?: string; recentSubmissions?: number; hasTelegram?: boolean };
+export type NetworkStats = { points?: number; stars?: number; lastSubmittedAt?: string; recentSubmissions?: number; hasTelegram?: boolean; /** Present from level 2 on. */ level?: number };
 export type NetworkMember = User & NetworkStats;
 export type AuthUser = Pick<User, "id" | "name" | "firstName" | "lastName" | "avatarUrl" | "profileVersion" | "login" | "telegramId" | "role" | "teamId" | "teamJoinedAt" | "parentUserId" | "canReview" | "canPublishTasks" | "canInviteMembers"> & { sessionVersion?: number };
 
 export type TaskProgram = {
-  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; pinnedAt?: string; publisherId?: string; audienceRootId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string;
+  id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; pinnedAt?: string; publisherId?: string; audienceRootId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string; /** Present from level 2 on. */ level?: number;
 };
 export type MemberProgramProgress = {
   id: string; userId: string; programId: string; currentTaskId?: string; unlockedAt: string; dueAt: string; status: ProgramStatus; completedAt?: string;
@@ -50,7 +51,7 @@ export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; pinnedAt?: string; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; programTitle?: string; programSteps?: number; createdAt: string; updatedAt: string;
-  attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary; quiz?: { questions: number };
+  attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary; quiz?: { questions: number }; /** Present from level 2 on. */ level?: number;
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; authorName?: string; authorAvatarUrl?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;
@@ -72,7 +73,7 @@ export type Review = {
   photos: AnnouncementPhoto[]; createdAt: string; editedAt?: string; canDelete: boolean; isMine: boolean;
 };
 export type ReviewSummary = { count: number; average: number; stars: Record<1 | 2 | 3 | 4 | 5, number> };
-export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number; /** Personal totals behind «Звёздный курс». */ miles?: number; stars?: number };
+export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number; /** Personal totals behind «Звёздный курс» on the participant's level. */ miles?: number; stars?: number; level?: number };
 export type Store = {
   users: User[]; tasks: Task[]; programs: TaskProgram[]; programProgress: MemberProgramProgress[]; programModules?: ProgramModule[];
   /** Program steps the participant has passed, whole, to read again. */

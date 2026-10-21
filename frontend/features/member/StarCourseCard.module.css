@@ -15,4 +15,5 @@
 .rank:hover { color: var(--blue); }
 .rank:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .done :global(.score-label) { color: #a8741a; }
+.level { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: #fff3d9; color: #a8741a; font-size: 10px; letter-spacing: .04em; vertical-align: 1px; }
 @media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }

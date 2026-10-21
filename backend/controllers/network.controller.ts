@@ -2,7 +2,8 @@ import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body
 import { failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
-import { createTeamInvitation, getNetworkForViewer, updateNetworkUser } from "@/backend/services/network.service";
+import { createTeamInvitation, getNetworkForViewer, setMemberLevel, updateNetworkUser } from "@/backend/services/network.service";
+import { parseLevel } from "@/shared/domain/levels";
 import { scheduleTelegramDelivery } from "@/backend/services/telegram-notifications.service";
 import { auditUser, recordAudit } from "@/backend/services/audit-log.service";
 
@@ -58,6 +59,28 @@ export async function patchNetworkUser(request: Request, id: string) {
       if (Object.keys(details).length) await recordAudit(user, { action: "user.network", targetId: id, targetLabel: before.name, teamId: user.teamId, details });
     }
     return ok({ user: result.data });
+  } catch (error) {
+    return requestBodyFailure(error) || failure("Некорректные данные.", 400);
+  }
+}
+
+export async function patchMemberLevel(request: Request, id: string) {
+  const user = await currentUser(request);
+  if (!user || user.role !== "admin") return failure("Только руководитель команды может менять уровень.", user ? 403 : 401);
+  if (!isUuid(id)) return failure("Некорректный пользователь.", 400);
+  try {
+    const body = await readLimitedJson(request);
+    const level = parseLevel(body.level);
+    if (!level) return failure("Уровень может быть от 1 до 3.", 400);
+    const before = await auditUser(id);
+    const result = await setMemberLevel(user, id, level);
+    if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if ("forbidden" in result) return failure("Пользователь не входит в вашу команду.", 403);
+    if ("validationError" in result) return failure(result.validationError || "Некорректный уровень.", 400);
+    if ("error" in result) return failure("Не удалось изменить уровень.");
+    scheduleTelegramDelivery();
+    await recordAudit(user, { action: "user.level", targetId: id, targetLabel: before?.name || "", teamId: user.teamId, details: { level: result.data } });
+    return ok({ level: result.data });
   } catch (error) {
     return requestBodyFailure(error) || failure("Некорректные данные.", 400);
   }

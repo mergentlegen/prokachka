@@ -3,7 +3,7 @@ import { isUuid } from "@/backend/http/security";
 import type { AuthUser } from "@/shared/domain/types";
 
 export type AuditAction =
-  | "user.access" | "user.delete" | "user.network"
+  | "user.access" | "user.delete" | "user.network" | "user.level"
   | "team.create" | "team.update" | "team.disable" | "team.enable" | "team.delete"
   | "request.approve" | "request.reject"
   | "task.create" | "task.delete" | "task.nudge" | "task.video" | "task.reward" | "program.create" | "program.rename" | "program.delete"

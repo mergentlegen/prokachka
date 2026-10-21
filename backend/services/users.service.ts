@@ -10,8 +10,17 @@ export async function findUsers(options: { teamId?: string; userId?: string; inc
   let query = supabase.from("users").select(fields).order("created_at", { ascending: false });
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (options.userId) query = query.eq("id", options.userId);
-  const result = await readPages(query.order("id"));
-  return result.error ? { error: result.error } : { data: result.data };
+  let levelsQuery = supabase.from("member_levels").select("user_id,level,users!inner(team_id)").is("revoked_at", null);
+  if (options.teamId) levelsQuery = levelsQuery.eq("users.team_id", options.teamId);
+  if (options.userId) levelsQuery = levelsQuery.eq("user_id", options.userId);
+  const [result, levels] = await Promise.all([readPages(query.order("id")), readPages(levelsQuery.order("user_id").order("level"))]);
+  if (result.error) return { error: result.error };
+  const rows = (result.data || []) as unknown as Array<Record<string, unknown>>;
+  // Levels only label people and count who a task is for; without them the list still works.
+  if (levels.error) { console.warn("Member levels are temporarily unavailable", { error: levels.error.message }); return { data: rows }; }
+  const levelOf = new Map<string, number>();
+  for (const row of levels.data || []) levelOf.set(String(row.user_id), Math.max(levelOf.get(String(row.user_id)) || 1, Number(row.level) || 1));
+  return { data: rows.map((row) => levelOf.has(String(row.id)) ? { ...row, level: levelOf.get(String(row.id)) } : row) };
 }
 
 export async function saveUser(name: string, telegramId: string) {

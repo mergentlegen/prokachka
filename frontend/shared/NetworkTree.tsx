@@ -99,7 +99,7 @@ function NetworkRow({ entry, byId, currentUserId, searching, collapsed, highligh
         {activity && <i className={`${styles.dot} ${styles[activity]}`} title={activityLabels[activity]} />}
       </span>
       <span className={styles.copy}>
-        <strong>{user.name}{user.id === currentUserId && <em className={styles.you}>Вы</em>}{isNewMember(user) && <em className={styles.new}>Новый</em>}</strong>
+        <strong>{user.name}{user.id === currentUserId && <em className={styles.you}>Вы</em>}{isNewMember(user) && <em className={styles.new}>Новый</em>}{user.role === "member" && (user.level ?? 1) > 1 && <em className={styles.level}>Ур. {user.level}</em>}</strong>
         <small>{subtitle}</small>
         {activity && activity !== "active" && <small className={styles.activityText}>{activityLabels[activity]}</small>}
       </span>

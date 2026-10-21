@@ -105,6 +105,7 @@ test('a step added after a participant finished is shown as open, not missed', a
     tasks: [{ id: 'one', program_id: 'program', position: 1, title: 'One', max_points: 5 }, { id: 'two', program_id: 'program', position: 2, title: 'Two', max_points: 5 }],
     member_program_progress: [{ user_id: 'm', program_id: 'program', current_task_id: 'two', status: 'active', unlocked_at: iso(-3_600_000), due_at: iso(23 * 3_600_000) }],
     submissions: [{ id: 's', user_id: 'm', task_id: 'one', status: 'accepted', points: 5, submitted_at: '2026-02-01T00:00:00Z', reviewed_at: '2026-02-01T01:00:00Z' }],
+    member_levels: [],
   };
   const db = { from(table) {
     let nullColumn;

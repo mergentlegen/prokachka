@@ -17,12 +17,11 @@ test('Звёздный курс = miles (up to 100) + stars (up to 10) × 20, at
 });
 
 test('one rating by course; on a tie more stars (also above 10) go higher, then the name', () => {
-  const miles = [row('a', 'Вера', 100), row('b', 'Анна', 60), row('c', 'Борис', 100), row('d', 'Гоша', 500), row('e', 'Даша', 100)];
-  const stars = [row('a', 'Вера', 1), row('b', 'Анна', 3), row('c', 'Борис', 1), row('d', 'Гоша', 10), row('e', 'Даша', 13)];
-  const ranking = course.courseRanking(miles, stars);
+  const person = (id, name, miles, stars) => ({ id, name, miles, stars });
+  const ranking = course.courseRanking([person('a', 'Вера', 100, 1), person('b', 'Анна', 60, 3), person('c', 'Борис', 100, 1), person('d', 'Гоша', 500, 10), person('e', 'Даша', 100, 13)]);
   assert.deepEqual(ranking.map((entry) => [entry.name, entry.points]), [['Даша', 300], ['Гоша', 300], ['Анна', 120], ['Борис', 120], ['Вера', 120]]);
   assert.deepEqual(ranking[0], { id: 'e', name: 'Даша', avatarUrl: undefined, points: 300, miles: 100, stars: 13 }, 'personal totals stay as they are');
-  assert.deepEqual(course.courseRanking([row('x', 'Без звёзд', 30)], []).map((entry) => [entry.points, entry.stars]), [[30, 0]]);
+  assert.deepEqual(course.courseRanking([person('x', 'Без звёзд', 30, 0)]).map((entry) => [entry.points, entry.stars]), [[30, 0]]);
 });
 
 test('the next place: course points, and whether miles or a star get there', () => {
@@ -54,15 +53,22 @@ test('the participant card shows the course out of 300, both fuels and the hint'
   assert.match(done, /больше звёзд/);
 });
 
-test('the rating API returns one course rating and no separate miles or stars ratings', async () => {
-  const controller = loadTs('backend/controllers/ranking.controller.ts', {
-    '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'me', role: 'member', teamId: 'team' }) },
-    '@/backend/services/ranking.service': {
-      findRanking: async () => ({ data: [row('a', 'Анна', 100), row('b', 'Борис', 30)] }),
-      findStarRanking: async () => ({ data: [row('a', 'Анна', 0), row('b', 'Борис', 5)] }),
-    },
+test('the rating API returns the course rating of the viewer’s level only, and a pending congratulation', async () => {
+  const standings = [
+    { id: 'a', name: 'Анна', level: 1, miles: 100, stars: 0 }, { id: 'b', name: 'Борис', level: 1, miles: 30, stars: 5 },
+    { id: 'me', name: 'Я', level: 2, miles: 10, stars: 1 }, { id: 'c', name: 'Вера', level: 2, miles: 40, stars: 0 },
+  ];
+  const api = (user, levelUp = null) => loadTs('backend/controllers/ranking.controller.ts', {
+    '@/backend/http/current-user': { getCurrentUser: async () => user },
+    '@/backend/services/ranking.service': { findCourseStandings: async () => ({ data: standings }), findPendingLevelUp: async () => levelUp, markMemberLevelSeen: async () => ({ data: true }) },
   });
-  const body = await (await controller.listRanking(new Request('https://example.test/api/ranking'))).json();
-  assert.deepEqual(body.ranking.map((entry) => [entry.name, entry.points, entry.miles, entry.stars]), [['Борис', 130, 30, 5], ['Анна', 100, 100, 0]]);
-  assert.equal(body.starRanking, undefined);
+  const rating = async (user, levelUp) => (await (await api(user, levelUp).listRanking(new Request('https://example.test/api/ranking'))).json());
+  const first = await rating({ id: 'a', role: 'member', teamId: 'team' });
+  assert.deepEqual(first.ranking.map((entry) => [entry.name, entry.points, entry.miles, entry.stars]), [['Борис', 130, 30, 5], ['Анна', 100, 100, 0]]);
+  assert.equal(first.level, 1);
+  assert.equal(first.starRanking, undefined);
+  const second = await rating({ id: 'me', role: 'member', teamId: 'team' }, 2);
+  assert.deepEqual(second.ranking.map((entry) => entry.name), ['Вера', 'Я'], 'only level 2, with level 2 miles and stars');
+  assert.equal(second.level, 2);
+  assert.equal(second.levelUp, 2, 'the congratulation that was not shown yet');
 });

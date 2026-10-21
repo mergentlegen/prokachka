@@ -42,23 +42,23 @@ test('missing production account cannot reuse an old signed session', async () =
 test('teamless account cannot trigger globally scoped rating queries', async () => {
   const controller = load('backend/controllers/ranking.controller.ts', {
     [currentKey]: { getCurrentUser: async () => ({ id: 'member', role: 'member' }) },
-    '@/backend/services/ranking.service': { findRanking: () => assert.fail('global read'), findStarRanking: () => assert.fail('global read') },
+    '@/backend/services/ranking.service': { findCourseStandings: () => assert.fail('global read'), findPendingLevelUp: () => assert.fail('global read'), markMemberLevelSeen: () => assert.fail('global write') },
   });
   const response = await controller.listRanking(req());
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).ranking, []);
 });
-test('ranking passes explicit fresh team scope and does not silently hide star query errors', async () => {
+test('ranking passes explicit fresh team scope and does not silently hide query errors', async () => {
   const calls = [];
   const controller = load('backend/controllers/ranking.controller.ts', {
     [currentKey]: { getCurrentUser: async () => ({ id: 'member', role: 'member', teamId: 'fresh' }) },
     '@/backend/services/ranking.service': {
-      findRanking: async (scope) => { calls.push(scope); return { data: [] }; },
-      findStarRanking: async (scope) => { calls.push(scope); return { error: new Error('DB unavailable') }; },
+      findCourseStandings: async (scope) => { calls.push(scope); return { error: new Error('DB unavailable') }; },
+      findPendingLevelUp: async () => null, markMemberLevelSeen: async () => ({ data: true }),
     },
   });
   assert.equal((await controller.listRanking(req())).status, 500);
-  assert.deepEqual(calls, [{ kind: 'team', teamId: 'fresh' }, { kind: 'team', teamId: 'fresh' }]);
+  assert.deepEqual(calls, [{ kind: 'team', teamId: 'fresh' }]);
 });
 test('teamless mentor is rejected by both request controller and service before any DB operation', async () => {
   const actor = { id: 'mentor', role: 'admin' };
@@ -152,7 +152,7 @@ test('program history excludes ready games and empty programs while preserving a
       { id: 'empty-program', team_id: 'team', deadline_hours: 24 },
     ],
     tasks: [{ id: 'step', program_id: 'program', position: 1, title: 'Step' }],
-    member_program_progress: [], submissions: [],
+    member_program_progress: [], submissions: [], member_levels: [],
   };
   const db = { from(table) {
     let nullColumn;

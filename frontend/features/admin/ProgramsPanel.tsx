@@ -14,6 +14,7 @@ import { formatMiles } from "@/frontend/shared/lib/format";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import type { ProgramHistory } from "@/shared/domain/history";
 import { plural } from "@/frontend/shared/lib/plural";
+import { LEVELS } from "@/shared/domain/levels";
 import styles from "./ProgramsPanel.module.css";
 
 type Props = {
@@ -69,12 +70,14 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     finally { setBusyId(""); }
   }
 
-  async function update(program: TaskProgram, patch: { title?: string; isActive?: boolean; isPinned?: boolean }) {
+  async function update(program: TaskProgram, patch: { title?: string; isActive?: boolean; isPinned?: boolean; level?: number }) {
     if (busyId) return false;
     setBusyId(program.id);
     try {
       const updated = await updateAdminProgram(program.id, patch);
-      onChange(programs.map((item) => item.id === updated.id ? updated : item), tasks);
+      // The steps follow the program to its new level.
+      const moved = patch.level === undefined ? tasks : tasks.map((task) => task.programId === program.id ? { ...task, level: patch.level && patch.level > 1 ? patch.level : undefined } : task);
+      onChange(programs.map((item) => item.id === updated.id ? updated : item), moved);
       return true;
     } catch (error) { onError(error instanceof Error ? error.message : "Не удалось изменить программу."); return false; }
     finally { setBusyId(""); }
@@ -114,6 +117,8 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
       { label: "Переименовать", icon: actionIcons.edit, onSelect: () => { setRenameValue(program.title); setRenameTarget(program); } },
       { label: program.isPinned ? "Открепить" : "Закрепить сверху", icon: pinIcon, onSelect: () => void update(program, { isPinned: !program.isPinned }) },
       { label: program.isActive ? "Скрыть от участников" : "Показать участникам", icon: program.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => void update(program, { isActive: !program.isActive }) },
+      ...LEVELS.filter((level) => level !== (program.level ?? 1) && !program.templateKey).map((level) => ({ label: `Перенести на уровень ${level}`, icon: actionIcons.show,
+        onSelect: () => void update(program, { level }).then((done) => { if (done) onError(`Программа «${program.title}» теперь для уровня ${level}.`); }) })),
       { label: "Удалить программу", icon: actionIcons.remove, danger: true, onSelect: () => setDeleteTarget(program) },
     ] : [];
     return <section key={program.id} className={[styles.card, program.isActive ? "" : styles.cardHidden, isExpanded ? styles.cardOpen : ""].join(" ")} data-stagger style={staggerStyle(position)}>
@@ -123,6 +128,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
             <span className={styles.badges}>
               <span className={program.isActive ? styles.badgeOn : styles.badgeOff}>{program.isActive ? "Активна" : "Скрыта"}</span>
               {program.isPinned && <span className={styles.badgePin}>{pinIcon}Закреплена</span>}
+              {(program.level ?? 1) > 1 && <span className={styles.badgeLevel}>Уровень {program.level}</span>}
             </span>
             <strong className={styles.cardTitle}>{program.title}</strong>
             <span className={styles.facts}>{steps.length} {plural(steps.length, "шаг", "шага", "шагов")} · {program.deadlineHours} ч на шаг · до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>

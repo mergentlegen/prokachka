@@ -54,3 +54,4 @@
 \ir 20261104-reviews.sql
 \ir 20261105-review-mile.sql
 \ir 20261106-feedback-inbox.sql
+\ir 20261107-member-levels.sql

@@ -1,3 +1,4 @@
+import { levelTitle, levelUpMessage } from "@/shared/domain/levels";
 import { after } from "next/server";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { serverEnv } from "@/backend/config/env";
@@ -84,8 +85,8 @@ export async function copyTelegramMessage(toChatId: string, fromChatId: string, 
 
 type NotificationJob = {
   id: string; recipient_id: string; submission_id: string | null; feedback_event_seq: number | null;
-  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount" | "review";
-  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number; reviewId?: string }; summary_sent: boolean; attempts: number; lock_token: string;
+  kind: "permissions" | "submission" | "survey" | "company-voice" | "captain-screenshot" | "feedback" | "task-reminder" | "task-nudge" | "announcement" | "start-reminder" | "miles-recount" | "review" | "level-up";
+  payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number; reviewId?: string; level?: number; memberId?: string }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
 // Mass mailings go out at this pace: one worker run a minute, personal notifications first.
@@ -123,6 +124,23 @@ export function milesRecountText(title: string, from: number, to: number, link: 
     "🔄 Изменён вес задания «" + (title.trim().slice(0, 200) || "Задание") + "»: теперь оно даёт " + to + " " + milesUnit(to) + ".",
     "Ваши мили за него пересчитаны: было " + from + ", стало " + to + ".",
     link ? "Открыть сайт: " + link : "",
+  ].filter(Boolean).join("\n");
+}
+
+/** A new level: the participant gets the congratulation, their mentor learns who moved up. */
+export function levelUpText(level: number, memberName: string | null, link: string) {
+  const name = levelTitle(level);
+  if (memberName !== null) return [
+    "🎉 " + (memberName.trim().slice(0, 120) || "Участник") + " — новый уровень: " + level + (level === 2 ? " (" + name + ")" : "") + ".",
+    "Звёздный курс пройден: 100 миль и 10 звёзд. Теперь у него новые задания и новый рейтинг.",
+    link ? "Структура сети: " + link : "",
+  ].filter(Boolean).join("\n");
+  const message = levelUpMessage(level);
+  return [
+    "🎉 Звёздный курс пройден — ты на уровне " + level + "!",
+    message.title + ". " + message.text + ".",
+    "На сайте уже открыты задания нового уровня. Прошлые задания остались в архиве — их можно пересмотреть.",
+    link ? "Открыть: " + link : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -240,6 +258,20 @@ export async function deliverTelegramNotifications() {
         if (!review.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
         const author = Array.isArray(review.data.users) ? review.data.users[0] : review.data.users;
         delivery = await sendTelegramMessage(chatId, reviewNoticeText(String(author?.name || "Участник"), Number(review.data.rating || 0), String(review.data.body || ""), appUrl() ? appUrl() + "/admin?section=reviews" : ""));
+      } else if (job.kind === "level-up") {
+        // A mentor may have returned the participant to the previous level while the message waited.
+        const memberId = job.payload.memberId ? String(job.payload.memberId) : user.id;
+        const level = Number(job.payload.level || 2);
+        const current = await supabase.rpc("app_member_level", { p_user: memberId });
+        if (current.error) throw new Error("Cannot verify member level");
+        if (Number(current.data) < level) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        let memberName: string | null = null;
+        if (job.payload.memberId) {
+          const member = await supabase.from("users").select("name").eq("id", memberId).maybeSingle();
+          if (member.error) throw new Error("Cannot load member");
+          memberName = String(member.data?.name || "Участник");
+        }
+        delivery = await sendTelegramMessage(chatId, levelUpText(level, memberName, appUrl() ? appUrl() + (memberName === null ? "/" : "/admin?section=network") : ""));
       } else if (job.kind === "miles-recount") {
         delivery = await sendTelegramMessage(chatId, milesRecountText(String(job.payload.title || ""), Number(job.payload.from || 0), Number(job.payload.to || 0), appUrl() ? appUrl() + "/" : ""));
       } else if (job.kind === "permissions") {

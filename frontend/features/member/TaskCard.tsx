@@ -24,7 +24,7 @@ import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
 
-export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean }) {
+export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false, readOnly = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean; /** An earlier level: materials only, nothing can be sent. */ readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [linkOpened, setLinkOpened] = useState(false);
@@ -43,7 +43,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const countdown = deadlineInfo(deadline);
   const step = !inModule && task.publicationType === "sequential" && task.position ? task.position : undefined;
   const resource = externalHref(task.resourceUrl);
-  const canSubmit = task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
+  const canSubmit = !readOnly && task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   const submitLabel = status === "revision" ? "Отправить повторно" : expired ? "Отправить с опозданием" : "Отправить ответ";
   function openedResource() {
     if (!canSubmit || isInteractive) return;
@@ -56,6 +56,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     try { await onSubmit(task.id); } finally { setSending(false); }
   }
   function action(inDetail = false) {
+    if (readOnly && status !== "accepted" && status !== "pending") return <span className={styles.waiting}>Архив · только просмотр</span>;
     if (captainPending) return <button className={styles.submit} onClick={() => setOpen(true)}>Отправить скриншот · +1 миля</button>;
     if (surveyInProgress) return <button className={styles.submit} onClick={() => setOpen(true)}>Продолжить опросник</button>;
     if (status === "accepted") return <strong className={styles.accepted}>+{formatMiles(submission?.points || 0)}</strong>;
@@ -82,10 +83,11 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     </article>
     {open && <ModalSheet title={isInteractive ? task.title : "Задание"} variant={isInteractive ? "immersive" : "default"} onClose={() => setOpen(false)}>
       <div className={`${styles.detail} ${isInteractive ? styles.interactiveDetail : ""}`}>
-        {!isInteractive && <><div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
+        {(!isInteractive || readOnly) && <><div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div></>}
-        {task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {readOnly && isInteractive && <p className={styles.waiting}>Игры прошлого уровня в архиве не запускаются.</p>}
+        {!readOnly && <>{task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "first-year" && <FirstYearGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "safety-watch" && <SafetyWatchGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
@@ -93,7 +95,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "captain-cruise" && <CaptainCruiseGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "count-your-dream" && <CountYourDreamGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "dream-route" && <DreamRouteGame taskId={task.id} onCompleted={onInteractiveComplete} />}
-        {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}
+        {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}</>}
         {task.video?.playable && <ProtectedVideo taskId={task.id} onCompleted={() => setVideoWatched(true)} />}
         {quizSent ? <QuizSentNotice score={quizSent.score} total={quizSent.total} />
           : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
@@ -106,7 +108,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
         {submission && !isInteractive && onFeedback && <button type="button" className={styles.read} onClick={() => { setOpen(false); onFeedback(task.id); }}>Открыть переписку с наставником →</button>}
         {submission && !isInteractive && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}
-        {!isInteractive && !(isQuiz && (canSubmit || quizSent)) && <div className={styles.detailAction}>{action(true)}</div>}
+        {(!isInteractive || readOnly) && !(isQuiz && (canSubmit || quizSent)) && <div className={styles.detailAction}>{action(true)}</div>}
       </div>
     </ModalSheet>}
   </>;

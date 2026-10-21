@@ -8,6 +8,7 @@ import { isNewMember, networkActivity, networkAncestors, type NetworkEntry } fro
 import { milesUnit } from "./lib/format";
 import { plural } from "./lib/plural";
 import { PhoneLinks, usePhone } from "./PhoneBook";
+import { levelLabel } from "@/shared/domain/levels";
 import styles from "./NetworkPersonCard.module.css";
 
 export function daysAgo(value: string, now = Date.now()) {
@@ -39,6 +40,7 @@ export function NetworkPersonCard({ entry, byId, currentUserId, canReveal, onRev
           <div className={styles.badges}>
             {user.id === currentUserId && <span className={styles.you}>Вы</span>}
             {isNewMember(user) && <span className={styles.new}>Новый</span>}
+            {user.role === "member" && (user.level ?? 1) > 1 && <span className={styles.level}>{levelLabel(user.level ?? 1)}</span>}
             {roles.map((role) => <span key={role}>{role}</span>)}
           </div>
         </div>

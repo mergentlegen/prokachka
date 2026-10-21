@@ -4,7 +4,7 @@ const load = require('./helpers/load-ts.cjs');
 const harnessFactory = require('./helpers/hook-harness.cjs');
 
 function fixture() {
-  const tables = { task_programs: [], tasks: [], users: [], member_program_progress: [], ready_program_attempts: [] };
+  const tables = { task_programs: [], tasks: [], users: [], member_program_progress: [], ready_program_attempts: [], member_levels: [] };
   const calls = [];
   let conflict = false;
   const db = { from(table) {

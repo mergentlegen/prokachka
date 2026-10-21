@@ -6,7 +6,7 @@ export type JournalTone = "good" | "danger" | "neutral";
 
 const roleNames: Record<string, string> = { ceo: "CEO", admin: "Наставник", member: "Участник" };
 const titles: Record<string, string> = {
-  "user.access": "Изменён доступ", "user.delete": "Удалён пользователь", "user.network": "Изменены права в сети",
+  "user.access": "Изменён доступ", "user.delete": "Удалён пользователь", "user.network": "Изменены права в сети", "user.level": "Изменён уровень участника",
   "team.create": "Создана команда", "team.update": "Изменена команда", "team.disable": "Команда отключена", "team.enable": "Команда включена", "team.delete": "Удалена команда",
   "request.approve": "Заявка одобрена", "request.reject": "Заявка отклонена",
   "task.create": "Опубликовано задание", "task.delete": "Удалено задание", "task.nudge": "Напоминание по заданию", "task.video": "Загружено видео к заданию", "task.reward": "Изменена награда за задание",
@@ -52,6 +52,7 @@ export function journalDetails(entry: CeoJournalEntry): string[] {
   if (typeof d.canReview === "boolean") lines.push("Проверка работ: " + (d.canReview ? "разрешена" : "запрещена"));
   if (typeof d.canPublishTasks === "boolean") lines.push("Публикация заданий: " + (d.canPublishTasks ? "разрешена" : "запрещена"));
   if (Array.isArray(d.parent)) lines.push("Наставник: " + pair(d.parent, "нет"));
+  if (typeof d.level === "number" && entry.action === "user.level") lines.push(`Уровень ${d.level}`);
   if (Array.isArray(d.name)) lines.push("Название: " + pair(d.name, "—"));
   if (typeof d.miles === "number" && entry.action === "task.create") lines.push(d.programStep ? `Шаг программы · ${d.miles} ${plural(d.miles, "миля", "мили", "миль")}` : `${d.miles} ${plural(d.miles, "миля", "мили", "миль")}`);
   if (Array.isArray(d.reward)) { const [from, to] = (d.reward as unknown[]).map(Number); lines.push(`Награда: ${from} → ${to} ${plural(to, "миля", "мили", "миль")}`); }

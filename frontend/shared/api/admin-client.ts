@@ -35,8 +35,8 @@ export async function loadAdminPublicationHistory(): Promise<PublicationHistoryI
   const response = await request<ApiResponse<{ history: PublicationHistoryItem[] }>>("/api/publication-history");
   return response.history || [];
 }
-type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null };
-type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive" | "isPinned">, "resourceUrl"> & { resourceUrl?: string | null }>;
+type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null; level?: number };
+type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive" | "isPinned">, "resourceUrl"> & { resourceUrl?: string | null; level?: number }>;
 export async function createAdminTask(input: AdminTaskInput): Promise<Task> {
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks", { method: "POST", body: JSON.stringify(input) }); return mapTask(response.task);
 }
@@ -74,12 +74,12 @@ export async function loadTaskNudge(taskId: string): Promise<TaskNudgeState> { c
 export async function sendTaskNudge(taskId: string): Promise<TaskNudgeState> { const response = await request<ApiResponse<{ nudge: TaskNudgeState }>>(`/api/tasks/${encodeURIComponent(taskId)}/nudge`, { method: "POST" }); return response.nudge; }
 export async function createAdminStarAward(input: { userId: string; kind: StarAwardKind; comment: string }): Promise<StarAward> { const response = await request<ApiResponse<{ award: ApiRow }>>("/api/stars", { method: "POST", body: JSON.stringify(input) }); return mapStarAward(response.award); }
 export async function deleteAdminStarAward(id: string) { await request<ApiResponse<Record<string, never>>>("/api/stars/" + id, { method: "DELETE" }); }
-export type ProgramCreateInput = { title: string; deadlineHours: number; tasks: Array<{ title: string; description: string; maxPoints: number; resourceUrl?: string | null }> };
+export type ProgramCreateInput = { title: string; deadlineHours: number; level?: number; tasks: Array<{ title: string; description: string; maxPoints: number; resourceUrl?: string | null }> };
 export async function createAdminProgram(input: ProgramCreateInput): Promise<{ program: TaskProgram; tasks: Task[] }> {
   const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[] }>>("/api/programs", { method: "POST", body: JSON.stringify(input) });
   return { program: mapProgram(response.program), tasks: response.tasks.map(mapTask) };
 }
-export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean }): Promise<TaskProgram> {
+export async function updateAdminProgram(id: string, input: { title?: string; deadlineHours?: number; isActive?: boolean; isPinned?: boolean; level?: number }): Promise<TaskProgram> {
   const response = await request<ApiResponse<{ program: ApiRow }>>("/api/programs/" + id, { method: "PATCH", body: JSON.stringify(input) }); return mapProgram(response.program);
 }
 export async function addProgramGame(programId: string, kind: string): Promise<{ task: Task; reopened: number }> {

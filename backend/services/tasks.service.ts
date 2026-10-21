@@ -9,7 +9,7 @@ type TaskViewer = { id: string; role: string; teamId?: string; canPublishTasks?:
 type TaskInput = {
   title?: string; description?: string; maxPoints?: number; deadlineAt?: string | null; isActive?: boolean; isPinned?: boolean; teamId?: string;
   publicationType?: "evergreen" | "fixed" | "sequential"; programId?: string; position?: number; deadlineHours?: number; resourceUrl?: string | null;
-  publisherId?: string; audienceRootId?: string | null;
+  publisherId?: string; audienceRootId?: string | null; level?: number;
 };
 
 export async function findTasks(teamId?: string, viewer?: TaskViewer) {
@@ -50,6 +50,8 @@ export async function insertTask(input: Required<Pick<TaskInput, "title" | "desc
     is_active: input.isActive !== false,
     publication_type: input.publicationType || (input.deadlineAt ? "fixed" : "evergreen"),
     program_id: input.programId || null, position: input.position || null, deadline_hours: input.deadlineHours || null,
+    // A program step takes its program's level in the database.
+    level: input.level || 1,
   }).select().single();
   return result.error ? { error: result.error } : { data: result.data };
 }
@@ -65,6 +67,7 @@ export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer
   if (gameStep && Object.keys(input).some((key) => key !== "isActive")) return { validationError: "Игру в программе можно только скрыть, переставить или удалить." };
   if (current.data.interactive_kind && !gameStep) return { validationError: "Готовую игру нельзя изменять как обычное задание. Используйте каталог готовых заданий." };
   if (input.isPinned !== undefined && current.data.program_id) return { validationError: "Закрепляйте программу целиком." };
+  if (input.level !== undefined && current.data.program_id) return { validationError: "Уровень шага задаётся программой." };
   const patch: Record<string, unknown> = {};
   if (typeof input.title === "string") patch.title = input.title.trim();
   if (typeof input.description === "string") patch.description = input.description.trim();
@@ -77,6 +80,7 @@ export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer
   if (input.isPinned !== undefined) patch.is_pinned = input.isPinned;
   if (input.deadlineHours !== undefined) patch.deadline_hours = input.deadlineHours;
   if (input.resourceUrl !== undefined) patch.resource_url = input.resourceUrl || null;
+  if (input.level !== undefined) patch.level = Number(input.level);
   let query = supabase.from("tasks").update(patch).eq("id", id);
   if (actor?.role !== "ceo" && actor?.teamId) query = query.eq("team_id", actor.teamId);
   const result = await query.select().single();

@@ -14,6 +14,10 @@ export async function createNetworkInvitation(): Promise<{ url: string; expiresA
   return { url: response.invitation.url, expiresAt: response.invitation.expires_at };
 }
 
+export async function setNetworkMemberLevel(id: string, level: number): Promise<number> {
+  const response = await request<ApiResponse<{ level: number }>>(`/api/network/users/${id}/level`, { method: "POST", body: JSON.stringify({ level }) });
+  return Number(response.level) || 1;
+}
 export async function updateNetworkUser(id: string, input: { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean }): Promise<User> {
   const response = await request<ApiResponse<{ user: ApiRow }>>(`/api/network/users/${id}`, { method: "PATCH", body: JSON.stringify(input) });
   return mapUser(response.user);

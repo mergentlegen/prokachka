@@ -8,6 +8,7 @@
 .badges span { padding: 3px 8px; border-radius: 7px; background: #f1f4f9; color: #5b6b85; font-size: 11px; font-weight: 600; }
 .badges .you { background: #eaf0ff; color: var(--blue); }
 .badges .new { background: #e6f5ef; color: var(--green); }
+.badges .level { background: #fff3d9; color: #a8741a; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
 .stats > div { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fafbfd; }

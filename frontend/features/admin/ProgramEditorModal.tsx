@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createAdminProgram } from "@/frontend/shared/api/admin-client";
+import { LevelPicker } from "./LevelPicker";
 import { uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
 import { saveTaskQuiz } from "@/frontend/shared/api/task-quiz-client";
@@ -25,6 +26,7 @@ function validLink(value: string) {
 export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated: (program: TaskProgram, tasks: Task[]) => void; onClose: () => void; onError: (message: string) => void }) {
   const [title, setTitle] = useState("");
   const [deadlineHours, setDeadlineHours] = useState("72");
+  const [level, setLevel] = useState(1);
   const [draftTasks, setDraftTasks] = useState<DraftTask[]>([]);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -66,7 +68,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
     setBusy(true);
     try {
       const created = await createAdminProgram({
-        title: title.trim(), deadlineHours: Number(deadlineHours),
+        title: title.trim(), deadlineHours: Number(deadlineHours), level,
         tasks: draftTasks.map((task) => ({ title: task.title.trim(), description: task.description.trim(), resourceUrl: task.resourceUrl.trim() || null, maxPoints: Number(task.maxPoints) })),
       });
       const tasksWithFiles = [...created.tasks];
@@ -113,7 +115,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
       <div className="panel-title"><div><p className="eyebrow">Последовательное обучение</p><h2>Новая программа</h2></div><span className="program-rule">{preview ? "2 / 2 · Проверка" : "1 / 2 · Содержание"}</span></div>
       {preview ? <div className="program-preview">
         <h3 ref={reviewTitle} tabIndex={-1}>Проверьте программу перед публикацией</h3>
-        <p><strong>{title.trim()}</strong><br />Шагов: {draftTasks.length} · На каждый шаг: {deadlineHours} ч</p>
+        <p><strong>{title.trim()}</strong><br />Уровень {level} · Шагов: {draftTasks.length} · На каждый шаг: {deadlineHours} ч</p>
         {draftTasks.length === 1 && <p className="program-review-note">Сейчас в программе только один шаг. Если планировали несколько, вернитесь к редактированию и добавьте остальные.</p>}
         <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {formatMiles(task.maxPoints)}{task.resourceUrl.trim() ? " · С материалом" : ""}{task.video ? " · Видео" : ""}{task.questions.length ? ` · Вопросы: ${task.questions.length}` : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
         <div className="program-builder-actions"><button type="button" className="button button-edit" disabled={busy} onClick={() => setPreview(false)}>← К редактированию</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? progress || "Публикуем..." : "Подтвердить и опубликовать"}</button></div>
@@ -123,6 +125,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
             <label>Название программы<input required minLength={2} maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Например, Старт новичка" /></label>
             <label>Срок на каждый шаг, часов<input required type="number" min="1" max="720" step="1" value={deadlineHours} onChange={(event) => setDeadlineHours(event.target.value)} /></label>
           </div>
+          <LevelPicker value={level} onChange={setLevel} />
           <div className="program-steps-heading"><div><p className="eyebrow">Содержание</p><h3>Шаги программы</h3></div><span>{draftTasks.length} / 100</span></div>
           {draftTasks.length === 0 ? <div className="program-empty-steps"><span aria-hidden="true">＋</span><div><strong>Начните с первого шага</strong><p>Добавьте задания в нужном порядке. Участники будут проходить их последовательно.</p></div></div> :
             <div className="program-step-editor">{draftTasks.map((task, index) => <div className="program-step" key={task.id}>

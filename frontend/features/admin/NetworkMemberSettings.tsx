@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import type { NetworkMember } from "@/shared/domain/types";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { buildNetworkTree, networkDescendantIds } from "@/frontend/shared/lib/network-tree";
+import { MAX_LEVEL, levelLabel } from "@/shared/domain/levels";
 import styles from "./NetworkMemberSettings.module.css";
 
-export type NetworkUserPatch = { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean };
+export type NetworkUserPatch = { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean; level?: number };
 type Permission = "canReview" | "canPublishTasks";
-type Pending = { kind: "parent"; parent: NetworkMember | null } | { kind: Permission; value: boolean };
+type Pending = { kind: "parent"; parent: NetworkMember | null } | { kind: Permission; value: boolean } | { kind: "level"; level: number };
 
 const PICKER_LIMIT = 8;
 const permissions: Record<Permission, { label: string; hint: string; grant: string; revoke: string; grantNote: string }> = {
@@ -35,15 +36,20 @@ export function NetworkMemberSettings({ user, users, busy, onSave }: {
 
   async function confirm() {
     if (!pending) return;
-    const input: NetworkUserPatch = pending.kind === "parent" ? { parentUserId: pending.parent?.id ?? null } : { [pending.kind]: pending.value };
+    const input: NetworkUserPatch = pending.kind === "parent" ? { parentUserId: pending.parent?.id ?? null } : pending.kind === "level" ? { level: pending.level } : { [pending.kind]: pending.value };
     if (await onSave(input)) { setPending(null); setPicking(false); setQuery(""); }
   }
 
   if (pending) {
-    const question = pending.kind === "parent"
-      ? pending.parent ? `Перенести в ветку «${pending.parent.name}»?` : "Убрать руководителя?"
-      : pending.value ? permissions[pending.kind].grant : permissions[pending.kind].revoke;
-    const note = pending.kind === "parent"
+    const level = user.level ?? 1;
+    const question = pending.kind === "level"
+      ? pending.level > level ? `Перевести на уровень ${pending.level}?` : `Вернуть на уровень ${pending.level}?`
+      : pending.kind === "parent"
+        ? pending.parent ? `Перенести в ветку «${pending.parent.name}»?` : "Убрать руководителя?"
+        : pending.value ? permissions[pending.kind].grant : permissions[pending.kind].revoke;
+    const note = pending.kind === "level"
+      ? pending.level > level ? "Участник увидит поздравление, задания и рейтинг нового уровня. Прошлые задания останутся в архиве." : "Участник снова увидит задания и рейтинг этого уровня. Сам по себе он больше не перейдёт — только вашей кнопкой."
+      : pending.kind === "parent"
       ? pending.parent ? branchSize ? `Вместе с участником переедет вся его сеть: ${branchSize} чел.` : "Участник переедет один, своей сети у него пока нет." : "Участник окажется в списке «Без закрепления» вместе со своей сетью."
       : pending.value ? permissions[pending.kind].grantNote : "Доступ к этим разделам закроется сразу.";
     return <div className={styles.confirm} role="group" aria-label="Подтверждение изменения">
@@ -76,6 +82,17 @@ export function NetworkMemberSettings({ user, users, busy, onSave }: {
         {matches.length > PICKER_LIMIT && <small className={styles.hint}>Показаны первые {PICKER_LIMIT} из {matches.length}. Уточните поиск.</small>}
         {matches.length === 0 && <small className={styles.hint}>Никого не нашли. Участников из сети этого человека выбрать нельзя.</small>}
       </div>}
+    </div>
+    <div className={styles.field}>
+      <span className={styles.label}>Уровень</span>
+      <div className={styles.current}>
+        <span>{levelLabel(user.level ?? 1)}</span>
+        <span className={styles.levelButtons}>
+          {(user.level ?? 1) > 1 && <button type="button" className="button button-edit" disabled={busy} onClick={() => setPending({ kind: "level", level: (user.level ?? 1) - 1 })}>Вернуть на {(user.level ?? 1) - 1}</button>}
+          {(user.level ?? 1) < MAX_LEVEL && <button type="button" className="button button-edit" disabled={busy} onClick={() => setPending({ kind: "level", level: (user.level ?? 1) + 1 })}>Перевести на {(user.level ?? 1) + 1}</button>}
+        </span>
+      </div>
+      <small className={styles.hint}>Сам переход происходит при 300 на Звёздном курсе. Кнопки — для особых случаев.</small>
     </div>
     <div className={styles.switches}>
       {(Object.keys(permissions) as Permission[]).map((key) => <label className={styles.switch} key={key}>

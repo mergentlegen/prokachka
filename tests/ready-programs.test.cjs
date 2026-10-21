@@ -116,9 +116,9 @@ test("removing a ready publication removes its task from member feed without cha
     { id: "sibling-game", team_id: "team", is_active: true, publication_type: "evergreen", program_id: "sibling", audience_root_id: "sibling" },
   ];
   const programs = [{ id: "ready", team_id: "team", is_active: true, audience_root_id: null, created_at: "2026-09-25" }, { id: "sibling", team_id: "team", is_active: true, audience_root_id: "sibling", created_at: "2026-09-25" }];
-  const tables = { tasks, task_programs: programs, member_program_progress: [] };
+  const tables = { tasks, task_programs: programs, member_program_progress: [], member_levels: [] };
   const client = { from(table) {
-    return { table, filters: [], select() { return this; }, eq(key, value) { this.filters.push([key, value]); return this; }, order() { return this; } };
+    return { table, filters: [], select() { return this; }, eq(key, value) { this.filters.push([key, value]); return this; }, is() { return this; }, order() { return this; } };
   } };
   const { getMemberTaskFeed } = loadTs("backend/services/member-progress.service.ts", {
     "@/backend/infrastructure/supabase/admin-client": { getSupabaseAdmin: () => client },

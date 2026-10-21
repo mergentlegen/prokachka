@@ -1,0 +1,10 @@
+.picker { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.picker legend { margin-bottom: 8px; padding: 0; color: var(--navy); font-size: 13px; font-weight: 700; }
+.options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.options label { position: relative; display: grid; gap: 2px; min-height: 52px; padding: 8px 12px; border: 1px solid #dde4f0; border-radius: 12px; background: #fff; cursor: pointer; }
+.options input { position: absolute; opacity: 0; pointer-events: none; }
+.options b { color: var(--navy); font-size: 14px; }
+.options small { color: #6b7a91; font-size: 12px; }
+.options .on { border-color: var(--blue); background: #f2f6ff; box-shadow: 0 0 0 1px var(--blue); }
+.options label:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (max-width: 420px) { .options { grid-template-columns: 1fr; } .options label { min-height: 44px; } }

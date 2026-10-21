@@ -38,7 +38,7 @@ test('a participant feed asks for the team structure together with the lists', a
   });
   const feed = service.getMemberTaskFeed('m', 'team');
   await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.deepEqual(started.sort(), ['list', 'list', 'list', 'network']);
+  assert.deepEqual(started.sort(), ['list', 'list', 'list', 'list', 'network'], 'lists, levels and the team structure start together');
   release();
   assert.deepEqual((await feed).data, []);
 });
