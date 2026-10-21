@@ -40,7 +40,7 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
   const [progressResult, submissionsResult, levelsResult] = await Promise.all([
     readPages(supabase.from("member_program_progress").select("*,task_programs!inner(team_id)").eq("task_programs.team_id", teamId).order("id")),
     readPages(supabase.from("submissions").select("id,user_id,task_id,status,points,submitted_at,reviewed_at,tasks!inner(team_id,publication_type)").eq("tasks.team_id", teamId).eq("tasks.publication_type", "sequential").order("id")),
-    readPages(supabase.from("member_levels").select("user_id,level,reached_at,users!inner(team_id)").eq("users.team_id", teamId).is("revoked_at", null).order("user_id").order("level")),
+    readPages(supabase.from("member_levels").select("user_id,level,reached_at,users!member_levels_user_id_fkey!inner(team_id)").eq("users.team_id", teamId).is("revoked_at", null).order("user_id").order("level")),
   ]);
   if (progressResult.error || submissionsResult.error || levelsResult.error) return { error: progressResult.error || submissionsResult.error || levelsResult.error };
   // When each participant reached each level (level 1: joining the team).

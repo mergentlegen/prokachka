@@ -110,7 +110,7 @@ async function findNetworkStats(teamId: string, mentorView: boolean) {
   const [points, stars, levels, activity, telegram] = await Promise.all([
     readPages<{ id: string; points: number | string }>(supabase.rpc("app_ranking", { p_team_id: teamId, p_metric: "points" }).order("id")),
     readPages<{ id: string; points: number | string }>(supabase.rpc("app_ranking", { p_team_id: teamId, p_metric: "stars" }).order("id")),
-    readPages<{ user_id: string; level: number | string }>(supabase.from("member_levels").select("user_id,level,users!inner(team_id)").eq("users.team_id", teamId).is("revoked_at", null).order("user_id").order("level")),
+    readPages<{ user_id: string; level: number | string }>(supabase.from("member_levels").select("user_id,level,users!member_levels_user_id_fkey!inner(team_id)").eq("users.team_id", teamId).is("revoked_at", null).order("user_id").order("level")),
     mentorView ? readPages<{ id: string; user_id: string; submitted_at: string }>(supabase.from("submissions").select("id,user_id,submitted_at,users!inner(team_id)")
       .eq("users.team_id", teamId).gte("submitted_at", since).order("id")) : none,
     mentorView ? readPages<{ id: string }>(supabase.from("users").select("id").eq("team_id", teamId).not("telegram_id", "is", null).order("id")) : none,

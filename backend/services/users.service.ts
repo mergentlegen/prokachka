@@ -10,7 +10,7 @@ export async function findUsers(options: { teamId?: string; userId?: string; inc
   let query = supabase.from("users").select(fields).order("created_at", { ascending: false });
   if (options.teamId) query = query.eq("team_id", options.teamId);
   if (options.userId) query = query.eq("id", options.userId);
-  let levelsQuery = supabase.from("member_levels").select("user_id,level,users!inner(team_id)").is("revoked_at", null);
+  let levelsQuery = supabase.from("member_levels").select("user_id,level,users!member_levels_user_id_fkey!inner(team_id)").is("revoked_at", null);
   if (options.teamId) levelsQuery = levelsQuery.eq("users.team_id", options.teamId);
   if (options.userId) levelsQuery = levelsQuery.eq("user_id", options.userId);
   const [result, levels] = await Promise.all([readPages(query.order("id")), readPages(levelsQuery.order("user_id").order("level"))]);

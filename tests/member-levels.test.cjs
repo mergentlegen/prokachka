@@ -165,3 +165,13 @@ test('Telegram: the participant is congratulated, the mentor learns who moved up
   const mentor = levelUpText(2, 'Алия Бекова', 'https://prokachka.kz/admin?section=network');
   assert.match(mentor, /Алия Бекова — новый уровень: 2 \(Капитан\)/);
 });
+
+test('levels join users by user_id: member_levels has two links to users (user_id, granted_by)', () => {
+  const fs = require('node:fs');
+  for (const file of ['backend/services/network.service.ts', 'backend/services/program-history.service.ts', 'backend/services/users.service.ts']) {
+    const source = fs.readFileSync(file, 'utf8');
+    const selects = source.match(/from\("member_levels"\)\.select\("[^"]*"\)/g) || [];
+    assert.ok(selects.length > 0, file);
+    for (const select of selects) assert.doesNotMatch(select, /[,(]users!inner/, file + ': an ambiguous embed breaks the request in production');
+  }
+});
