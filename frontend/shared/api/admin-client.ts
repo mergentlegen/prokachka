@@ -35,8 +35,8 @@ export async function loadAdminPublicationHistory(): Promise<PublicationHistoryI
   const response = await request<ApiResponse<{ history: PublicationHistoryItem[] }>>("/api/publication-history");
   return response.history || [];
 }
-type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null; level?: number };
-type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive" | "isPinned">, "resourceUrl"> & { resourceUrl?: string | null; level?: number }>;
+type AdminTaskInput = Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl">, "resourceUrl"> & { resourceUrl?: string | null; level?: number; voiceAnswer?: boolean };
+type AdminTaskPatch = Partial<Omit<Pick<Task, "title" | "description" | "maxPoints" | "deadlineAt" | "resourceUrl" | "isActive" | "isPinned">, "resourceUrl"> & { resourceUrl?: string | null; level?: number; voiceAnswer?: boolean }>;
 export async function createAdminTask(input: AdminTaskInput): Promise<Task> {
   const response = await request<ApiResponse<{ task: ApiRow }>>("/api/tasks", { method: "POST", body: JSON.stringify(input) }); return mapTask(response.task);
 }

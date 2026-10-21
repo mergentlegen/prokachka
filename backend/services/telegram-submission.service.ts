@@ -11,6 +11,8 @@ export type TelegramSubmissionResult = {
   summary?: string;
   /** The voice is a work for the mentor's review (it brings the miles), not practice. */
   review?: boolean;
+  /** The selected task takes one voice message as its answer. */
+  voice?: boolean;
 };
 
 export function telegramTokenHash(token: string) {

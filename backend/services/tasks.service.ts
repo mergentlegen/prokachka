@@ -10,6 +10,7 @@ type TaskInput = {
   title?: string; description?: string; maxPoints?: number; deadlineAt?: string | null; isActive?: boolean; isPinned?: boolean; teamId?: string;
   publicationType?: "evergreen" | "fixed" | "sequential"; programId?: string; position?: number; deadlineHours?: number; resourceUrl?: string | null;
   publisherId?: string; audienceRootId?: string | null; level?: number;
+  /** The answer is one voice message in Telegram. */ voiceAnswer?: boolean;
 };
 
 export async function findTasks(teamId?: string, viewer?: TaskViewer) {
@@ -52,6 +53,7 @@ export async function insertTask(input: Required<Pick<TaskInput, "title" | "desc
     program_id: input.programId || null, position: input.position || null, deadline_hours: input.deadlineHours || null,
     // A program step takes its program's level in the database.
     level: input.level || 1,
+    voice_answer: input.voiceAnswer === true,
   }).select().single();
   return result.error ? { error: result.error } : { data: result.data };
 }
@@ -81,6 +83,7 @@ export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer
   if (input.deadlineHours !== undefined) patch.deadline_hours = input.deadlineHours;
   if (input.resourceUrl !== undefined) patch.resource_url = input.resourceUrl || null;
   if (input.level !== undefined) patch.level = Number(input.level);
+  if (input.voiceAnswer !== undefined) patch.voice_answer = input.voiceAnswer === true;
   let query = supabase.from("tasks").update(patch).eq("id", id);
   if (actor?.role !== "ceo" && actor?.teamId) query = query.eq("team_id", actor.teamId);
   const result = await query.select().single();

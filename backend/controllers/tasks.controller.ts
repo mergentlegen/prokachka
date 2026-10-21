@@ -81,7 +81,8 @@ export async function createTask(request: Request) {
     if (body.publicationType !== undefined && !["evergreen", "fixed", "sequential"].includes(body.publicationType)) return failure("Некорректный тип публикации.", 400);
     const level = body.level === undefined ? 1 : parseLevel(body.level);
     if (!level) return failure("Уровень может быть от 1 до 3.", 400);
-    const result = await insertTask({ level,
+    if (body.voiceAnswer !== undefined && typeof body.voiceAnswer !== "boolean") return failure("Некорректный способ ответа.", 400);
+    const result = await insertTask({ level, voiceAnswer: body.voiceAnswer === true,
       title: body.title.trim(), description: body.description.trim(), maxPoints: body.maxPoints, deadlineAt: deadline.value,
       isActive: body.isActive, teamId, publicationType: body.publicationType, programId: body.programId,
       position: body.position, deadlineHours: body.deadlineHours, resourceUrl: resourceUrl.value,
@@ -110,6 +111,7 @@ export async function updateTask(request: Request, id: string) {
     if (body.isActive !== undefined && typeof body.isActive !== "boolean") return failure("Некорректный статус задания.", 400);
     if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
     if (body.level !== undefined && !parseLevel(body.level)) return failure("Уровень может быть от 1 до 3.", 400);
+    if (body.voiceAnswer !== undefined && typeof body.voiceAnswer !== "boolean") return failure("Некорректный способ ответа.", 400);
     const deadline = Object.prototype.hasOwnProperty.call(body, "deadlineAt") ? parseDeadline(body.deadlineAt) : { value: undefined as string | null | undefined };
     if ("error" in deadline) return failure(deadline.error, 400);
     const resourceUrl = Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? parseExternalUrl(body.resourceUrl) : { value: undefined as string | null | undefined };

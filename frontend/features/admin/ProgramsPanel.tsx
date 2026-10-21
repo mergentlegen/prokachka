@@ -161,6 +161,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
                   {task.interactiveKind && <span className={styles.tagGame}>игра · без срока</span>}
                   {task.video && <span className={styles.tag}>видео</span>}
                   {task.quiz && <span className={styles.tag}>тест</span>}
+                  {task.voiceAnswer && <span className={styles.tag}>голосовое</span>}
                   {Boolean(task.attachments?.length) && <span className={styles.tag}>PDF</span>}
                   {!task.isActive && <span className={styles.tagHidden}>скрыт</span>}
                   {progress && count > 0 && <span className={styles.here}>сейчас здесь: {count}</span>}

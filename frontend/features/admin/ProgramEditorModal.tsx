@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createAdminProgram } from "@/frontend/shared/api/admin-client";
+import { createAdminProgram, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { LevelPicker } from "./LevelPicker";
 import { uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
@@ -16,7 +16,7 @@ import { formatMiles } from "@/frontend/shared/lib/format";
 import { MAX_MILES, validMiles } from "@/shared/domain/miles";
 import styles from "./ProgramsPanel.module.css";
 
-type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string; files: File[]; video: File | null; questions: QuizQuestion[] };
+type DraftTask = { id: number; title: string; description: string; resourceUrl: string; maxPoints: string; files: File[]; video: File | null; questions: QuizQuestion[] ; voiceAnswer: boolean };
 function validLink(value: string) {
   if (!value.trim()) return true;
   try { return value.trim().length <= 2000 && ["http:", "https:"].includes(new URL(value.trim()).protocol); }
@@ -57,7 +57,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
   function addStep() {
     if (busy || draftTasks.length >= 100) return;
     focusNewStep.current = true;
-    const task: DraftTask = { id: nextId.current++, title: "", description: "", resourceUrl: "", maxPoints: "10", files: [], video: null, questions: [] };
+    const task: DraftTask = { id: nextId.current++, title: "", description: "", resourceUrl: "", maxPoints: "10", files: [], video: null, questions: [], voiceAnswer: false };
     setDraftTasks((current) => [...current, task]);
   }
   function updateTask<K extends keyof Omit<DraftTask, "id">>(id: number, key: K, value: DraftTask[K]) {
@@ -86,6 +86,10 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
         // Questions and video of the step; a failure is reported, the published program stays.
         const draft = draftTasks[index];
         const taskIndex = tasksWithFiles.findIndex((item) => item.id === task.id);
+        if (draft.voiceAnswer) {
+          try { tasksWithFiles[taskIndex] = { ...tasksWithFiles[taskIndex], ...await updateAdminTask(task.id, { voiceAnswer: true }), attachments: tasksWithFiles[taskIndex].attachments }; }
+          catch { uploadErrors.push(`голосовой ответ шага ${index + 1}`); }
+        }
         if (draft.questions.length) {
           try {
             const checked = validateQuiz(draft.questions);
@@ -117,7 +121,7 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
         <h3 ref={reviewTitle} tabIndex={-1}>Проверьте программу перед публикацией</h3>
         <p><strong>{title.trim()}</strong><br />Уровень {level} · Шагов: {draftTasks.length} · На каждый шаг: {deadlineHours} ч</p>
         {draftTasks.length === 1 && <p className="program-review-note">Сейчас в программе только один шаг. Если планировали несколько, вернитесь к редактированию и добавьте остальные.</p>}
-        <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {formatMiles(task.maxPoints)}{task.resourceUrl.trim() ? " · С материалом" : ""}{task.video ? " · Видео" : ""}{task.questions.length ? ` · Вопросы: ${task.questions.length}` : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
+        <ol>{draftTasks.map((task) => <li key={task.id}><strong>{task.title.trim()}</strong><span>До {formatMiles(task.maxPoints)}{task.resourceUrl.trim() ? " · С материалом" : ""}{task.video ? " · Видео" : ""}{task.questions.length ? ` · Вопросы: ${task.questions.length}` : ""}{task.voiceAnswer ? " · Ответ голосовым" : ""}</span><p>{task.description.trim()}</p></li>)}</ol>
         <div className="program-builder-actions"><button type="button" className="button button-edit" disabled={busy} onClick={() => setPreview(false)}>← К редактированию</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? progress || "Публикуем..." : "Подтвердить и опубликовать"}</button></div>
       </div> : <>
         <fieldset disabled={busy} className="program-fields">
@@ -144,6 +148,8 @@ export function ProgramEditorModal({ onCreated, onClose, onError }: { onCreated:
                 if (task.files.length + valid.length > 10) { onError("К шагу можно прикрепить не больше 10 PDF."); event.target.value = ""; return; }
                 updateTask(task.id, "files", [...task.files, ...valid]); event.target.value = "";
               }} /></label>
+              <label className="toggle-row"><span><strong>🎙 Ответ голосовым в Telegram</strong><small>{task.voiceAnswer ? "Бот примет только голосовое сообщение" : "Ответ текстом, фото, видео или файлом"}</small></span>
+                <input type="checkbox" role="switch" className="toggle-switch" checked={task.voiceAnswer} onChange={(event) => updateTask(task.id, "voiceAnswer", event.target.checked)} /></label>
               <TaskVideoField file={task.video} removing={false} disabled={busy} onFile={(file) => updateTask(task.id, "video", file)} onRemove={() => undefined} onError={onError} />
               <QuizEditor questions={task.questions} loading={false} disabled={busy} onChange={(questions) => updateTask(task.id, "questions", questions)} />
               {task.files.length > 0 && <ul className={styles.selectedFiles}>{task.files.map((file, fileIndex) => <li key={`${file.name}-${file.lastModified}-${fileIndex}`}><span>{file.name} · {(file.size / 1048576).toFixed(1)} МБ</span><button type="button" onClick={() => updateTask(task.id, "files", task.files.filter((_, itemIndex) => itemIndex !== fileIndex))}>Убрать</button></li>)}</ul>}

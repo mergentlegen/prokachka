@@ -62,3 +62,4 @@
 }
 @media (prefers-reduced-motion: reduce) { .fold i { transition: none; } }
 .level { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 10px; border-radius: 99px; background: #fff3d9; color: #a8741a; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.voice { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 10px; border-radius: 99px; background: #efeafd; color: #6a4fc0; font-size: 12px; font-weight: 800; white-space: nowrap; }

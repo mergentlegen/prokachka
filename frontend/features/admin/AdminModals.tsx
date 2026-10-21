@@ -11,7 +11,7 @@ import { LevelPicker } from "./LevelPicker";
 import type { QuizQuestion } from "@/shared/domain/task-quiz";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { MAX_MILES } from "@/shared/domain/miles";
-export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string; level: number };
+export type TaskDraft = { title: string; description: string; resourceUrl: string; maxPoints: string; hasDeadline: boolean; deadline: string; level: number; voiceAnswer: boolean };
 export type ReviewDraft = { points: string; comment: string };
 
 export function TaskEditorModal({ taskId, task, program, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, quiz, onChange, onClose, onSubmit }: { taskId?: string; task?: Task; program?: TaskProgram; draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
@@ -31,6 +31,8 @@ export function TaskEditorModal({ taskId, task, program, draft, editing, busy, b
     <TaskVideoField task={task} file={video.file} removing={video.removing} disabled={busy} onFile={video.onFile} onRemove={video.onRemove} onError={video.onError} />
     <QuizEditor questions={quiz.questions} loading={quiz.loading} disabled={busy} onChange={quiz.onChange} />
     <TaskFilePicker taskId={taskId} attachments={attachments} files={files} disabled={busy} onFilesChange={onFilesChange} onRemove={onRemoveAttachment} />
+    {!task?.interactiveKind && <label className="toggle-row"><span><strong>🎙 Ответ голосовым в Telegram</strong><small>{draft.voiceAnswer ? "Участник запишет голосовое — бот примет только его, вы послушаете его в «Проверке работ»" : "Ответ текстом, фото, видео или файлом"}</small></span>
+      <input type="checkbox" role="switch" className="toggle-switch" checked={draft.voiceAnswer} onChange={(event) => onChange("voiceAnswer", event.target.checked)} /></label>}
     <label>Максимум миль<input type="number" inputMode="numeric" min="0" max={MAX_MILES} step="1" value={draft.maxPoints} onChange={(event) => onChange("maxPoints", event.target.value)} /></label>
     {!programStep && <><label className="toggle-row"><span><strong>Срок сдачи</strong><small>{draft.hasDeadline ? "Участники должны отправить ответ до даты ниже" : "Без срока — можно отправить в любое время"}</small></span>
       <input type="checkbox" role="switch" className="toggle-switch" checked={draft.hasDeadline} onChange={(event) => onChange("hasDeadline", event.target.checked)} /></label>

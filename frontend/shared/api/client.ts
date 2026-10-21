@@ -132,7 +132,7 @@ export function mapTask(row: ApiRow): Task {
     interactiveKind: isTaskInteractiveKind(row.interactive_kind) ? row.interactive_kind : undefined,
     updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()),
     attachments: Array.isArray(row.attachments) ? row.attachments.filter((item): item is ApiRow => Boolean(item && typeof item === "object")).map(mapTaskAttachment) : [],
-    ...(Number(row.level) > 1 ? { level: Number(row.level) } : {}) };
+    ...(Number(row.level) > 1 ? { level: Number(row.level) } : {}), ...(row.voice_answer === true ? { voiceAnswer: true } : {}) };
 }
 export function mapProgram(row: ApiRow): TaskProgram {
   return { id: String(row.id), teamId: String(row.team_id), title: String(row.title || ""), deadlineHours: Number(row.deadline_hours || 72), isActive: Boolean(row.is_active), isPinned: Boolean(row.is_pinned), pinnedAt: row.pinned_at ? String(row.pinned_at) : undefined, publisherId: row.publisher_id ? String(row.publisher_id) : undefined, audienceRootId: row.audience_root_id ? String(row.audience_root_id) : undefined, templateKey: isReadyProgramKey(row.template_key) ? row.template_key : undefined, createdAt: String(row.created_at || new Date().toISOString()), updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()), ...(Number(row.level) > 1 ? { level: Number(row.level) } : {}) };

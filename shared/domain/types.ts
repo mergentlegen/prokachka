@@ -52,6 +52,7 @@ export type Task = {
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;
   publisherId?: string; interactiveKind?: TaskInteractiveKind; programTitle?: string; programSteps?: number; createdAt: string; updatedAt: string;
   attachments?: TaskAttachment[]; feedOrder?: number; video?: TaskVideoSummary; quiz?: { questions: number }; /** Present from level 2 on. */ level?: number;
+  /** The answer is one voice message in Telegram. */ voiceAnswer?: boolean;
 };
 export type Announcement = {
   id: string; teamId: string; authorId?: string; authorName?: string; authorAvatarUrl?: string; title: string; content: string; resourceUrl?: string; photos?: AnnouncementPhoto[]; isActive: boolean; isPinned?: boolean; pinnedAt?: string; createdAt: string; updatedAt: string;

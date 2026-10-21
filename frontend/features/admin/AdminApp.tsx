@@ -87,7 +87,7 @@ export function AdminApp() {
   const [programEditorOpen, setProgramEditorOpen] = useState(false);
   const [taskOrderOpen, setTaskOrderOpen] = useState(false);
   const [taskActionBusy, setTaskActionBusy] = useState("");
-  const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "", level: 1 });
+  const [taskDraft, setTaskDraft] = useState<TaskDraft>({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "", level: 1, voiceAnswer: false });
   const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([]);
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
   const [taskVideoFile, setTaskVideoFile] = useState<File | null>(null);
@@ -276,6 +276,7 @@ export function AdminApp() {
       hasDeadline: Boolean(task?.deadlineAt),
       deadline: toLocalDateTime(task?.deadlineAt),
       level: task?.level ?? 1,
+      voiceAnswer: Boolean(task?.voiceAnswer),
     });
     setTaskAttachments(task?.attachments || []);
     setTaskFiles([]);
@@ -457,10 +458,10 @@ export function AdminApp() {
       const newStep = !modal.task && modal.program ? modal.program : null;
       let reopened = 0;
       const taskRecord = modal.task
-        ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, ...(modal.task.programId ? {} : { level: taskDraft.level }) })
+        ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, voiceAnswer: taskDraft.voiceAnswer, ...(modal.task.programId ? {} : { level: taskDraft.level }) })
         : newStep
-          ? await addProgramStep(newStep.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints }).then((added) => { reopened = added.reopened; return added.task; })
-          : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, level: taskDraft.level });
+          ? await addProgramStep(newStep.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints }).then(async (added) => { reopened = added.reopened; return taskDraft.voiceAnswer ? updateAdminTask(added.task.id, { voiceAnswer: true }) : added.task; })
+          : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, level: taskDraft.level, voiceAnswer: taskDraft.voiceAnswer });
       let saved: Task = { ...taskRecord, attachments: taskAttachments, video: modal.task?.video };
       for (let index = 0; index < taskFiles.length; index += 1) {
         try {
