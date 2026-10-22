@@ -43,7 +43,7 @@ export function TaskEditorModal({ taskId, task, program, draft, editing, busy, b
 export function ReviewModal({ draft, status, maxPoints, busy, onChange, onClose, onSubmit }: { draft: ReviewDraft; status: "accepted" | "revision"; maxPoints: number; busy: boolean; onChange: (key: keyof ReviewDraft, value: string) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   const accepting = status === "accepted";
   return <FormSheet title={accepting ? "Принять работу" : "Вернуть на доработку"} busy={busy} tone={accepting ? "success" : "warning"} submitLabel={accepting ? "Принять работу" : "Вернуть на доработку"} onClose={onClose} onSubmit={onSubmit}
-    intro={accepting ? "Мили сразу пойдут в Звёздный курс участника." : "Напишите понятный комментарий, чтобы участник знал, что исправить."}>
+    intro={accepting ? "Мили сразу добавятся к опыту (XP) участника." : "Напишите понятный комментарий, чтобы участник знал, что исправить."}>
     <label><span className="field-label">Мили <span className="field-hint">максимум {formatMiles(maxPoints)}</span></span><input type="number" inputMode="numeric" min="0" max={maxPoints} step="1" value={draft.points} onChange={(event) => onChange("points", event.target.value)} /></label>
     <label>{accepting ? "Комментарий наставника" : "Что нужно доработать"}<textarea value={draft.comment} onChange={(event) => onChange("comment", event.target.value)} placeholder={accepting ? "Например, отличный разбор..." : "Например, подробнее раскрой второй пункт..."} rows={5} required={!accepting} maxLength={4000} /></label>
   </FormSheet>;

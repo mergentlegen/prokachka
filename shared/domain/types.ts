@@ -74,7 +74,7 @@ export type Review = {
   photos: AnnouncementPhoto[]; createdAt: string; editedAt?: string; canDelete: boolean; isMine: boolean;
 };
 export type ReviewSummary = { count: number; average: number; stars: Record<1 | 2 | 3 | 4 | 5, number> };
-export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number; /** Personal totals behind «Звёздный курс» on the participant's level. */ miles?: number; stars?: number; level?: number };
+export type RankEntry = { id: string; name: string; avatarUrl?: string; points: number; /** Personal totals behind XP («Опыт») on the participant's level. */ miles?: number; stars?: number; level?: number };
 export type Store = {
   users: User[]; tasks: Task[]; programs: TaskProgram[]; programProgress: MemberProgramProgress[]; programModules?: ProgramModule[];
   /** Program steps the participant has passed, whole, to read again. */

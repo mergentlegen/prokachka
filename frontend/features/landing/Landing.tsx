@@ -206,21 +206,21 @@ export function Landing() {
           <article className={styles.feature} data-reveal>
             <div className={styles.featureCopy}>
               <h3>Мотивация, которая работает без вас</h3>
-              <p>Мили за задания и звёзды за достижения складываются в Звёздный курс до 300. Рейтинг показывает, сколько до следующего места, а пройденный курс открывает уровень «Капитан» с новыми заданиями и значком.</p>
+              <p>Мили за задания и звёзды за достижения складываются в опыт — до 300 XP. Рейтинг показывает, сколько XP до следующего места, а 300 XP открывают уровень «Капитан» с новыми заданиями и значком.</p>
             </div>
             <div className={`${styles.panel} ${styles.course}`} aria-hidden="true">
               <div className={styles.courseTop}>
                 <div className={styles.coinStage}>
                   <div className={styles.coin}>
                     <span className={styles.coinFace}><Mark className={styles.coinMark} /><small>Капитан</small></span>
-                    <span className={`${styles.coinFace} ${styles.coinBack}`}><b>300</b><small>курс</small></span>
+                    <span className={`${styles.coinFace} ${styles.coinBack}`}><b>300</b><small>XP</small></span>
                   </div>
                 </div>
                 <div className={styles.courseMeter}>
-                  <small>Звёздный курс</small>
-                  <b>160 <span>из 300</span></b>
+                  <small>Опыт</small>
+                  <b>160 <span>из 300 XP</span></b>
                   <i><b style={{ width: "53%" }} /></i>
-                  <small>До уровня «Капитан» — 140</small>
+                  <small>До уровня «Капитан» — 140 XP</small>
                 </div>
               </div>
               <ol className={styles.ranking}>

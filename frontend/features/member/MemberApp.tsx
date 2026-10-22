@@ -168,7 +168,7 @@ export function MemberApp() {
     setTaskFilter("done");
     setTab("tasks");
   }
-  // Place, miles and stars all come from «Звёздный курс»; miles and stars are the participant's own totals.
+  // Place, miles and stars all come from XP («Опыт»); miles and stars are the participant's own totals.
   const myEntry = user ? teamRanking.find((member) => member.id === user.id) : undefined;
   const currentRank = user ? teamRanking.findIndex((member) => member.id === user.id) + 1 : 0;
   const currentPoints = myEntry?.miles ?? 0;

@@ -141,12 +141,12 @@ export function levelUpText(level: number, memberName: string | null, link: stri
   const name = levelTitle(level);
   if (memberName !== null) return [
     "🎉 " + (memberName.trim().slice(0, 120) || "Участник") + " — новый уровень: " + level + (level === 2 ? " (" + name + ")" : "") + ".",
-    "Звёздный курс пройден: 100 миль и 10 звёзд. Теперь у него новые задания и новый рейтинг.",
+    "Набрано 300 XP: 100 миль и 10 звёзд. Теперь у него новые задания и новый рейтинг.",
     link ? "Структура сети: " + link : "",
   ].filter(Boolean).join("\n");
   const message = levelUpMessage(level);
   return [
-    "🎉 Звёздный курс пройден — ты на уровне " + level + "!",
+    "🎉 300 XP набрано — ты на уровне " + level + "!",
     message.title + ". " + message.text + ".",
     "На сайте уже открыты задания нового уровня. Прошлые задания остались в архиве — их можно пересмотреть.",
     link ? "Открыть: " + link : "",

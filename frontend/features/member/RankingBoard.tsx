@@ -11,12 +11,12 @@ import styles from "./RankingBoard.module.css";
 
 const starsUnit = (count: number) => plural(count, "звезда", "звезды", "звёзд");
 
-/** «До 2-го места — 15 курса: 15 миль или 1 звезда». */
+/** «До 2-го места — 15 XP: 15 миль или 1 звезда». */
 export function overtakeText(me: RankEntry, ahead: RankEntry) {
   const need = overtake(me, ahead);
-  if (need.onlyStars) return me.points >= COURSE_MAX ? `ещё ${need.stars} ${starsUnit(need.stars)}` : `дойди до ${COURSE_MAX} и набери больше звёзд`;
+  if (need.onlyStars) return me.points >= COURSE_MAX ? `ещё ${need.stars} ${starsUnit(need.stars)}` : `дойди до ${COURSE_MAX} XP и набери больше звёзд`;
   const ways = [need.miles ? `${need.miles} ${milesUnit(need.miles)}` : "", need.stars ? `${need.stars} ${starsUnit(need.stars)}` : ""].filter(Boolean);
-  return `${need.course} курса${ways.length ? `: ${ways.join(" или ")}` : ""}`;
+  return `${need.course} XP${ways.length ? `: ${ways.join(" или ")}` : ""}`;
 }
 
 const totals = (member: RankEntry) => <small className={styles.totals}>⭐ {member.stars ?? 0} · ✈️ {member.miles ?? 0}</small>;
@@ -28,7 +28,7 @@ export function RankingBoard({ ranking, userId, level = 1 }: { ranking: RankEntr
   const me = rankGap(ranking, userId);
   return <>
     <div className="section-heading ranking-heading">
-      <div className="ranking-title"><div><p className="eyebrow">{level > 1 ? levelLabel(level) : "Команда"}</p><h2>Звёздный курс</h2><p className={styles.formula}>Курс = мили + звёзды × 20 · до {COURSE_MAX}</p></div><span className="trophy">♛</span></div>
+      <div className="ranking-title"><div><p className="eyebrow">{level > 1 ? levelLabel(level) : "Команда"}</p><h2>Опыт (XP)</h2><p className={styles.formula}>XP = мили + звёзды × 20 · до {COURSE_MAX}</p></div><span className="trophy">♛</span></div>
     </div>
     {ranking.length === 0 ? <div className="empty-state"><span>◌</span><p>Рейтинг пока пуст.</p></div> : <>
       {podium.length > 0 && <ol className={styles.podium} aria-label="Первая тройка">
@@ -37,7 +37,7 @@ export function RankingBoard({ ranking, userId, level = 1 }: { ranking: RankEntr
           return <li key={member.id} className={`rank-podium ${styles.place} ${styles[`place${place}`]} ${member.id === userId ? styles.mine : ""}`}>
             <span className={styles.avatarWrap}>{place === 1 && <span className={styles.crown} aria-hidden="true">♛</span>}<Avatar className={styles.avatar} name={member.name} src={member.avatarUrl} /></span>
             <span className={styles.name}>{member.name}{member.id === userId && <small>это вы</small>}</span>
-            <strong>{member.points}<small> курса</small></strong>
+            <strong>{member.points}<small> XP</small></strong>
             {totals(member)}
             <span className={styles.step} aria-label={`${place} место`}>{place}</span>
           </li>;
@@ -47,7 +47,7 @@ export function RankingBoard({ ranking, userId, level = 1 }: { ranking: RankEntr
         <span className={`rank-position rank-${index + podium.length + 1}`}>{index + podium.length + 1}</span>
         <Avatar className="rank-avatar" name={member.name} src={member.avatarUrl} />
         <span className={`rank-name ${styles.rowName}`}>{member.name}{member.id === userId && <small>это вы</small>}{totals(member)}</span>
-        <strong>{member.points}<small className={styles.unit}> курса</small></strong>
+        <strong>{member.points}<small className={styles.unit}> XP</small></strong>
       </div>)}</div>}
       {me && <MyPlace place={me.place} points={me.points} next={me.ahead ? `До ${me.place - 1}-го места — ${overtakeText(ranking[me.place - 1], me.ahead)}` : ""} />}
     </>}
@@ -59,7 +59,7 @@ function MyPlace({ place, points, next }: { place: number; points: number; next:
   return <div className={styles.me} role="status">
     <span className={styles.mePlace}><b>{place}</b><small>место</small></span>
     <span className={styles.meText}>
-      <strong>{shownPoints} из {COURSE_MAX} курса</strong>
+      <strong>{shownPoints} из {COURSE_MAX} XP</strong>
       <small>{next || "Ты на первом месте — так держать!"}</small>
     </span>
   </div>;

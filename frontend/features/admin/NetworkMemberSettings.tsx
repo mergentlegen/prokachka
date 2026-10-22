@@ -92,7 +92,7 @@ export function NetworkMemberSettings({ user, users, busy, onSave }: {
           {(user.level ?? 1) < MAX_LEVEL && <button type="button" className="button button-edit" disabled={busy} onClick={() => setPending({ kind: "level", level: (user.level ?? 1) + 1 })}>Перевести на {(user.level ?? 1) + 1}</button>}
         </span>
       </div>
-      <small className={styles.hint}>Сам переход происходит при 300 на Звёздном курсе. Кнопки — для особых случаев.</small>
+      <small className={styles.hint}>Сам переход происходит при 300 XP. Кнопки — для особых случаев.</small>
     </div>
     <div className={styles.switches}>
       {(Object.keys(permissions) as Permission[]).map((key) => <label className={styles.switch} key={key}>

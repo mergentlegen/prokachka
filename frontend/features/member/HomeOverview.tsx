@@ -29,7 +29,7 @@ export function HomeOverview({ userId, tasks, submissions, ranking, feedbackUnre
     <Tile icon={memberNavIcons.feedback} onClick={() => onOpen("feedback")} tone={feedbackUnread ? "gold" : "plain"} value={feedbackUnread ? unread : "0"} pulse={feedbackUnread > 0}
       label={feedbackUnread ? plural(feedbackUnread, "новый ответ", "новых ответа", "новых ответов") : "новых ответов нет"} note="от наставника" />
     {position?.ahead
-      ? <Tile icon={memberNavIcons.ranking} onClick={() => onOpen("ranking")} tone="plain" value={gap} label={`курса до ${position.place - 1}-го места`} note={`сейчас ${position.place}-е место`} />
+      ? <Tile icon={memberNavIcons.ranking} onClick={() => onOpen("ranking")} tone="plain" value={gap} label={`XP до ${position.place - 1}-го места`} note={`сейчас ${position.place}-е место`} />
       : <Tile icon={memberNavIcons.ranking} onClick={() => onOpen("ranking")} tone="plain" value={position ? "1" : "—"} label={position ? "место в рейтинге" : "рейтинг"} note={position ? "ты лидер!" : "пока без места"} />}
     <Tile icon={<span className={styles.trend} aria-hidden="true">↗</span>} onClick={() => onOpen("ranking")} tone="green" value={`+${week}`} label={`${milesUnit(week)} за 7 дней`} note="твой темп" />
   </nav>;

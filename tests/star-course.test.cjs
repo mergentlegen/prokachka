@@ -7,7 +7,7 @@ const loadTs = require('./helpers/load-ts.cjs');
 const course = loadTs('shared/domain/star-course.ts');
 const row = (id, name, points) => ({ id, name, points });
 
-test('Звёздный курс = miles (up to 100) + stars (up to 10) × 20, at most 300', () => {
+test('XP (Опыт) = miles (up to 100) + stars (up to 10) × 20, at most 300', () => {
   assert.equal(course.starCourse(100, 3), 160);
   assert.equal(course.starCourse(40, 0), 40);
   assert.equal(course.starCourse(450, 3), 160, 'miles above 100 do not add to the course');
@@ -28,10 +28,10 @@ test('the next place: course points, and whether miles or a star get there', () 
   const { overtakeText } = loadTs('frontend/features/member/RankingBoard.tsx');
   const me = (miles, stars) => ({ id: 'me', name: 'Я', miles, stars, points: course.starCourse(miles, stars) });
   const ahead = (points, stars = 0) => ({ id: 'x', name: 'Он', points, stars, miles: 100 });
-  assert.equal(overtakeText(me(85, 3), ahead(159)), '15 курса: 15 миль или 1 звезда');
-  assert.equal(overtakeText(me(100, 3), ahead(174)), '15 курса: 1 звезда', 'miles are full, only a star helps');
-  assert.equal(overtakeText(me(90, 10), ahead(295)), '6 курса: 6 миль', 'stars are full, only miles help');
-  assert.equal(overtakeText(me(100, 2), ahead(200)), '61 курса: 4 звезды');
+  assert.equal(overtakeText(me(85, 3), ahead(159)), '15 XP: 15 миль или 1 звезда');
+  assert.equal(overtakeText(me(100, 3), ahead(174)), '15 XP: 1 звезда', 'miles are full, only a star helps');
+  assert.equal(overtakeText(me(90, 10), ahead(295)), '6 XP: 6 миль', 'stars are full, only miles help');
+  assert.equal(overtakeText(me(100, 2), ahead(200)), '61 XP: 4 звезды');
   assert.equal(overtakeText(me(100, 10), ahead(300, 12)), 'ещё 3 звезды', 'at 300 only more stars overtake');
   assert.equal(overtakeText(me(100, 10), ahead(300, 10)), 'ещё 1 звезда');
 });
@@ -40,16 +40,17 @@ test('the participant card shows the course out of 300, both fuels and the hint'
   const { StarCourseCard } = loadTs('frontend/features/member/StarCourseCard.tsx');
   const card = (miles, stars) => renderToStaticMarkup(React.createElement(StarCourseCard, { miles, stars, rank: 2, onOpenRanking() {} }));
   const html = card(140, 3);
-  assert.match(html, /Звёздный курс/);
+  assert.match(html, /Опыт/);
+  assert.match(html, /из 300 XP/);
   assert.match(html, /из 300/);
   assert.match(html, /aria-valuenow="160"/);
-  assert.match(html, /3\/10 звёзд<\/span><b>→ 60 курса/);
-  assert.match(html, /100\/100 миль<\/span><b>→ 100 курса/);
-  assert.match(html, /Следующая звезда = \+20 к курсу\. Один PREMIUM = \+100\./);
+  assert.match(html, /3\/10 звёзд<\/span><b>→ 60 XP/);
+  assert.match(html, /100\/100 миль<\/span><b>→ 100 XP/);
+  assert.match(html, /Следующая звезда = \+20 XP\. Один PREMIUM = \+100 XP\./);
   assert.match(html, /2 место в рейтинге/);
   assert.match(card(40, 12), /Добирай мили/);
   const done = card(100, 10);
-  assert.match(done, /Звёздный курс пройден ✓/);
+  assert.match(done, /Опыт набран ✓/);
   assert.match(done, /больше звёзд/);
 });
 

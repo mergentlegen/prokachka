@@ -1,4 +1,4 @@
-// Levels: 300 on «Звёздный курс» moves a participant up (1 → 2 → 3). Each level has its own tasks, miles, stars and rating;
+// Levels: 300 XP («Опыт», formerly «Звёздный курс») moves a participant up (1 → 2 → 3). Each level has its own tasks, miles, stars and rating;
 // lower levels stay open as a read-only archive.
 export const MAX_LEVEL = 3;
 export type Level = 1 | 2 | 3;
@@ -27,7 +27,7 @@ export function levelUpMessage(level: number) {
 /** Profile badges earned by moving up: «Капитан» for level 2, then level 3. */
 export function levelBadges(level: number) {
   return [
-    ...(level >= 2 ? [{ key: "captain", icon: "⚓", title: "Капитан", note: "за пройденный Звёздный курс уровня 1" }] : []),
-    ...(level >= 3 ? [{ key: "level-3", icon: "★", title: "Уровень 3", note: "за пройденный Звёздный курс уровня 2" }] : []),
+    ...(level >= 2 ? [{ key: "captain", icon: "⚓", title: "Капитан", note: "за 300 XP на уровне 1" }] : []),
+    ...(level >= 3 ? [{ key: "level-3", icon: "★", title: "Уровень 3", note: "за 300 XP на уровне 2" }] : []),
   ];
 }

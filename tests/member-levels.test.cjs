@@ -104,12 +104,12 @@ test('the level switch lists the current level first and earlier levels as archi
 test('the course card names the level and how to reach the next one', () => {
   const { StarCourseCard } = loadTs('frontend/features/member/StarCourseCard.tsx');
   const first = renderToStaticMarkup(React.createElement(StarCourseCard, { miles: 40, stars: 2, rank: 3, level: 1, onOpenRanking() {} }));
-  assert.match(first, /300 — переход на уровень 2/);
+  assert.match(first, /300 XP — переход на уровень 2/);
   const second = renderToStaticMarkup(React.createElement(StarCourseCard, { miles: 0, stars: 0, rank: 1, level: 2, onOpenRanking() {} }));
   assert.match(second, /Уровень 2 · Капитан/);
   assert.match(second, /0\/100 миль/);
   const last = renderToStaticMarkup(React.createElement(StarCourseCard, { miles: 100, stars: 10, rank: 1, level: 3, onOpenRanking() {} }));
-  assert.match(last, /Звёздный курс пройден ✓/);
+  assert.match(last, /Опыт набран ✓/);
 });
 
 test('«Ответили N из M» counts those on the task’s level and anyone who already answered', () => {
@@ -164,6 +164,9 @@ test('Telegram: the participant is congratulated, the mentor learns who moved up
   assert.match(member, /Ты на безоплатном членстве/);
   const mentor = levelUpText(2, 'Алия Бекова', 'https://prokachka.kz/admin?section=network');
   assert.match(mentor, /Алия Бекова — новый уровень: 2 \(Капитан\)/);
+  assert.match(member, /300 XP набрано/);
+  assert.match(mentor, /Набрано 300 XP: 100 миль и 10 звёзд/);
+  assert.doesNotMatch(member + mentor, /Звёздный курс/);
 });
 
 test('levels join users by user_id: member_levels has two links to users (user_id, granted_by)', () => {

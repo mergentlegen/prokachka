@@ -1,6 +1,6 @@
 import type { RankEntry } from "./types";
 
-// «Звёздный курс» — the only team rating. Miles and stars stay personal counters everywhere else;
+// XP, shown as «Опыт» (formerly «Звёздный курс»), — the only team rating. Miles and stars stay personal counters everywhere else;
 // the course takes at most 100 miles and 10 stars, a star is worth 20, so the course ends at 300.
 export const COURSE_MILES = 100;
 export const COURSE_STARS = 10;

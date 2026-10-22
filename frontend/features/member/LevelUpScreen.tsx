@@ -14,7 +14,7 @@ export function LevelUpScreen({ level, onTeam, onClose }: { level: number; onTea
     <div className={styles.rays} aria-hidden="true" />
     <section className={styles.content}>
       <p className={styles.badge}><span aria-hidden="true">★</span>Уровень {level}</p>
-      <p className={styles.course}>Звёздный курс пройден: 100 миль и 10 звёзд</p>
+      <p className={styles.course}>300 XP набрано: 100 миль и 10 звёзд</p>
       <h2 id="level-up-title">{message.title}</h2>
       <p className={styles.text}>{message.text}</p>
       <button ref={button} type="button" className={styles.team} onClick={onTeam}>{message.action}</button>

@@ -97,7 +97,7 @@ test('home overview tiles show tasks waiting, unread replies, place and weekly m
   assert.match(markup, /<strong>2<\/strong><span[^>]*>задания ждут/);
   assert.match(markup, /осталось 4 ч/, 'the nearest deadline is visible on the tile');
   assert.match(markup, /новых ответа/);
-  assert.match(markup, /<strong>71<\/strong><span[^>]*>курса до 1-го места/);
+  assert.match(markup, /<strong>71<\/strong><span[^>]*>XP до 1-го места/);
   assert.match(markup, /сейчас 2-е место/);
   assert.match(markup, /\+30/);
   const calm = renderToStaticMarkup(React.createElement(HomeOverview, { userId: 'me', now, feedbackUnread: 0, tasks: [], submissions: [], ranking: [{ id: 'me', name: 'B', points: 5 }], onOpen() {} }));
@@ -113,12 +113,12 @@ test('ranking shows a podium for the top three and pins the participant’s own 
   const podium = markup.slice(markup.indexOf('Первая тройка'), markup.indexOf('</ol>'));
   assert.ok(podium.indexOf('Борис') < podium.indexOf('Анна') && podium.indexOf('Анна') < podium.indexOf('Вера'), 'second, first, third like a real podium');
   assert.equal((markup.match(/class="rank-row/g) || []).length, 2);
-  assert.match(markup, /До 4-го места — 11 курса: 11 миль или 1 звезда/);
+  assert.match(markup, /До 4-го места — 11 XP: 11 миль или 1 звезда/);
   assert.match(markup, /⭐ 2 · ✈️ 20/, 'stars and miles under the name');
   assert.doesNotMatch(markup, />Мили<|>Звёзды</, 'no separate miles and stars ratings');
   const leader = renderToStaticMarkup(React.createElement(RankingBoard, { ranking, userId: 'u0' }));
   assert.match(leader, /на первом месте/);
-  assert.match(leader, /100 из 300 курса/);
+  assert.match(leader, /100 из 300 XP/);
   const small = renderToStaticMarkup(React.createElement(RankingBoard, { ranking: ranking.slice(0, 2), userId: 'u1' }));
   assert.ok(!small.includes('Первая тройка'), 'no podium for fewer than three people');
 });

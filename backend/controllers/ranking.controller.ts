@@ -4,7 +4,7 @@ import { failure, ok } from "@/backend/http/api-response";
 import { findCourseStandings, findPendingLevelUp, markMemberLevelSeen } from "@/backend/services/ranking.service";
 import { courseRanking } from "@/shared/domain/star-course";
 
-// The rating is «Звёздный курс» of the viewer's level: only those on the same level, with that level's miles and stars.
+// The rating is XP («Опыт», formerly «Звёздный курс») of the viewer's level: only those on the same level, with that level's miles and stars.
 export async function listRanking(request: Request) {
   const user = await getCurrentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
