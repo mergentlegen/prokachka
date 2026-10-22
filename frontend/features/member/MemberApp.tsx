@@ -218,6 +218,8 @@ export function MemberApp() {
   }
 
   function handleAuthenticated(nextUser: AuthUser) {
+    // The landing page's ?auth=… is only for the sign-in screen.
+    writePageParam("auth", null);
     void hydrateUser(nextUser);
   }
 
@@ -326,7 +328,7 @@ export function MemberApp() {
     try { await hydrateUser(await refreshAuthSession()); }
     catch (error) { if (error instanceof ApiError && error.status === 401) setUser(null); }
   }} />;
-  if (!user) return <AuthScreen onAuthenticated={handleAuthenticated} />;
+  if (!user) return <AuthScreen onAuthenticated={handleAuthenticated} homeHref="/" />;
 
   return <><main className={`app-shell member-shell member-tab-${tab === "profile" ? previousTab : tab}`}>
     <header className="topbar"><a className="brand" href="/" aria-label="На главную"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="topbar-actions">{hasMentorAccess(user) && <a className="mentor-link" href="/admin">Панель наставника</a>}<button className="logout-link" onClick={logout}>Выйти</button><button className="avatar-button" onClick={() => navigate("profile")} aria-label="Открыть профиль"><Avatar name={user.name} src={user.avatarUrl} className="header-avatar" eager /></button></div></header>

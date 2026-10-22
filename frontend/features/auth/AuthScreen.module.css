@@ -9,6 +9,11 @@
 }
 .panel { width: min(480px, 100%); min-width: 0; margin: auto; }
 .brand { display: flex; justify-content: center; margin-bottom: 20px; }
+.home { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin: -8px 0 12px; padding: 0 14px 0 10px; border: 1px solid #334762; border-radius: 999px; background: #16253d; color: #b1bfd4; font-size: 14px; font-weight: 600; text-decoration: none; transition: color .2s, border-color .2s, background-color .2s; }
+.home svg { width: 18px; height: 18px; transition: transform .2s; }
+.home:hover { border-color: #4a6283; background: #1b2d49; color: #f4f7fc; }
+.home:hover svg { transform: translateX(-3px); }
+.home:focus-visible { outline: 2px solid #e8b65a; outline-offset: 3px; }
 .brand img { display: block; width: 180px; height: 60px; }
 .card {
   min-width: 0;

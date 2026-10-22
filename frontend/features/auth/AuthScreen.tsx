@@ -18,12 +18,15 @@ import { suggestEmail } from "@/frontend/shared/lib/email-typos";
 
 const noSubscribe = () => () => undefined;
 function readInviteToken() { return new URLSearchParams(window.location.search).get("invite") || ""; }
+/** The landing page opens this screen with ?auth=register or ?auth=login. */
+function readRequestedMode() { return new URLSearchParams(window.location.search).get("auth") || ""; }
 
-export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthenticated: (user: AuthUser) => void; initialMode?: AuthMode }) {
+export function AuthScreen({ onAuthenticated, initialMode = "login", homeHref }: { onAuthenticated: (user: AuthUser) => void; initialMode?: AuthMode; homeHref?: string }) {
   // An invitation link means a newcomer: open sign-up unless the person picks "Войти".
   const invite = useSyncExternalStore(noSubscribe, readInviteToken, () => "");
   const [chosenMode, setChosenMode] = useState<AuthMode | null>(null);
-  const mode = chosenMode ?? (invite ? "register" : initialMode);
+  const requested = useSyncExternalStore(noSubscribe, readRequestedMode, () => "");
+  const mode = chosenMode ?? (invite || requested === "register" ? "register" : requested === "login" ? "login" : initialMode);
   const [invitationResult, setInvitationResult] = useState<InvitationPreview | null>(null);
   const invitation = !invite ? null : invitationResult?.token === invite ? invitationResult : "loading";
   const [values, setValues] = useState<AuthValues>({ firstName: "", lastName: "", email: "", password: "", passwordConfirmation: "" });
@@ -132,7 +135,7 @@ export function AuthScreen({ onAuthenticated, initialMode = "login" }: { onAuthe
   }} />;
   const emailSuggestion = mode === "register" && (attempted || touched.has("email")) ? suggestEmail(values.email) : null;
   const invited = invitation !== "loading" && invitation?.status === "ok" ? invitation : null;
-  return <AuthLayout>
+  return <AuthLayout homeHref={homeHref}>
       {mode === "register" && <AuthSteps current={1} />}
       <h1 className={styles.heading}>{mode === "login" ? "Войти в аккаунт" : "Создать аккаунт"}</h1>
       <p className={styles.intro}>{mode === "login" ? "С возвращением! Продолжайте выполнять задания и расти вместе с командой."
