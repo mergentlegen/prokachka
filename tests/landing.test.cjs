@@ -6,7 +6,7 @@ const loadTs = require('./helpers/load-ts.cjs');
 
 const Link = ({ href, children, ...rest }) => React.createElement('a', { href, ...rest }, children);
 const font = () => ({ variable: 'font' });
-const overrides = { 'next/link': { default: Link }, 'next/font/google': { Geologica: font, Onest: font } };
+const overrides = { 'next/link': { default: Link }, 'next/font/google': { Onest: font } };
 
 test('the landing sends leaders to WhatsApp and participants into the sign-up and sign-in screen', () => {
   const { Landing, REGISTER_HREF, LOGIN_HREF, LEADER_HREF, LEADER_PHONE, LEADER_MESSAGE } = loadTs('frontend/features/landing/Landing.tsx', overrides);
@@ -15,7 +15,7 @@ test('the landing sends leaders to WhatsApp and participants into the sign-up an
   assert.equal(LEADER_PHONE, '+7 707 689 73 25');
   assert.equal(LEADER_HREF, `https://wa.me/77076897325?text=${encodeURIComponent(LEADER_MESSAGE)}`, 'the chat opens with the message already typed');
   const html = renderToStaticMarkup(React.createElement(Landing));
-  assert.match(html, /<h1[^>]*>Команда растёт по/);
+  assert.match(html, /<h1[^>]*>Система обучения новичков для/);
   assert.equal((html.match(/Подключить команду/g) || []).length, 3, 'the leader offer is in the header, hero and connect block');
   const whatsapp = html.match(/<a[^>]*href="https:\/\/wa\.me\/77076897325[^"]*"[^>]*>/g) || [];
   assert.equal(whatsapp.length, 5, 'header, hero, connect button, phone number and chat window open WhatsApp');

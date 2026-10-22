@@ -24,40 +24,29 @@ export function LandingMotion() {
 }
 
 /**
- * A 3D scene that turns after the pointer on a computer, and after the scroll on a phone (the scene turns as it
- * crosses the screen). CSS keeps a gentle idle sway either way.
+ * A product picture that lies tilted back while it sits low on the screen and straightens out as it scrolls up
+ * (`--tilt` from 14deg to 0). Only this one element turns — nothing inside it is 3D — so Safari draws it whole.
  */
-export function TiltScene({ className, children }: { className?: string; children: ReactNode }) {
-  const stage = useRef<HTMLDivElement>(null);
+export function ScrollTilt({ className, children }: { className?: string; children: ReactNode }) {
+  const element = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const element = stage.current;
-    if (!element || reducedMotion()) return;
+    const node = element.current;
+    if (!node || reducedMotion()) return;
     let frame = 0;
-    const tilt = (x: number, y: number) => {
-      element.style.setProperty("--tilt-x", x.toFixed(2) + "deg");
-      element.style.setProperty("--tilt-y", y.toFixed(2) + "deg");
-    };
-    const later = (work: () => void) => { cancelAnimationFrame(frame); frame = requestAnimationFrame(work); };
-    if (window.matchMedia("(pointer: fine)").matches) {
-      const move = (event: PointerEvent) => later(() => {
-        const box = element.getBoundingClientRect();
-        const x = (event.clientX - (box.left + box.width / 2)) / window.innerWidth;
-        const y = (event.clientY - (box.top + box.height / 2)) / window.innerHeight;
-        tilt(-y * 10, x * 14);
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const top = node.getBoundingClientRect().top;
+        const height = window.innerHeight;
+        // Flat once the top edge reaches 35% of the screen height; fully tilted while it is at the bottom edge.
+        const lean = Math.max(0, Math.min(1, (top - height * 0.35) / (height * 0.65)));
+        node.style.setProperty("--tilt", (lean * 14).toFixed(2) + "deg");
       });
-      window.addEventListener("pointermove", move, { passive: true });
-      return () => { window.removeEventListener("pointermove", move); cancelAnimationFrame(frame); };
-    }
-    const scroll = () => later(() => {
-      const box = element.getBoundingClientRect();
-      // -1 when the scene's centre is at the bottom edge of the screen, 0 at the middle, 1 at the top edge.
-      const progress = Math.max(-1, Math.min(1, (window.innerHeight / 2 - (box.top + box.height / 2)) / (window.innerHeight / 2)));
-      // Entering from below the scene stands more upright, so its top edge never rises over the text above.
-      tilt(progress * 6, progress * 12);
-    });
-    scroll();
-    window.addEventListener("scroll", scroll, { passive: true });
-    return () => { window.removeEventListener("scroll", scroll); cancelAnimationFrame(frame); };
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => { window.removeEventListener("scroll", update); window.removeEventListener("resize", update); cancelAnimationFrame(frame); };
   }, []);
-  return <div ref={stage} className={className}>{children}</div>;
+  return <div ref={element} className={className}>{children}</div>;
 }
