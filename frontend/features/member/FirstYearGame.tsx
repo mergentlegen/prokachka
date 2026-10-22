@@ -6,6 +6,7 @@ import { firstYearAction } from "@/frontend/shared/api/first-year-client";
 import {
   applyFirstYear, FIRST_YEAR_GOAL, FIRST_YEAR_MONTHS, FIRST_YEAR_MOTIVATION, FIRST_YEAR_REWARD, replayFirstYear, type FirstYearChoice, type FirstYearState,
 } from "@/shared/domain/first-year";
+import { FirstYearMaterial, MaterialButton } from "./GameMaterial";
 import styles from "./FirstYearGame.module.css";
 
 type Screen =
@@ -40,6 +41,7 @@ function Rich({ html, as: Tag = "span", className }: { html: string; as?: "span"
 
 export function FirstYearGame({ taskId, onCompleted }: { taskId: string; onCompleted?: (submission: Submission) => void }) {
   const [state, setState] = useState<FirstYearState>(() => replayFirstYear([]));
+  const [material, setMaterial] = useState(false);
   const [choices, setChoices] = useState<number[]>([]);
   const [month, setMonth] = useState(1);
   const [screen, setScreen] = useState<Screen>({ kind: "intro" });
@@ -205,11 +207,11 @@ export function FirstYearGame({ taskId, onCompleted }: { taskId: string; onCompl
         : <button type="button" className={styles.btn} onClick={nextMonth}>Следующий месяц →</button>}
     </div>}
 
-    {screen.kind === "finale" && <Finale state={state} busy={busy} rewarded={rewarded} replay={replay} onAgain={() => restart(true)} />}
+    {screen.kind === "finale" && (material ? <FirstYearMaterial onBack={() => setMaterial(false)} /> : <Finale state={state} busy={busy} rewarded={rewarded} replay={replay} onAgain={() => restart(true)} onMaterial={rewarded || replay ? () => setMaterial(true) : undefined} />)}
   </div>;
 }
 
-function Finale({ state, busy, rewarded, replay, onAgain }: { state: FirstYearState; busy: boolean; rewarded: boolean; replay: boolean; onAgain: () => void }) {
+function Finale({ state, busy, rewarded, replay, onAgain, onMaterial }: { state: FirstYearState; busy: boolean; rewarded: boolean; replay: boolean; onAgain: () => void; onMaterial?: () => void }) {
   const spent = state.goalMonth ? FIRST_YEAR_GOAL : 0;
   const title = state.late === 0 ? `Ты доплыл до мечты в месяце ${state.goalMonth}!` : `Ты доплыл, но позже — в месяце ${state.goalMonth}`;
   const text = state.late === 0 ? "Все взносы — вовремя. Удвоение сработало на 100%." : `Из-за оплат с опозданием (${state.late}) ты потерял ${state.late * 100} баллов и дошёл до цели позже, чем мог бы — в месяце 7.`;
@@ -244,6 +246,7 @@ function Finale({ state, busy, rewarded, replay, onAgain }: { state: FirstYearSt
       <li>Проверь, подключён ли автоплатёж.</li>
       <li>Посмотри свой баланс баллов.</li>
     </ol>
+    {onMaterial && <MaterialButton onClick={onMaterial} />}
     <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={onAgain}>Сыграть ещё раз</button>
   </div>;
 }

@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { advanceReadyProgram, answerReadyProgram, completeReadyProgram, restartReadyProgramQuiz, startReadyProgram } from "@/frontend/shared/api/ready-program-client";
 import type { Submission } from "@/shared/domain/types";
+import { MaterialBar, MaterialButton } from "./GameMaterial";
 import styles from "./DreamPlanGame.module.css";
 
 const MAX_MONTHS = 12;
@@ -183,6 +184,7 @@ export function DreamPlanGame({ taskId, onCompleted }: { taskId: string; onCompl
 
   return <section ref={gameSection} className={styles.game} aria-label="Интерактивная игра Мечта с планом">
     {stage === "route" ? <div className={styles.route}>
+      {attemptStatus === "completed" && <MaterialBar onBack={() => setStage("quiz")} />}
       <header className={styles.gameHeader}>
         <div className={styles.stageLine}><span className={styles.kicker}>01 / Путь к мечте</span><span className={styles.reward}>Игра + тест · {formatMiles(maxPoints)}</span></div>
         <h4>Круиз: сама или через клуб?</h4>
@@ -228,6 +230,7 @@ export function DreamPlanGame({ taskId, onCompleted }: { taskId: string; onCompl
         <h4 ref={questionHeading} tabIndex={-1}>Программа пройдена!</h4>
         <strong className={styles.resultMiles}>+{formatMiles(earnedPoints)}</strong>
         <p>Все ответы верные. Мили начислены и добавлены в твой общий рейтинг.</p>
+        <MaterialButton onClick={() => setStage("route")} />
         <span className={styles.resultHint}>Можно закрыть окно и продолжить обучение.</span>
       </div> : <>
         <div className={styles.quizProgress}>

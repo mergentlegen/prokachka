@@ -10,6 +10,7 @@ import { ApiError, createTelegramLink } from "@/frontend/shared/api/client";
 import type { Submission } from "@/shared/domain/types";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { plural } from "@/frontend/shared/lib/plural";
+import { MaterialBar, MaterialButton } from "./GameMaterial";
 import styles from "./CompanyVoyageGame.module.css";
 
 type View = "intro" | "cards" | "quizIntro" | "quiz" | "result" | "story" | "waiting" | "done";
@@ -116,9 +117,11 @@ export function CompanyVoyageGame({ taskId }: { taskId: string; onCompleted?: (s
     } finally { inFlight.current = false; if (current === version.current) setBusy(false); }
   }
 
+  /** The cards again, read-only — the game is already passed. */
+  function openMaterial() { setPractice(null); setCardIndex(0); setView("cards"); }
   function goCard(index: number) {
     if (!attempt || busy) return;
-    if (index >= COMPANY_CARDS.length) { setView(attempt.completed ? "result" : "quizIntro"); return; }
+    if (index >= COMPANY_CARDS.length) { setView(attempt.completed ? placeFor(attempt) : "quizIntro"); return; }
     if (attempt.completed || index <= attempt.step) { setCardIndex(index); return; }
     void run(() => advanceReadyProgram(taskId, index), () => setCardIndex(index));
   }
@@ -214,6 +217,7 @@ export function CompanyVoyageGame({ taskId }: { taskId: string; onCompleted?: (s
     </>}
 
     {view === "cards" && <>
+      {attempt?.completed && <MaterialBar onBack={() => setView(placeFor(attempt))} />}
       <div className={styles.card} onTouchStart={(event) => { if (event.touches.length === 1) touch.current = { x: event.touches[0].clientX, y: event.touches[0].clientY, at: event.timeStamp }; }}
         onTouchEnd={(event) => {
           // Only a clear horizontal swipe turns the card, so scrolling the text never does.
@@ -279,8 +283,8 @@ export function CompanyVoyageGame({ taskId }: { taskId: string; onCompleted?: (s
       {voice?.status === "pending" ? <button type="button" className={`${styles.btn} ${styles.gold}`} onClick={() => setView("waiting")}>Моё голосовое у наставника</button>
         : voice?.status === "accepted" ? <button type="button" className={`${styles.btn} ${styles.gold}`} onClick={() => setView("done")}>К награде</button>
         : <button type="button" className={`${styles.btn} ${styles.gold}`} onClick={() => { setPractice(null); setView("story"); }}>Дальше: мой рассказ</button>}
+      <MaterialButton label="Посмотреть материал игры — карточки" onClick={openMaterial} />
       <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={() => { setPractice(null); setView("quizIntro"); }}>Пройти игру ещё раз</button>
-      <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={() => { setPractice(null); setCardIndex(0); setView("cards"); }}>Перечитать карточки</button>
     </>}
 
     {view === "story" && <>
@@ -318,6 +322,7 @@ export function CompanyVoyageGame({ taskId }: { taskId: string; onCompleted?: (s
       <div className={styles.reward}><div className={styles.big}>⏳</div><h3 className={styles.h1}>Жду ответ</h3>
         <p className={styles.lead}>Твоё голосовое у наставника. Когда он его послушает, он ответит тебе и начислит <b>{MILES} ✈️</b>.</p></div>
       <div className={styles.card}><h4>Пока ждёшь</h4><p>Перечитай свою копилку ответов — завтра они могут пригодиться в разговоре с другом.</p></div>
+      <MaterialButton label="Посмотреть материал игры — карточки" onClick={openMaterial} />
       <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={() => setView("result")}>Открыть копилку ответов</button>
       <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={() => setLoadKey((key) => key + 1)}>Обновить статус</button>
     </>}
@@ -326,6 +331,7 @@ export function CompanyVoyageGame({ taskId }: { taskId: string; onCompleted?: (s
       <div className={styles.reward}><div className={styles.big}>🏅</div><h3 className={styles.h1}>Наставник принял твой рассказ!</h3>
         <p className={styles.lead}><b>+{formatMiles(voice?.points || COMPANY_VOYAGE_REWARD)} ✈️</b> уже в твоём рейтинге.{voice?.comment && <> Наставник: «{voice.comment}»</>}</p></div>
       <div className={styles.card}><h4>🧰 Твоя копилка ответов</h4>{bank}</div>
+      <MaterialButton label="Посмотреть материал игры — карточки" onClick={openMaterial} />
       <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={() => { setPractice(null); setView("quizIntro"); }}>Пройти игру ещё раз</button>
     </>}
 

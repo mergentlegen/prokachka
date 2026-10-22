@@ -85,7 +85,9 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
       {deadline && (countdown && canSubmit && !captainPending && !surveyInProgress
         ? <p className={`${styles.countdown} ${styles[countdown.tone]}`}><span>{countdown.text}</span><small>{countdown.tone === "expired" ? "можно отправить с опозданием" : `до ${formatDateTime(deadline)}`}</small></p>
         : <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>)}
-      <div className={styles.actions}><button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isSurvey ? "Открыть опросник" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>{action()}</div>
+      <div className={styles.actions}>{status === "accepted" && !captainPending && !surveyInProgress && !(readOnly && isInteractive)
+          ? <button className={`${styles.read} ${styles.readMaterial}`} onClick={() => setOpen(true)} aria-haspopup="dialog"><span className={styles.readIcon} aria-hidden="true">📖</span>{isInteractive ? "Материал игры" : "Материал задания"}</button>
+          : <button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isSurvey ? "Открыть опросник" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>}{action()}</div>
     </article>
     {open && <ModalSheet title={isInteractive ? task.title : "Задание"} variant={isInteractive ? "immersive" : "default"} onClose={() => setOpen(false)}>
       <div className={`${styles.detail} ${isInteractive ? styles.interactiveDetail : ""}`}>

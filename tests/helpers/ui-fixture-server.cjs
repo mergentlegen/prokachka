@@ -117,7 +117,7 @@ http.createServer((req, res) => {
         if (input.action === 'answer') {
           if (rulesAttempt.failed || rulesAttempt.step !== 1 || input.questionIndex !== rulesAttempt.questionIndex) return json({ message: 'Invalid question state' }, 409);
           rulesAttempt.lastAnswer = input.answer;
-          rulesAttempt.failed = [1,1,0,1,2][rulesAttempt.questionIndex] !== input.answer;
+          rulesAttempt.failed = [0,1,0,0,0][rulesAttempt.questionIndex] !== input.answer;
           if (!rulesAttempt.failed) { rulesAttempt.questionIndex += 1; rulesAttempt.earnedPoints += 1; rulesAttempt.ready = rulesAttempt.questionIndex === 5; }
         }
         if (input.action === 'restart-quiz') Object.assign(rulesAttempt, { questionIndex: 0, earnedPoints: 0, lastAnswer: null, failed: false, ready: false, attemptNumber: rulesAttempt.attemptNumber + 1 });

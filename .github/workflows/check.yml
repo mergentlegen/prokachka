@@ -176,6 +176,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/voice-answers.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261109-voice-answers-flow.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/voice-answers-flow.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261110-starter-rules-xp.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/starter-rules-xp.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

@@ -5,6 +5,7 @@ import type { Submission } from "@/shared/domain/types";
 import { safetyWatchAction } from "@/frontend/shared/api/safety-watch-client";
 import { SAFETY_WATCH_DECKS, SAFETY_WATCH_REWARD, SAFETY_WATCH_SOURCES, SAFETY_WATCH_SUMMARY, SAFETY_WATCH_TOTAL } from "@/shared/domain/safety-watch";
 import { formatMiles } from "@/frontend/shared/lib/format";
+import { MaterialButton, SafetyWatchMaterial } from "./GameMaterial";
 import styles from "./SafetyWatchGame.module.css";
 
 type Screen = "start" | "intro" | "question" | "deckEnd" | "final";
@@ -20,6 +21,7 @@ export function SafetyWatchGame({ taskId, onCompleted }: { taskId: string; onCom
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [screen, setScreen] = useState<Screen>("start");
+  const [material, setMaterial] = useState(false);
   // Decks the site has accepted; in practice mode (after the miles) nothing is sent.
   const [saved, setSaved] = useState(0);
   const [rewarded, setRewarded] = useState(false);
@@ -187,7 +189,8 @@ export function SafetyWatchGame({ taskId, onCompleted }: { taskId: string; onCom
         : <button type="button" className={`${styles.btn} ${styles.orange}`} disabled={busy} onClick={() => startDeck(deck + 1)}>{busy ? "Сохраняем…" : "Следующая палуба →"}</button>}
     </section>}
 
-    {screen === "final" && <section className={styles.screen}>
+    {screen === "final" && material && <section className={styles.screen}><SafetyWatchMaterial onBack={() => setMaterial(false)} /></section>}
+    {screen === "final" && !material && <section className={styles.screen}>
       <div className={styles.big}>
         <div className={styles.emoji}>⚓</div>
         <h3>Вахта сдана!</h3>
@@ -204,6 +207,7 @@ export function SafetyWatchGame({ taskId, onCompleted }: { taskId: string; onCom
         <div><b>{fixes}</b><span>ошибок исправлено</span></div>
       </div>
       <div className={styles.memo}><h4>Главное за 30 секунд</h4><ul>{SAFETY_WATCH_SUMMARY.map((line) => <li key={line}>{line}</li>)}</ul></div>
+      {rewarded && <MaterialButton onClick={() => setMaterial(true)} />}
       <button type="button" className={`${styles.btn} ${styles.ghost}`} disabled={busy} onClick={again}>↻ Пройти ещё раз</button>
       <div className={styles.tip}>Совет: вернись к игре через 2–3 дня. Вопросы перемешаются — проверь, что всё помнишь.</div>
     </section>}

@@ -4,12 +4,15 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { answerReadyProgram, completeReadyProgram, restartReadyProgramQuiz, type ReadyAttempt } from "@/frontend/shared/api/ready-program-client";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import type { Submission } from "@/shared/domain/types";
+import { MaterialButton } from "./GameMaterial";
 import styles from "./DreamPlanGame.module.css";
 
 export type ReadyQuizQuestion = { title: string; description?: string; options: readonly string[]; feedback: string };
 type Props = {
   taskId: string; initialAttempt: ReadyAttempt; questions: readonly ReadyQuizQuestion[];
   onBack: () => void; onCompleted?: (submission: Submission) => void;
+  /** Opens the game's material again from the result screen. */
+  onMaterial?: () => void;
 };
 
 function shuffledIndices(length: number) {
@@ -21,7 +24,7 @@ function shuffledIndices(length: number) {
   return indices;
 }
 
-export function ReadyProgramQuiz({ taskId, initialAttempt, questions, onBack, onCompleted }: Props) {
+export function ReadyProgramQuiz({ taskId, initialAttempt, questions, onBack, onCompleted, onMaterial }: Props) {
   const [view, setView] = useState(() => ({
     attempt: initialAttempt,
     questionIndex: Math.min(questions.length - 1, initialAttempt.questionIndex),
@@ -84,6 +87,7 @@ export function ReadyProgramQuiz({ taskId, initialAttempt, questions, onBack, on
       <h4 ref={heading} tabIndex={-1}>Правила усвоены!</h4>
       <strong className={styles.resultMiles}>+{formatMiles(attempt.earnedPoints)}</strong>
       <p>Все ответы верные. Мили уже добавлены в твой рейтинг.</p>
+      {onMaterial && <MaterialButton onClick={onMaterial} />}
       <span className={styles.resultHint}>Закрой окно и переходи к следующим заданиям.</span>
     </div> : <>
       <div className={styles.quizProgress}>

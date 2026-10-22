@@ -22,6 +22,10 @@
 .submit:disabled { opacity:.55; }
 .read { padding-left:0; padding-right:4px; background:transparent; color:var(--blue); }
 .read span { margin-left:5px; }
+/* A passed task or game: its material is one clear tap away. */
+.read.readMaterial { display:inline-flex; align-items:center; gap:6px; padding:9px 12px; white-space:nowrap; border:1.5px solid var(--blue); background:#edf2fd; color:#1d3a85; font-size:14px; font-weight:750; }
+.read.readMaterial:hover { background:#e1e9fb; }
+.read .readIcon { margin:0; font-size:16px; line-height:1; }
 .waiting { color:#7f8b9e; font-size:12px; line-height:1.5; }
 .detail { min-width:0; }
 .interactiveDetail { width:100%; }

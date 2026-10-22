@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { heartSurveyRequest, type HeartSurveyState } from "@/frontend/shared/api/heart-survey-client";
 import { formatMiles } from "@/frontend/shared/lib/format";
+import { MaterialBar, MaterialButton } from "./GameMaterial";
 import base from "./DreamPlanGame.module.css";
 import styles from "./HeartSurvey.module.css";
 
@@ -13,6 +14,7 @@ export function HeartSurvey({ taskId, onProgress }: { taskId: string; onProgress
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reward, setReward] = useState("");
+  const [material, setMaterial] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const inFlight = useRef(false);
   const loadVersion = useRef(0);
@@ -61,7 +63,14 @@ export function HeartSurvey({ taskId, onProgress }: { taskId: string; onProgress
   return <section className={`${base.game} ${styles.game}`} aria-label="Опросник Куда зовёт твоё сердце">
     <div className={styles.content}>
       <div className={base.stageLine}><p className={base.kicker}>Старт новичка</p><span className={`${base.reward} ${styles.counter}`}>✈ {formatMiles(survey?.earnedPoints ?? 0)}</span></div>
-      {!started && !survey?.completed ? <div className={styles.intro}>
+      {survey?.completed && material ? <div className={styles.intro}>
+        <MaterialBar onBack={() => setMaterial(false)} />
+        <span className={styles.sunrise} aria-hidden="true">🌅</span>
+        <h4>{survey.definition.title}</h4>
+        <p>5 честных вопросов о путешествиях, которых ты хочешь, но пока откладываешь. Здесь нет неправильных ответов — твой выбор отмечен.</p>
+        <ol className={styles.materialList}>{survey.definition.questions.map((item, index) => <li key={item.title}><strong>{item.title}</strong><ul>{item.options.map((option, optionIndex) => <li key={option.text} className={survey.answers[index] === optionIndex ? styles.materialPicked : ""}>{option.emoji} {option.text}{survey.answers[index] === optionIndex && <b> · твой ответ</b>}</li>)}</ul></li>)}</ol>
+        <button type="button" className={base.back} onClick={() => setMaterial(false)}>← К результату</button>
+      </div> : !started && !survey?.completed ? <div className={styles.intro}>
         <span className={styles.sunrise} aria-hidden="true">🌅</span>
         <h4 ref={heading}>Куда зовёт твоё сердце?</h4>
         <p>5 честных вопросов о путешествиях, которых ты хочешь, но пока откладываешь.</p>
@@ -69,7 +78,7 @@ export function HeartSurvey({ taskId, onProgress }: { taskId: string; onProgress
         <button type="button" className={base.primary} disabled={!survey || busy} onClick={() => setStarted(true)}>{survey ? "Начать путешествие →" : error ? "Опросник пока недоступен" : "Загружаем опросник…"}</button>
         <small>Ответы увидят наставники выше тебя по ветке с правом проверки работ.</small>
       </div> : survey?.completed && result ? <div className={styles.result}>
-        <div className={base.completed}><span className={base.resultIcon} aria-hidden="true">✓</span><h4 ref={heading} tabIndex={-1}>Твоя мечта стала ближе</h4><strong className={base.resultMiles}>+{formatMiles(survey.earnedPoints)}</strong><p>Все 5 миль уже в твоём рейтинге.</p></div>
+        <div className={base.completed}><span className={base.resultIcon} aria-hidden="true">✓</span><h4 ref={heading} tabIndex={-1}>Твоя мечта стала ближе</h4><strong className={base.resultMiles}>+{formatMiles(survey.earnedPoints)}</strong><p>Все 5 миль уже в твоём рейтинге.</p><MaterialButton onClick={() => setMaterial(true)} /></div>
         <div className={styles.reason}><span>Твоя настоящая причина · {result.title}</span><p>«{result.text}»</p></div>
         <p className={styles.reflect}>Если ничего не менять — когда случится твоё путешествие мечты?</p>
         <p className={styles.hint}>Запомни свою причину — она будет вести тебя дальше. Следующий шаг: узнай, как клуб помогает путешествовать чаще и за меньшие деньги.</p>

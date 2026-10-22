@@ -3,16 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { advanceReadyProgram, startReadyProgram, type ReadyAttempt } from "@/frontend/shared/api/ready-program-client";
 import type { Submission } from "@/shared/domain/types";
+import { MaterialBar } from "./GameMaterial";
 import { ReadyProgramQuiz, type ReadyQuizQuestion } from "./ReadyProgramQuiz";
 import quizStyles from "./DreamPlanGame.module.css";
 import styles from "./StarterRulesGame.module.css";
 
+// The answer key lives on the server (app_ready_program_spec, migration 20261110): the right option of each
+// question by its index in `options` — [0, 1, 0, 0, 0]. The quiz shows options in a random order.
 export const STARTER_RULES_QUESTIONS: readonly ReadyQuizQuestion[] = [
-  { title: "За что ты получаешь мили?", options: ["За каждого нового игрока в команде", "За знания и действия: уроки, квизы, задания", "За время, проведённое на сайте"], feedback: "Мили — за знания и действия. За новых игроков ты получаешь звёзды." },
-  { title: "Сколько звёзд может принести один новый игрок в команде?", options: ["Всегда 1 звезду", "От 1 до 5 звёзд", "10 звёзд"], feedback: "Каждый новый игрок приносит от 1 до 5 звёзд: Starter — 1, Classic — 2, Premium — 5. Цель — 10 звёзд." },
-  { title: "Чем «Задания» отличаются от «Программ»?", options: ["В готовых заданиях нет срока, а в программах есть дедлайн", "В готовых заданиях есть дедлайн, а в программах нет", "Ничем, это одно и то же"], feedback: "Готовые задания проходишь в своём темпе, а шаги программы — с персональными дедлайнами." },
-  { title: "Зачем в игре дедлайн?", options: ["Чтобы наказать за опоздание", "Чтобы задать темп и за 14 дней выйти на первый результат", "Чтобы было сложнее"], feedback: "Дедлайн — не наказание, а темп. Он не даёт отложить «на потом»." },
-  { title: "Тебе что-то непонятно в игре. Что делаешь?", options: ["Бросаю, раз не понимаю", "Жду, пока само прояснится", "Пишу наставнику — задавать вопросы тоже часть игры"], feedback: "Рядом твой наставник — человек, который пригласил тебя в игру. Обращаться за поддержкой — нормально." },
+  { title: "За что ты получаешь мили?", options: ["За обучение и задания", "За результат: новых игроков в команде", "За время, проведённое на сайте"], feedback: "Мили — за обучение. В заданиях можно собрать 100 миль." },
+  { title: "За что ты получаешь звёзды?", options: ["За прохождение уроков", "За реальный результат", "За вход на платформу каждый день"], feedback: "Звёзды — за результат. Максимум 10 звёзд." },
+  { title: "Что показывает XP?", options: ["Твой настоящий прогресс", "Только сколько уроков ты прошёл", "Сколько времени ты провёл на сайте"], feedback: "XP — твой настоящий прогресс: учёба и результат вместе." },
+  { title: "Какая у тебя цель в игре?", options: ["Набрать 300 XP", "Просто пройти один урок", "Дождаться, пока наставник сделает всё за меня"], feedback: "Цель — набрать 300 XP." },
+  { title: "Что нужно, чтобы Асель лично вела твой путь и давала консультации?", options: ["Постоянно быть активным на платформе и учиться", "Один раз зайти и больше не появляться", "Ничего не делать, всё произойдёт само"], feedback: "Асель ведёт твой результат, если ты постоянно проявляешь активность и учишься." },
 ];
 
 export function StarterRulesGame({ taskId, onCompleted }: { taskId: string; onCompleted?: (submission: Submission) => void }) {
@@ -56,27 +59,29 @@ export function StarterRulesGame({ taskId, onCompleted }: { taskId: string; onCo
     finally { inFlight.current = false; setBusy(false); }
   }
 
+  const reviewing = Boolean(attempt?.completed);
   return <section ref={section} className={`${quizStyles.game} ${styles.game}`} aria-label="Игра Правила игры">
-    {quizOpen && attempt ? <ReadyProgramQuiz taskId={taskId} initialAttempt={attempt} questions={STARTER_RULES_QUESTIONS} onBack={() => setQuizOpen(false)} onCompleted={onCompleted} /> : <div className={styles.intro}>
+    {quizOpen && attempt ? <ReadyProgramQuiz taskId={taskId} initialAttempt={attempt} questions={STARTER_RULES_QUESTIONS} onBack={() => setQuizOpen(false)} onMaterial={() => setQuizOpen(false)} onCompleted={onCompleted} /> : <div className={styles.intro}>
+      {reviewing && <MaterialBar onBack={() => setQuizOpen(true)} />}
       <header className={styles.hero}>
-        <div className={styles.heroTop}><span>Старт новичка · 14 дней</span><span>Награда +5 миль</span></div>
-        <svg className={styles.ship} viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M8 38h48l-9 14H17L8 38Z" fill="currentColor"/><path d="M20 38V25h24v13M29 25V14h6v11" stroke="currentColor" strokeWidth="4" strokeLinejoin="round"/><path d="M8 57q6-5 12 0t12 0t12 0t12 0" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
-        <h4>Твой старт начинается здесь</h4><p>За 14 дней ты познакомишься с клубом и узнаешь, как в нём зарабатывают. Через игру, знания и свои первые шаги.</p>
+        <div className={styles.heroTop}><span>🚢 Старт новичка</span><span>Награда +5 миль</span></div>
+        <h4>Правила игры «Старт новичка»</h4><p>Учись, действуй, набирай XP.</p>
       </header>
       <div className={styles.rewards}>
-        <article className={`${styles.card} ${styles.miles}`}><span className={styles.icon} aria-hidden="true">↗</span><h5>Мили</h5><p>За знания и действия: уроки, квизы и задания.</p><strong>Цель — 100 миль</strong></article>
-        <article className={`${styles.card} ${styles.stars}`}><span className={styles.icon} aria-hidden="true">★</span><h5>Звёзды</h5><p>За нового игрока в команде — от 1 до 5 звёзд.</p><strong>Цель — 10 звёзд</strong></article>
+        <article className={`${styles.card} ${styles.miles}`}><span className={styles.icon} aria-hidden="true">✈️</span><h5>Мили — за обучение</h5><p>В заданиях можно собрать 100 миль.</p></article>
+        <article className={`${styles.card} ${styles.stars}`}><span className={styles.icon} aria-hidden="true">⭐</span><h5>Звёзды — за результат</h5><p>Максимум 10 звёзд.</p></article>
       </div>
-      <article className={styles.card}><p className={styles.kicker}>Как устроено обучение</p><h5>Два пути — один результат</h5><div className={styles.tabs}>
-        <div><span>Задания</span><p>Готовые игры — без срока выполнения. Узнай, что такое клуб и что он даёт тебе. Проходи в своём темпе.</p></div>
-        <div><span>Программы</span><p>Шаги с дедлайнами. Первая неделя — про твою выгоду в клубе, вторая — про то, как в клубе зарабатывают.</p></div>
-      </div></article>
-      <article className={styles.card}><p className={styles.kicker}>Двигайся в своём ритме</p><h5>Дедлайн помогает держать темп</h5><p>Это не наказание: срок помогает не откладывать на потом и за 14 дней выйти на первый результат.</p></article>
-      <article className={styles.card}><p className={styles.kicker}>Поддержка рядом</p><h5>Ты не один</h5><p>Твой наставник — человек, который пригласил тебя в игру. Если что-то непонятно, пиши ему. Задавать вопросы — тоже часть игры.</p></article>
-      <article className={`${styles.card} ${styles.prize}`}><span className={styles.prizeIcon} aria-hidden="true">✦</span><p className={styles.kicker}>Главный приз</p><h5>100 миль + 10 звёзд</h5><p>Собери их за 14 дней, и твои звёзды превратятся в настоящий результат за чашкой кофе с личным наставником в красивом месте.</p><p className={styles.note}>Звёзды показывают, как работает вознаграждение в inCruises. Условия начисления бонусов ты разберёшь в «Программах».</p></article>
-      <footer className={styles.start}><div><p className={styles.kicker}>Проверь себя</p><h5>5 вопросов — 5 миль</h5><p>Ответь на все вопросы верно и нажми «Завершить». Если ошибёшься, сможешь пройти тест заново.</p></div>
+      <article className={`${styles.card} ${styles.xp}`}><span className={styles.icon} aria-hidden="true">⚡️</span><h5>XP — твой настоящий прогресс</h5></article>
+      <article className={`${styles.card} ${styles.goal}`}><h5>🎯 Цель — набрать 300 XP</h5></article>
+      <article className={`${styles.card} ${styles.welcome}`}>
+        <h5>Радуйся: ты счастливчик! 🎉</h5>
+        <p>Ты в команде, у которой есть своя платформа. Её лично разработала твой исполнительный директор Асель Баялинова, чтобы учить и растить именно твою команду.</p>
+        <p>Асель лично ведёт твой путь и твой результат и даёт тебе консультации. Условие одно: ты постоянно проявляешь активность на платформе и учишься.</p>
+        <p className={styles.motto}>Учись, действуй, набирай XP. Будь крут и будь счастлив. Ты в нужном месте. 🚀</p>
+      </article>
+      <footer className={styles.start}><div><p className={styles.kicker}>Проверь себя</p><h5>5 вопросов — 5 миль</h5><p>За каждый верный ответ — 1 миля. Ответь на все вопросы верно и нажми «Завершить». Если ошибёшься, сможешь пройти тест заново.</p></div>
         {error && <div className={quizStyles.quizFailure} role="alert"><p>{error}</p>{!attempt && <button type="button" className={quizStyles.retry} onClick={() => void load()}>Повторить загрузку</button>}</div>}
-        <button type="button" className={quizStyles.primary} disabled={!attempt || busy} onClick={() => void beginQuiz()}>{busy ? "Открываем тест…" : !attempt ? error ? "Игра пока недоступна" : "Загружаем прогресс…" : attempt.completed ? "Посмотреть результат" : attempt.step === 1 ? "Продолжить тест →" : "Перейти к тесту →"}</button>
+        <button type="button" className={quizStyles.primary} disabled={!attempt || busy} onClick={() => void beginQuiz()}>{busy ? "Открываем тест…" : !attempt ? error ? "Игра пока недоступна" : "Загружаем прогресс…" : attempt.completed ? "К результату →" : attempt.step === 1 ? "Продолжить тест →" : "Перейти к тесту →"}</button>
         <span className={styles.noDeadline}>Эта игра без дедлайна. Прогресс сохраняется автоматически.</span>
       </footer>
     </div>}
