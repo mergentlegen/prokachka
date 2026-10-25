@@ -94,7 +94,12 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {(!isInteractive || readOnly) && <><div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div></>}
+        {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
         {readOnly && isInteractive && <p className={styles.waiting}>Игры прошлого уровня в архиве не запускаются.</p>}
+        {/* Materials come first (video, PDF, link), then the game or the test, then the answer. */}
+        {task.video?.playable && <ProtectedVideo taskId={task.id} onCompleted={() => setVideoWatched(true)} />}
+        <TaskAttachments taskId={task.id} attachments={task.attachments} />
+        {resource && <ResourceCard url={resource} onOpen={openedResource} />}
         {!readOnly && <>{task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "first-year" && <FirstYearGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "safety-watch" && <SafetyWatchGame taskId={task.id} onCompleted={onInteractiveComplete} />}
@@ -104,16 +109,12 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "count-your-dream" && <CountYourDreamGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "dream-route" && <DreamRouteGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}</>}
-        {task.video?.playable && <ProtectedVideo taskId={task.id} onCompleted={() => setVideoWatched(true)} />}
         {quizSent ? <QuizSentNotice score={quizSent.score} total={quizSent.total} />
           : voicePending && canSubmit ? <VoicePendingNotice url={voicePending.url} expiresAt={voicePending.expiresAt} onExpired={() => setVoicePending(null)} />
           : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} voice={task.voiceAnswer} onVoicePending={setVoicePending} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
         {isQuiz && status === "accepted" && <QuizReview taskId={task.id} />}
         {!isQuiz && !isInteractive && submission?.answerText && <div className={styles.answer}><strong>Ваш ответ</strong><p>{submission.answerText}</p></div>}
-        <TaskAttachments taskId={task.id} attachments={task.attachments} />
-        {resource && <ResourceCard url={resource} onOpen={openedResource} />}
         {linkOpened && canSubmit && !isQuiz && <div className={styles.returnHint} role="status"><strong>Уже выполнили?</strong><p>Нажмите «{submitLabel}» ниже. Без этого наставник не увидит работу, не даст обратную связь и не начислит мили.</p></div>}
-        {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
         {submission && !isInteractive && onFeedback && <button type="button" className={styles.read} onClick={() => { setOpen(false); onFeedback(task.id); }}>Открыть переписку с наставником →</button>}
         {submission && !isInteractive && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}

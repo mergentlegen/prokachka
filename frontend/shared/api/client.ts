@@ -96,7 +96,9 @@ export function recordTaskLinkOpen(taskId: string) {
   void authFetch(`/api/tasks/${encodeURIComponent(taskId)}/link-opened`, { method: "POST", keepalive: true }).catch(() => undefined);
 }
 export function mapTaskAttachment(row: ApiRow): TaskAttachment {
-  return { id: String(row.id), fileName: String(row.file_name || "document.pdf"), contentType: "application/pdf", sizeBytes: Number(row.size_bytes || 0), createdAt: String(row.created_at || new Date().toISOString()) };
+  // The task list sends camelCase (fileName, sizeBytes), the upload answer sends snake_case (file_name, size_bytes).
+  const name = row.file_name ?? row.fileName, size = row.size_bytes ?? row.sizeBytes, created = row.created_at ?? row.createdAt;
+  return { id: String(row.id), fileName: String(name || "document.pdf"), contentType: "application/pdf", sizeBytes: Number(size || 0), createdAt: String(created || new Date().toISOString()) };
 }
 function mapTaskVideo(value: unknown): TaskVideoSummary | undefined {
   if (!value || typeof value !== "object") return undefined;

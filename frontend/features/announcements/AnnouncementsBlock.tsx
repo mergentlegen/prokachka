@@ -61,11 +61,12 @@ function AnnouncementCard({ announcement, fresh, now, watch }: { announcement: A
   </article>;
 }
 
-export function AnnouncementsBlock({ announcements, userId }: { announcements: Announcement[]; userId: string }) {
+/** `at` fixes "now" (tests); the app uses the real clock. */
+export function AnnouncementsBlock({ announcements, userId, at }: { announcements: Announcement[]; userId: string; at?: number }) {
   const sorted = useMemo(() => sortAnnouncements(announcements), [announcements]);
   // What was already read when the screen opened; reading now does not take the mark away mid-scroll.
   const [seen] = useState(() => readSeen(userId));
-  const [now] = useState(() => Date.now());
+  const [now] = useState(() => at ?? Date.now());
   const [allOpen, setAllOpen] = useState(false);
   const [query, setQuery] = useState("");
   const watch = useSeenMarker(userId);

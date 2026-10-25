@@ -62,7 +62,7 @@ test('the block shows the author, a "new" mark, the new count and a button to al
     './AnnouncementGallery': { AnnouncementGallery: () => null },
   });
   const list = [item('a', -1000, { authorName: 'Асель Нурланова', content: 'Пишите на +77011234567' }), item('b', -DAY), item('c', -2 * DAY), item('d', -3 * DAY), item('e', -30 * DAY)];
-  const markup = renderToStaticMarkup(React.createElement(AnnouncementsBlock, { announcements: list, userId: 'me' }));
+  const markup = renderToStaticMarkup(React.createElement(AnnouncementsBlock, { announcements: list, userId: 'me', at: now }));
   assert.match(markup, /Асель Нурланова/);
   assert.match(markup, /Наставник/, 'an author outside the team still has a name');
   assert.match(markup, />4 новых</, 'the old announcement is not counted as new');
