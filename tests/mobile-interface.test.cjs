@@ -190,19 +190,21 @@ test("announcement editor preserves title, description, material and preview DOM
 
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-test("empty program presents add-step before a disabled next button; no immediate publish", () => {
+test("an empty program shows its settings, then the steps list with add buttons; publishing goes through a check", () => {
   const { ProgramEditorModal } = loadTs("frontend/features/admin/ProgramEditorModal.tsx", {
     "@/frontend/shared/api/admin-client": {},
     "@/frontend/shared/ConfirmModal": { ConfirmModal: () => null },
   });
   const markup = renderToStaticMarkup(React.createElement(ProgramEditorModal, {
-    onCreated() {}, onClose() {}, onError() {},
+    userId: "u", onCreated() {}, onClose() {}, onError() {},
   }));
-  const form = markup.slice(markup.indexOf("<form"), markup.indexOf("</form>"));
-  assert.ok(form.indexOf("Название программы") < form.indexOf("Добавить первый шаг"));
-  assert.ok(form.indexOf("Добавить первый шаг") < form.indexOf("Далее: проверить программу"));
-  assert.match(form, /<button[^>]*type="submit"[^>]*disabled=""/);
-  assert.ok(!form.includes("Подтвердить и опубликовать"));
+  assert.ok(markup.indexOf("Название программы") < markup.indexOf("Срок на каждый шаг"));
+  assert.ok(markup.indexOf("Срок на каждый шаг") < markup.indexOf("Начните с первого шага"));
+  assert.ok(markup.indexOf("Начните с первого шага") < markup.indexOf("＋ Шаг"));
+  assert.match(markup, /Готовая игра/);
+  assert.match(markup, /aria-pressed="true"[^>]*>3 дня</, "3 days per step by default, as a ready choice");
+  assert.match(markup, /Проверить и опубликовать/);
+  assert.ok(!markup.includes(">Опубликовать<"), "publishing is only on the check screen");
 });
 
 test("network search finds a deep participant and settings stay lazy until expanded", () => {

@@ -24,6 +24,8 @@ type Props = {
   onEditTask: (task: Task) => void; onToggleTask: (id: string) => void; onRemoveTask: (task: Task) => void;
   /** Opens the task form for a new step at the end of this program. */
   onAddStep?: (program: TaskProgram) => void;
+  /** A copy of a step becomes a new step at the end of the same program. */
+  onCopyTask?: (task: Task) => void;
 };
 
 /** "It also opened for 3 participants who had finished the program." */
@@ -31,7 +33,7 @@ export function reopenedNotice(count: number) {
   return count > 0 ? ` Он открылся и ${count} ${plural(count, "участнику", "участникам", "участникам")}, ${count === 1 ? "который уже прошёл" : "которые уже прошли"} программу.` : "";
 }
 
-export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history = [], taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask, onAddStep }: Props) {
+export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history = [], taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask, onAddStep, onCopyTask }: Props) {
   const customPrograms = programs.filter((program) => !program.templateKey).sort(comparePublications);
   const [busyId, setBusyId] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -149,6 +151,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
             const canEditStep = canManageAll || task.publisherId === actorId;
             const stepItems: MenuItem[] = [
               ...(!task.interactiveKind ? [{ label: "Изменить", icon: actionIcons.edit, onSelect: () => onEditTask(task) }] : []),
+              ...(!task.interactiveKind && onCopyTask ? [{ label: "Создать копию", icon: actionIcons.copy, onSelect: () => onCopyTask(task) }] : []),
               { label: task.isActive ? "Скрыть от участников" : "Показать участникам", icon: task.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => onToggleTask(task.id) },
               { label: "Удалить шаг", icon: actionIcons.remove, danger: true, onSelect: () => onRemoveTask(task) },
             ];

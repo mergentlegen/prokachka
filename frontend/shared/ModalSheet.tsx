@@ -14,6 +14,8 @@ type ModalSheetProps = {
   footer?: ReactNode;
   /** Taller sheet for forms with many fields. */
   tall?: boolean;
+  /** A wide sheet for an editor with a preview beside it. */
+  wide?: boolean;
 };
 
 /** The root of the app the sheet belongs to: its styles still apply, but no card around the opener can move the sheet. */
@@ -34,7 +36,7 @@ export function ModalSheet(props: ModalSheetProps) {
   return root ? createPortal(<Sheet {...props} />, root) : <span ref={anchor} hidden />;
 }
 
-function Sheet({ title, children, onClose, variant = "default", footer, tall = false }: ModalSheetProps) {
+function Sheet({ title, children, onClose, variant = "default", footer, tall = false, wide = false }: ModalSheetProps) {
   const panel = useRef<HTMLElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -49,7 +51,7 @@ function Sheet({ title, children, onClose, variant = "default", footer, tall = f
     return () => { document.body.style.overflow = overflow; if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
   }, []);
   return <div className={`${styles.backdrop} ${immersive ? styles.immersiveBackdrop : ""}`} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section ref={panel} className={`${styles.panel} ${immersive ? styles.immersivePanel : ""} ${tall ? styles.tallPanel : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={(event) => {
+    <section ref={panel} className={`${styles.panel} ${immersive ? styles.immersivePanel : ""} ${tall ? styles.tallPanel : ""} ${wide ? styles.widePanel : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); onClose(); }
       if (event.key !== "Tab") return;
       const controls = Array.from(panel.current?.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), a[href], textarea:not(:disabled), select:not(:disabled), summary, [tabindex='0']") || []).filter((item) => item.getClientRects().length);

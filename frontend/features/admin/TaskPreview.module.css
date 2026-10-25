@@ -1,0 +1,35 @@
+/* «Так увидит участник»: the member's task card, drawn from the editor's current values. */
+.preview { display:grid; gap:12px; min-width:0; padding:18px; border:1px solid #dfe5ef; border-radius:18px; background:#fff; color:var(--navy); box-shadow:0 10px 30px #1d2c4f12; pointer-events:none; user-select:none; }
+.top { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; }
+.status { display:inline-flex; align-items:center; gap:6px; color:#66738a; font-weight:650; }
+.status::before { content:""; width:7px; height:7px; border-radius:50%; background:#9aa6b8; }
+.points { color:#8592a6; }
+.preview h4 { margin:0; font-size:19px; font-weight:800; line-height:1.25; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.description { margin:0; color:#4a5870; font-size:14px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+.placeholder { color:#a3adbd !important; }
+.deadline { margin:0; color:#a35f15; font-size:12px; font-weight:600; }
+
+.video { position:relative; display:grid; place-items:center; aspect-ratio:16 / 9; max-width:100%; border-radius:12px; background:linear-gradient(135deg,#1c2d4d,#31466f); color:#fff; }
+.video span { display:grid; place-items:center; width:46px; height:46px; border-radius:50%; background:#ffffff26; font-size:18px; }
+.video small { position:absolute; left:12px; right:12px; bottom:10px; overflow:hidden; color:#dbe4f6; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+
+.files { display:grid; gap:8px; }
+.files > b, .quiz > b { color:#193453; font-size:13px; }
+.file { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:10px; padding:10px; border:1px solid #dce5ef; border-radius:12px; background:#fbfcfe; }
+.fileIcon { display:grid; place-items:center; width:36px; height:40px; border-radius:8px; background:#fff0ed; color:#bd493b; font-size:10px; font-weight:800; }
+.fileInfo { display:grid; gap:2px; min-width:0; }
+.fileInfo strong { overflow:hidden; color:#243650; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.fileInfo small { color:#748198; font-size:11px; }
+.fileButton { padding:7px 10px; border-radius:8px; background:#3157a4; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; }
+
+.quiz { display:grid; gap:8px; }
+.quiz ol { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.quiz ol > li { display:grid; gap:8px; padding:12px; border:1px solid #e3e8f0; border-radius:12px; background:#f8fafd; }
+.quiz strong { font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
+.quiz ul { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.quiz ul li { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #dfe5ef; border-radius:10px; background:#fff; color:#3d4b62; font-size:13px; overflow-wrap:anywhere; }
+.quiz ul i { flex:none; width:14px; height:14px; border:2px solid #a9b6cc; border-radius:50%; }
+.quiz ul i.square { border-radius:4px; }
+.textAnswer { padding:10px; border:1px dashed #cfd8e6; border-radius:10px; background:#fff; color:#a3adbd; font-size:13px; }
+.answer { display:grid; place-items:center; min-height:48px; border-radius:12px; background:#3151a3; color:#fff; font-size:14px; font-weight:750; text-align:center; }
+.hint { color:#7a879a; font-size:12px; line-height:1.4; text-align:center; }

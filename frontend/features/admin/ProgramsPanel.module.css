@@ -1,10 +1,5 @@
 /* Program names, facts and steps use the brand font, like the headings and the participant's program blocks. */
 .list { --program-font: 'Manrope', system-ui, sans-serif; }
-.selectedFiles { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
-.selectedFiles li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#4e5e76; font-size:12px; }
-.selectedFiles li span { min-width:0; overflow-wrap:anywhere; }
-.selectedFiles li button { flex:none; border:0; background:transparent; color:#ad4141; font:inherit; cursor:pointer; }
-.modalBuilder { border:0; border-radius:0; margin:0; }
 .gameCatalog { display: grid; gap: 14px; }
 .gameCatalog > p { margin: 0; color: #5b6b85; font-size: 14px; line-height: 1.5; }
 .gameCard { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e3e8f1; border-radius: 16px; background: linear-gradient(135deg, #f2f8ff, #fff8e8); }

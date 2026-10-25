@@ -6,6 +6,8 @@
 .header button span { font-size:23px; line-height:1; }
 .body { min-height:0; padding:24px; overflow-y:auto; overscroll-behavior:contain; }
 .tallPanel { width:min(640px,100%); max-height:min(92dvh,880px); }
+.widePanel { width:min(1180px,calc(100vw - 48px)); max-height:calc(100dvh - 48px); }
+.footer :global(.form-sheet-summary) { margin-right:auto; align-self:center; min-width:0; color:#5b6b85; font-size:13px; line-height:1.4; }
 .footer { display:flex; flex-shrink:0; justify-content:flex-end; gap:10px; padding:14px 24px; border-top:1px solid var(--line); background:#fff; }
 .footer :global(.button) { min-width:120px; min-height:46px; padding:10px 18px; border-radius:12px; font-size:14px; }
 .footer :global(.button-success) { border-color:#1f7a63; background:var(--green); color:#fff; }
@@ -23,7 +25,9 @@
   .panel { max-height:80dvh; border-radius:20px; }
   .header { padding:10px 14px; }
   .body { padding:18px 16px; }
-  .tallPanel { max-height:calc(100dvh - max(12px,env(safe-area-inset-top)) - 10px); }
+  .tallPanel, .widePanel { width:100%; max-height:calc(100dvh - max(12px,env(safe-area-inset-top)) - 10px); }
+  .footer { flex-wrap:wrap; }
+  .footer :global(.form-sheet-summary) { flex-basis:100%; margin:0 0 2px; font-size:12px; }
   .footer { padding:12px 16px; }
   .footer :global(.button) { flex:1; min-width:0; }
   .immersiveBackdrop { align-items:stretch; padding:0; }

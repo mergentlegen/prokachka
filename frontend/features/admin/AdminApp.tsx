@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLiveUpdates } from "@/frontend/shared/hooks/use-live-updates";
 import { SectionBoundary } from "@/frontend/shared/SectionBoundary";
 import { userScope } from "@/shared/domain/live-updates";
 import type { FormEvent } from "react";
 import { AuthScreen } from "@/frontend/features/auth/AuthScreen";
-import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, request, uploadTaskAttachment } from "@/frontend/shared/api/client";
+import { ApiError, authFetch, clearDevSession, createTelegramLink, deleteTaskAttachment, loadTelegramLinkStatus, refreshAuthSession, request, taskAttachmentUrl, uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { addProgramStep, createAdminTask, loadSubmissionTexts, deleteAdminTask, recordMentorCompletion, reviewAdminSubmission, updateAdminTask } from "@/frontend/shared/api/admin-client";
 import { reviewTeamJoinRequest } from "@/frontend/shared/api/team-client";
 import { Avatar } from "@/frontend/shared/Avatar";
@@ -52,6 +52,8 @@ import { adminSectionAllowed, adminSectionFromPage, type AdminSection } from "./
 import { useRestoreScroll } from "@/frontend/shared/hooks/use-restore-scroll";
 import { readPageParam, writePageParam } from "@/frontend/shared/lib/page-state";
 import { useAdminData } from "./use-admin-data";
+import { clearDraft, readDraft, savedAtText, taskDraftKey, writeDraft } from "./editor-drafts";
+import { freshQuestions } from "./task-editor";
 type AdminModal =
   | { type: "task"; task?: Task; program?: TaskProgram }
   | { type: "review"; submission: Submission; status: "accepted" | "revision" }
@@ -92,6 +94,10 @@ export function AdminApp() {
   const [taskFiles, setTaskFiles] = useState<File[]>([]);
   const [taskVideoFile, setTaskVideoFile] = useState<File | null>(null);
   const [taskVideoRemoving, setTaskVideoRemoving] = useState(false);
+  // A new separate task keeps its text in this browser until it is created (see editor-drafts).
+  const [taskAutosave, setTaskAutosave] = useState(false);
+  const [taskNotice, setTaskNotice] = useState<ReactNode>(null);
+  const copyToken = useRef(0);
   const [modalBusyLabel, setModalBusyLabel] = useState<string | undefined>(undefined);
   // Questions of the task being edited; "dirty" means they differ from what is stored.
   const [quizEdit, setQuizEdit] = useState<{ questions: QuizQuestion[]; loading: boolean; dirty: boolean }>({ questions: [], loading: false, dirty: false });
@@ -266,27 +272,66 @@ export function AdminApp() {
     }
   }
 
-  /** With `program` (and no task) the form adds a new step to the end of that program. */
-  function openTaskModal(task?: Task, program?: TaskProgram) {
-    setTaskDraft({
-      title: task?.title || "",
-      description: task?.description || "",
-      resourceUrl: task?.resourceUrl || "",
-      maxPoints: String(task?.maxPoints || 10),
-      hasDeadline: Boolean(task?.deadlineAt),
-      deadline: toLocalDateTime(task?.deadlineAt),
-      level: task?.level ?? 1,
-      voiceAnswer: Boolean(task?.voiceAnswer),
+  /**
+   * With `program` (and no task) the form adds a new step to the end of that program.
+   * With `copyFrom` the form starts as a copy of that task: text, miles, questions and PDF files (video is not copied).
+   */
+  function openTaskModal(task?: Task, program?: TaskProgram, copyFrom?: Task) {
+    const source = task || copyFrom;
+    const token = ++copyToken.current;
+    const saved = !source && !program && authUser ? readDraft<{ draft: TaskDraft; questions: QuizQuestion[]; savedAt: string }>(taskDraftKey(authUser.id)) : null;
+    setTaskDraft(saved?.draft ? { ...saved.draft } : {
+      title: copyFrom ? `${copyFrom.title} (копия)`.slice(0, 160) : source?.title || "",
+      description: source?.description || "",
+      resourceUrl: source?.resourceUrl || "",
+      maxPoints: String(source?.maxPoints ?? 10),
+      // A copy keeps the deadline only while it is still ahead.
+      hasDeadline: Boolean(source?.deadlineAt) && !(copyFrom && Date.parse(copyFrom.deadlineAt || "") <= Date.now()),
+      deadline: copyFrom && Date.parse(copyFrom.deadlineAt || "") <= Date.now() ? "" : toLocalDateTime(source?.deadlineAt),
+      level: source?.level ?? 1,
+      voiceAnswer: Boolean(source?.voiceAnswer),
     });
     setTaskAttachments(task?.attachments || []);
     setTaskFiles([]);
     setTaskVideoFile(null);
     setTaskVideoRemoving(false);
-    setQuizEdit({ questions: [], loading: Boolean(task?.quiz), dirty: false });
-    if (task?.quiz) loadQuizForEditing(task.id).then((questions) => setQuizEdit((current) => current.dirty ? current : { questions, loading: false, dirty: false }))
+    setTaskAutosave(!source && !program);
+    setTaskNotice(saved?.draft ? <>Восстановлен черновик ({savedAtText(saved.savedAt)}). <button type="button" className="text-button" onClick={() => {
+      if (authUser) clearDraft(taskDraftKey(authUser.id));
+      setTaskDraft({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "", level: 1, voiceAnswer: false });
+      setQuizEdit({ questions: [], loading: false, dirty: false }); setTaskNotice(null);
+    }}>Начать с чистого листа</button></>
+      : copyFrom ? <>Это копия задания «{copyFrom.title}». Текст, мили, вопросы{copyFrom.attachments?.length ? " и PDF-файлы" : ""} скопированы{copyFrom.video ? ", видео — нет: при необходимости добавьте его заново" : ""}.</> : null);
+    if (saved?.draft) setQuizEdit({ questions: saved.questions || [], loading: false, dirty: Boolean(saved.questions?.length) });
+    else setQuizEdit({ questions: [], loading: Boolean(source?.quiz), dirty: false });
+    if (!saved?.draft && source?.quiz) loadQuizForEditing(source.id).then((questions) => setQuizEdit((current) => current.dirty ? current
+      : copyFrom ? { questions: freshQuestions(questions), loading: false, dirty: true } : { questions, loading: false, dirty: false }))
       .catch(() => { setQuizEdit({ questions: [], loading: false, dirty: false }); setToast("Не удалось загрузить вопросы задания."); });
+    // The copy gets the same PDF files: they are downloaded here and uploaded with the new task.
+    if (copyFrom?.attachments?.length) void Promise.all(copyFrom.attachments.map(async (file) => {
+      const response = await authFetch(taskAttachmentUrl(copyFrom.id, file, { download: true }));
+      if (!response.ok) throw new Error(file.fileName);
+      return new File([await response.blob()], file.fileName, { type: "application/pdf" });
+    })).then((files) => { if (copyToken.current === token) setTaskFiles((current) => [...files, ...current]); })
+      .catch(() => { if (copyToken.current === token) setToast("Не удалось скопировать PDF-файлы. Прикрепите их вручную."); });
     setModal({ type: "task", task, program });
   }
+
+  function copyTask(task: Task) {
+    const program = task.programId ? store.programs.find((item) => item.id === task.programId) : undefined;
+    openTaskModal(undefined, program, task);
+  }
+
+  // The new task's text is kept while the form is open; it is cleared once the task is created.
+  useEffect(() => {
+    if (!taskAutosave || !authUser || modal?.type !== "task" || modal.task || modal.program) return;
+    const timer = window.setTimeout(() => {
+      const empty = !taskDraft.title.trim() && !taskDraft.description.trim() && !taskDraft.resourceUrl.trim() && !quizEdit.questions.length;
+      if (empty) clearDraft(taskDraftKey(authUser.id));
+      else writeDraft(taskDraftKey(authUser.id), { draft: taskDraft, questions: quizEdit.questions, savedAt: new Date().toISOString() });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [taskAutosave, authUser, modal, taskDraft, quizEdit.questions]);
 
   const openCompletionModal = useCallback((task: Task, member: User) => {
     setReviewDraft({ points: String(task.maxPoints), comment: "" });
@@ -514,6 +559,8 @@ export function AdminApp() {
       setTaskFiles([]);
       setTaskVideoFile(null);
       setTaskVideoRemoving(false);
+      if (!modal.task && !newStep && authUser) clearDraft(taskDraftKey(authUser.id));
+      setTaskAutosave(false);
       setModal(null);
       setToast((newStep ? `Шаг добавлен в конец программы «${newStep.title}».${reopenedNotice(reopened)}` : "Задание сохранено.") + videoNotice);
     } catch (error) {
@@ -614,11 +661,11 @@ export function AdminApp() {
             <span className="ready-catalog-text"><strong>Готовые игры и тесты</strong><small>Добавлено {readyPublications(store.programs, authUser.id, authUser.role === "admin").filter((program) => program.isActive).length} из {READY_PROGRAMS.length}</small></span>
             <span className="ready-catalog-open">Открыть каталог <span aria-hidden="true">→</span></span>
           </button>
-          <TasksView store={store} onOpenResults={(task) => setResultsTaskId(task.id)} onReview={authUser.role === "admin" || authUser.canReview ? (task) => { const first = queue.find((item) => item.taskId === task.id); if (first) setReviewFlow({ startId: first.id, taskId: task.id }); } : undefined} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
+          <TasksView store={store} onOpenResults={(task) => setResultsTaskId(task.id)} onReview={authUser.role === "admin" || authUser.canReview ? (task) => { const first = queue.find((item) => item.taskId === task.id); if (first) setReviewFlow({ startId: first.id, taskId: task.id }); } : undefined} actorId={authUser.id} canManageAll={authUser.role === "admin"} onToggle={toggleTask} onEdit={openTaskModal} onCopy={copyTask} onRemove={openDeleteModal} onPin={(task) => void pinTask(task)} busyId={taskActionBusy} />
         </div>}
         {section === "review" && <ReviewView store={store} submissions={queue} onReview={(submission, intent) => setReviewFlow({ startId: submission.id, intent })} onStart={() => { if (queue[0]) setReviewFlow({ startId: queue[0].id }); }} onEditTemplates={templates.canEdit ? () => setTemplatesEditorOpen(true) : undefined} />}
 {section === "feedback" && <FeedbackPanel viewerId={authUser.id} mentor refreshKey={feedbackVersion} templates={templates.list.length ? templates.list : DEFAULT_REVIEW_TEMPLATES} onOpenSubmission={openSubmission} onReview={openSubmission} onChange={() => setFeedbackCountVersion((value) => value + 1)} selectedThreadId={typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}
-        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel history={programHistory} taskBusyId={taskActionBusy} onEditTask={(task) => openTaskModal(task)} onAddStep={(program) => openTaskModal(undefined, program)} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} users={store.users} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} onNotice={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
+        {section === "history" && <HistoryView store={store} programs={programHistory} publications={publicationHistory} onReview={openReviewModal} actorId={authUser.id} canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} />}{section === "programs" && <ProgramsPanel history={programHistory} taskBusyId={taskActionBusy} onEditTask={(task) => openTaskModal(task)} onCopyTask={copyTask} onAddStep={(program) => openTaskModal(undefined, program)} onToggleTask={toggleTask} onRemoveTask={openDeleteModal} programs={store.programs} tasks={store.tasks} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(programs, tasks) => setStore((current) => ({ ...current, programs, tasks }))} onError={setToast} />}{section === "announcements" && <AnnouncementsPanel announcements={store.announcements} users={store.users} actorId={authUser.id} canManageAll={authUser.role === "admin"} onChange={(announcements) => setStore((current) => ({ ...current, announcements }))} onError={setToast} onNotice={setToast} />}{section === "stars" && <StarsPanel actorId={authUser.id} users={store.users} awards={store.starAwards} onChange={(starAwards) => setStore((current) => ({ ...current, starAwards }))} onError={setToast} />}
         {section === "requests" && <RequestsPanel requests={pendingRequests} users={store.users} onReview={reviewRequest} />}
         {section === "network" && <NetworkPanel authUser={authUser} users={networkUsers} onChange={setNetworkUsers} onError={setToast} />}
         {section === "welcome-video" && canPublishContent && <WelcomeVideoSettingsPanel user={authUser} />}
@@ -641,7 +688,7 @@ export function AdminApp() {
     </MobileDrawer>
     {profileOpen && <ProfileDialog user={authUser} onNotice={setToast} mentor={{ pending: counts.pending, onOpenReview: () => { setProfileOpen(false); setSection("review"); }, telegramBusy, onLinkTelegram: () => void linkTelegram(), onRefreshTelegram: () => checkTelegram(false), onUnlinkTelegram: unlinkAdminTelegram }} onClose={() => setProfileOpen(false)} onSaved={(updated) => { setAuthUser(updated); setToast("Профиль обновлён."); void refreshData(); }} />}
     {taskOrderOpen && <TaskOrderDialog onClose={() => setTaskOrderOpen(false)} onSaved={() => { setTaskOrderOpen(false); setToast("Порядок заданий сохранён."); void refreshData(); }} />}
-    {programEditorOpen && <ProgramEditorModal onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
+    {programEditorOpen && <ProgramEditorModal userId={authUser.id} onClose={() => setProgramEditorOpen(false)} onError={setToast} onCreated={(program, tasks) => setStore((current) => ({ ...current, programs: [...current.programs, program], tasks: [...current.tasks, ...tasks] }))} />}
     {toast && <Toast message={toast} onClose={() => setToast("")} />}
     <PullToRefresh onRefresh={async () => { setFeedbackVersion((value) => value + 1); await refreshData(); }} />
     {readyCatalogOpen && <ModalSheet title="Готовые игры и тесты" tall onClose={() => setReadyCatalogOpen(false)}>
@@ -653,7 +700,7 @@ export function AdminApp() {
       canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast}
       onReview={openReviewModal} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} onClose={() => setResultsTaskId("")} />}
     {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
-    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} program={modal.program} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit({ questions, loading: false, dirty: true }) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
+    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} program={modal.program} programDeadlineHours={store.programs.find((item) => item.id === modal.task?.programId)?.deadlineHours} notice={taskNotice} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit({ questions, loading: false, dirty: true }) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}

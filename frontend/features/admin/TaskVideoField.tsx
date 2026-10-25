@@ -19,8 +19,8 @@ export function taskVideoProblem(file: File) {
 }
 
 // The video block of the task editor: the file is uploaded after "Сохранить", then compressed on the server.
-export function TaskVideoField({ task, file, removing, disabled, onFile, onRemove, onError }: {
-  task?: Task; file: File | null; removing: boolean; disabled: boolean;
+export function TaskVideoField({ task, file, removing, disabled, onFile, onRemove, onError, bare = false }: {
+  task?: Task; file: File | null; removing: boolean; disabled: boolean; bare?: boolean;
   onFile: (file: File | null) => void; onRemove: (removing: boolean) => void; onError: (message: string) => void;
 }) {
   const [preview, setPreview] = useState(false);
@@ -36,7 +36,7 @@ export function TaskVideoField({ task, file, removing, disabled, onFile, onRemov
     title={title} hint="MP4, MOV или WebM до 1 ГБ и 20 минут · сожмём автоматически, участники смотрят только внутри кабинета" icon={videoIcon} />;
 
   return <div className={styles.field}>
-    <div className={styles.heading}><strong>Видео к заданию <span className="field-hint">необязательно</span></strong></div>
+    {!bare && <div className={styles.heading}><strong>Видео к заданию <span className="field-hint">необязательно</span></strong></div>}
     {file ? <div className={styles.row}>
       <span className={styles.icon}>{videoIcon}</span>
       <div className={styles.text}><strong>{file.name}</strong><small>{megabytes(file.size)} · загрузится после сохранения, затем сожмётся за несколько минут</small></div>

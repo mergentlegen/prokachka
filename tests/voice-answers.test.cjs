@@ -25,16 +25,17 @@ test('the flag travels from the database to the screen', () => {
   assert.equal('voiceAnswer' in mapTask({ id: 't', title: 'x', voice_answer: false }), false);
 });
 
-test('the mentor switches «Ответ голосовым» in the task form; games have no such switch', () => {
+test('the mentor chooses «Голосовое» in «Как участник отвечает»; games have no such block', () => {
   const { TaskEditorModal } = loadTs('frontend/features/admin/AdminModals.tsx', { '@/frontend/shared/FormSheet': { FormSheet: ({ children }) => React.createElement(React.Fragment, null, children) } });
   const draft = { title: '', description: '', resourceUrl: '', maxPoints: '10', hasDeadline: false, deadline: '', level: 1, voiceAnswer: true };
   const props = { draft, editing: false, busy: false, attachments: [], files: [], onFilesChange() {}, onRemoveAttachment() {}, onChange() {}, onClose() {}, onSubmit() {},
     video: { file: null, removing: false, onFile() {}, onRemove() {}, onError() {} }, quiz: { questions: [], loading: false, onChange() {} } };
   const html = renderToStaticMarkup(React.createElement(TaskEditorModal, props));
-  assert.match(html, /Ответ голосовым в Telegram/);
-  assert.match(html, /бот примет только его/);
+  assert.match(html, /Как участник отвечает/);
+  assert.match(html, /role="radio" aria-checked="true"[^>]*><b>Голосовое<\/b><small>бот примет только голосовое/);
+  assert.match(html, /Бот в Telegram примет только голосовое сообщение/, 'the preview says it too');
   const game = renderToStaticMarkup(React.createElement(TaskEditorModal, { ...props, task: { ...task, interactiveKind: 'dream-plan' }, editing: true }));
-  assert.doesNotMatch(game, /Ответ голосовым/);
+  assert.doesNotMatch(game, /Как участник отвечает/);
 });
 
 test('a new task and an edit save the flag', async () => {

@@ -9,8 +9,9 @@ export function newQuestion(kind: QuizKind): QuizQuestion {
 }
 
 // The mentor's question builder: tests (one or several right answers) and open questions in any order.
-export function QuizEditor({ questions, loading, disabled, onChange }: {
-  questions: QuizQuestion[]; loading: boolean; disabled: boolean; onChange: (questions: QuizQuestion[]) => void;
+/** `bare` leaves out the own heading when the form already gives the block a title. */
+export function QuizEditor({ questions, loading, disabled, onChange, bare = false }: {
+  questions: QuizQuestion[]; loading: boolean; disabled: boolean; onChange: (questions: QuizQuestion[]) => void; bare?: boolean;
 }) {
   const update = (index: number, patch: Partial<QuizQuestion>) => onChange(questions.map((question, position) => position === index ? { ...question, ...patch } : question));
   const move = (index: number, step: number) => {
@@ -42,10 +43,10 @@ export function QuizEditor({ questions, loading, disabled, onChange }: {
   }
 
   return <div className={styles.editor}>
-    <div className={styles.heading}>
+    {!bare && <div className={styles.heading}>
       <strong>Вопросы на сайте <span className="field-hint">необязательно</span></strong>
       <small>{questions.length ? "Участник ответит прямо на сайте, после просмотра видео, и ответы придут вам на проверку." : "Добавьте тест или вопрос — тогда участник ответит на сайте, а не через Telegram."}</small>
-    </div>
+    </div>}
     {loading ? <p className={styles.muted}>Загружаем вопросы…</p> : <ol className={styles.list}>
       {questions.map((question, index) => <li key={question.id} className={styles.card}>
         <div className={styles.cardTop}>

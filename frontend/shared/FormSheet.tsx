@@ -6,13 +6,16 @@ import { ModalSheet } from "./ModalSheet";
 type Tone = "primary" | "success" | "warning" | "danger";
 
 // One look for every create/edit form: fields scroll, Cancel and Save stay pinned at the bottom.
-export function FormSheet({ title, intro, busy = false, submitLabel, busyLabel = "Сохраняем…", tone = "primary", submitDisabled = false, cancelLabel = "Отмена", onSubmit, onClose, children }: {
+export function FormSheet({ title, intro, busy = false, submitLabel, busyLabel = "Сохраняем…", tone = "primary", submitDisabled = false, cancelLabel = "Отмена", wide = false, summary, onSubmit, onClose, children }: {
   title: string; intro?: ReactNode; busy?: boolean; submitLabel: string; busyLabel?: string; tone?: Tone; submitDisabled?: boolean; cancelLabel?: string;
+  /** A wide sheet (an editor with a preview); `summary` — a short line beside the buttons. */
+  wide?: boolean; summary?: ReactNode;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void; onClose: () => void; children: ReactNode;
 }) {
   const formId = useId();
   const close = () => { if (!busy) onClose(); };
-  return <ModalSheet title={title} tall onClose={close} footer={<>
+  return <ModalSheet title={title} tall wide={wide} onClose={close} footer={<>
+    {summary && <span className="form-sheet-summary">{summary}</span>}
     <button type="button" className="button button-muted" disabled={busy} onClick={close}>{cancelLabel}</button>
     <button type="submit" form={formId} className={`button button-${tone}`} disabled={busy || submitDisabled}>{busy ? busyLabel : submitLabel}</button>
   </>}>

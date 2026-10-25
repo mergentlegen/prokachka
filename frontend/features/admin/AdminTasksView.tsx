@@ -56,15 +56,16 @@ export const pinIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 type CardProps = {
   task: Task; users: User[]; submissions: Submission[]; now: number; canManage: boolean; busy: boolean;
   onOpenResults?: (task: Task) => void; onReview?: (task: Task) => void;
-  onToggle: (id: string) => void; onEdit: (task: Task) => void; onRemove: (task: Task) => void; onPin?: (task: Task) => void;
+  onToggle: (id: string) => void; onEdit: (task: Task) => void; onRemove: (task: Task) => void; onPin?: (task: Task) => void; onCopy?: (task: Task) => void;
 };
 
-function TaskCard({ task, users, submissions, now, canManage, busy, onOpenResults, onReview, onToggle, onEdit, onRemove, onPin }: CardProps) {
+function TaskCard({ task, users, submissions, now, canManage, busy, onOpenResults, onReview, onToggle, onEdit, onRemove, onPin, onCopy }: CardProps) {
   const state = taskState(task, now);
   const deadline = deadlineLine(task, now);
   const progress = taskProgress(taskParticipantResults(task, { users, submissions }));
   const items: MenuItem[] = [
     ...(onPin ? [{ label: task.isPinned ? "Открепить" : "Закрепить сверху", icon: pinIcon, onSelect: () => onPin(task) }] : []),
+    ...(onCopy && !task.interactiveKind ? [{ label: "Создать копию", icon: actionIcons.copy, onSelect: () => onCopy(task) }] : []),
     { label: task.isActive ? "Скрыть от участников" : "Показать участникам", icon: task.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => onToggle(task.id) },
     { label: "Удалить", icon: actionIcons.remove, danger: true, onSelect: () => onRemove(task) },
   ];
