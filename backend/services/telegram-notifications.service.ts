@@ -89,8 +89,13 @@ type NotificationJob = {
   payload: { canReview?: boolean; canPublishTasks?: boolean; taskId?: string; announcementId?: string; step?: number; title?: string; from?: number; to?: number; reviewId?: string; level?: number; memberId?: string; session?: string }; summary_sent: boolean; attempts: number; lock_token: string;
 };
 
-// Mass mailings go out at this pace: one worker run a minute, personal notifications first.
-const JOBS_PER_RUN = 20;
+// One delivery run (the server timer calls it every minute): up to this many jobs within the time budget,
+// sent by several workers at once. Telegram allows about 30 messages a second; five workers stay well below it,
+// so 1000 announcements go out in a few minutes instead of an hour. Personal notifications are claimed first.
+const JOBS_PER_RUN = 1200;
+const DELIVERY_WORKERS = 5;
+const RUN_BUDGET_MS = 45_000;
+type DeliveryOptions = { maxJobs?: number; workers?: number; budgetMs?: number };
 
 const almatyDateTime = new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Almaty", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const almatyHour = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Almaty", hour: "numeric", hourCycle: "h23" });
@@ -165,23 +170,28 @@ export function reviewNoticeText(author: string, rating: number, body: string, l
 
 export function scheduleTelegramDelivery() {
   after(async () => {
-    try { await deliverTelegramNotifications(); }
+    // A small run right after a webhook; the server timer sends the rest.
+    try { await deliverTelegramNotifications({ maxJobs: 20, workers: 2, budgetMs: 20_000 }); }
     catch { console.error("Telegram notification worker failed; queued jobs will be retried"); }
   });
 }
 
 /** A persisted queue is shared by webhook, role changes and the periodic delivery endpoint. */
-export async function deliverTelegramNotifications() {
+export async function deliverTelegramNotifications(options: DeliveryOptions = {}) {
   const supabase = getSupabaseAdmin();
   if (!supabase || !serverEnv.telegramBotToken) return { unavailable: true as const };
+  const maxJobs = options.maxJobs ?? JOBS_PER_RUN, workers = options.workers ?? DELIVERY_WORKERS, budgetMs = options.budgetMs ?? RUN_BUDGET_MS;
   let delivered = 0;
   let failed = 0;
+  let taken = 0;
+  let drained = false;
   const started = Date.now();
-  for (let count = 0; count < JOBS_PER_RUN && Date.now() - started < 40_000; count++) {
+  /** Claims one job and sends it; "empty" when nothing in the queue is ready. */
+  const deliverOne = async (): Promise<"empty" | "done"> => {
     const claimed = await supabase.rpc("tg_claim_notification");
     if (claimed.error) throw new Error("Cannot claim Telegram notification");
     const job = claimed.data?.[0] as NotificationJob | undefined;
-    if (!job) break;
+    if (!job) return "empty";
     const save = async (patch: Record<string, unknown>) => {
       const result = await supabase.from("telegram_notification_jobs").update(patch).eq("id", job.id).eq("lock_token", job.lock_token);
       if (result.error) throw new Error("Cannot update Telegram notification");
@@ -199,7 +209,7 @@ export async function deliverTelegramNotifications() {
         if (allowed.error) throw new Error("Cannot verify feedback access");
         if (!allowed.data || event.data.author_user_id === user.id) {
           await save({ cancelled_at: new Date().toISOString(), locked_until: null });
-          continue;
+          return "done";
         }
         const link = appUrl() ? appUrl() + (user.role === "admin" || user.can_review ? "/admin" : "/") + "?feedback=" + encodeURIComponent(event.data.thread_id) : "";
         delivery = await sendTelegramMessage(chatId, [
@@ -211,7 +221,7 @@ export async function deliverTelegramNotifications() {
         // Re-check at send time: the participant may have sent the work or reopened the link since queueing.
         const due = await supabase.rpc("app_task_reminder_due", { p_user: user.id, p_task: taskId });
         if (due.error) throw new Error("Cannot verify task reminder");
-        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const task = await supabase.from("tasks").select("title").eq("id", taskId).maybeSingle();
         if (task.error || !task.data) throw new Error("Cannot load reminder task");
         delivery = await sendTelegramMessage(chatId, [
@@ -225,7 +235,7 @@ export async function deliverTelegramNotifications() {
         // The participant may have answered, or the deadline passed, since the mentor pressed the button.
         const due = await supabase.rpc("app_task_nudge_due", { p_user: user.id, p_task: taskId });
         if (due.error) throw new Error("Cannot verify task nudge");
-        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const task = await supabase.from("tasks").select("title,deadline_at").eq("id", taskId).maybeSingle();
         if (task.error || !task.data) throw new Error("Cannot load nudge task");
         delivery = await sendTelegramMessage(chatId, [
@@ -237,7 +247,7 @@ export async function deliverTelegramNotifications() {
         const announcementId = String(job.payload.announcementId || "");
         const allowed = await supabase.rpc("app_announcement_recipient_ok", { p_user: user.id, p_announcement: announcementId });
         if (allowed.error) throw new Error("Cannot verify announcement recipient");
-        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const announcement = await supabase.from("announcements").select("title,content,resource_url,photos,teams(name)").eq("id", announcementId).maybeSingle();
         if (announcement.error || !announcement.data) throw new Error("Cannot load announcement");
         const item = announcement.data;
@@ -255,7 +265,7 @@ export async function deliverTelegramNotifications() {
       } else if (job.kind === "start-reminder") {
         const due = await supabase.rpc("app_start_reminder_due", { p_user: user.id });
         if (due.error) throw new Error("Cannot verify start reminder");
-        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!due.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const profile = await supabase.from("users").select("first_name,name,teams(name)").eq("id", user.id).maybeSingle();
         if (profile.error || !profile.data) throw new Error("Cannot load reminder recipient");
         const team = Array.isArray(profile.data.teams) ? profile.data.teams[0] : profile.data.teams;
@@ -264,7 +274,7 @@ export async function deliverTelegramNotifications() {
         // The review may have been deleted while the message waited in the queue.
         const review = await supabase.from("reviews").select("rating,body,users(name)").eq("id", String(job.payload.reviewId || "")).maybeSingle();
         if (review.error) throw new Error("Cannot load review");
-        if (!review.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!review.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const author = Array.isArray(review.data.users) ? review.data.users[0] : review.data.users;
         delivery = await sendTelegramMessage(chatId, reviewNoticeText(String(author?.name || "Участник"), Number(review.data.rating || 0), String(review.data.body || ""), appUrl() ? appUrl() + "/admin?section=reviews" : ""));
       } else if (job.kind === "submission-timeout") {
@@ -277,7 +287,7 @@ export async function deliverTelegramNotifications() {
           if (newer.error) throw new Error("Cannot check newer submission sessions");
           stale = Boolean(newer.data?.length);
         }
-        if (stale || !session.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (stale || !session.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const task = (Array.isArray(session.data.tasks) ? session.data.tasks[0] : session.data.tasks) as { title?: string; voice_answer?: boolean } | null;
         const metadata = (session.data.metadata || {}) as Record<string, unknown>;
         delivery = await sendTelegramMessage(chatId, submissionTimeoutText(String(task?.title || ""), task?.voice_answer === true, Boolean(metadata.quiz), appUrl() ? appUrl() + "/?tab=tasks" : ""));
@@ -287,7 +297,7 @@ export async function deliverTelegramNotifications() {
         const level = Number(job.payload.level || 2);
         const current = await supabase.rpc("app_member_level", { p_user: memberId });
         if (current.error) throw new Error("Cannot verify member level");
-        if (Number(current.data) < level) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (Number(current.data) < level) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         let memberName: string | null = null;
         if (job.payload.memberId) {
           const member = await supabase.from("users").select("name").eq("id", memberId).maybeSingle();
@@ -302,7 +312,7 @@ export async function deliverTelegramNotifications() {
         const publish = job.payload.canPublishTasks && (user.role === "admin" || user.can_publish_tasks);
         if (!user.team_id || (!review && !publish)) {
           await save({ cancelled_at: new Date().toISOString(), locked_until: null });
-          continue;
+          return "done";
         }
         delivery = await sendTelegramMessage(chatId, [
           "Вам выданы новые возможности:",
@@ -314,7 +324,7 @@ export async function deliverTelegramNotifications() {
       } else if (job.kind === "survey") {
         const allowed = await supabase.rpc("tg_can_receive_survey", { p_recipient: user.id, p_submission: job.submission_id });
         if (allowed.error) throw new Error("Cannot verify survey recipient access");
-        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const result = await supabase.from("submissions").select("answer_text").eq("id", job.submission_id).maybeSingle();
         if (result.error || !result.data?.answer_text) throw new Error("Cannot load survey answers");
         // One compact message fits Telegram's limit; no separate summary can duplicate.
@@ -325,7 +335,7 @@ export async function deliverTelegramNotifications() {
         const checkAccess = () => supabase.rpc("tg_can_receive_captain_screenshot", { p_recipient: user.id, p_submission: job.submission_id });
         const allowed = await checkAccess();
         if (allowed.error) throw new Error("Cannot verify screenshot recipient access");
-        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const result = await supabase.from("ready_program_attachments").select("summary,telegram_file_id,telegram_chat_id,telegram_message_id").eq("submission_id", job.submission_id).maybeSingle();
         if (result.error || !result.data?.telegram_file_id || !result.data.summary) throw new Error("Cannot load captain screenshot");
         const attachment = result.data;
@@ -336,12 +346,12 @@ export async function deliverTelegramNotifications() {
         }
         const recheck = await checkAccess();
         if (recheck.error) throw new Error("Cannot recheck screenshot recipient access");
-        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         delivery = await copyTelegramMessage(chatId, String(attachment.telegram_chat_id), String(attachment.telegram_message_id));
         if (!delivery.ok) {
           const fallbackAccess = await checkAccess();
           if (fallbackAccess.error) throw new Error("Cannot verify fallback screenshot access");
-          if (!fallbackAccess.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+          if (!fallbackAccess.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
           const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/sendPhoto`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ chat_id: chatId, photo: attachment.telegram_file_id }), signal: AbortSignal.timeout(8_000),
@@ -353,7 +363,7 @@ export async function deliverTelegramNotifications() {
         const checkAccess = () => supabase.rpc("tg_can_receive_company_voice", { p_recipient: user.id, p_submission: job.submission_id });
         const allowed = await checkAccess();
         if (allowed.error) throw new Error("Cannot verify voice recipient access");
-        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!allowed.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         const result = await supabase.from("submissions").select("company_voice_chat_id,company_voice_message_id,company_voice_file_id,users(name),tasks(title)").eq("id", job.submission_id).maybeSingle();
         if (result.error || !result.data?.company_voice_file_id) throw new Error("Cannot load company voice");
         const voice = result.data;
@@ -366,12 +376,12 @@ export async function deliverTelegramNotifications() {
         }
         const recheck = await checkAccess();
         if (recheck.error) throw new Error("Cannot recheck voice recipient access");
-        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         delivery = await copyTelegramMessage(chatId, String(voice.company_voice_chat_id), String(voice.company_voice_message_id));
         if (!delivery.ok) {
           const fallbackAccess = await checkAccess();
           if (fallbackAccess.error) throw new Error("Cannot verify fallback voice access");
-          if (!fallbackAccess.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+          if (!fallbackAccess.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
           // Reuse Telegram's file_id; no download or Supabase Storage copy.
           const response = await fetch(`https://api.telegram.org/bot${serverEnv.telegramBotToken}/sendVoice`, {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -389,7 +399,7 @@ export async function deliverTelegramNotifications() {
         if (submission.error) throw new Error("Cannot load submission");
         if (!allowed.data || !submission.data || submission.data.status !== "pending") {
           await save({ cancelled_at: new Date().toISOString(), locked_until: null });
-          continue;
+          return "done";
         }
         const answer = submission.data;
         const participant = Array.isArray(answer.users) ? answer.users[0] : answer.users;
@@ -407,7 +417,7 @@ export async function deliverTelegramNotifications() {
         // Re-check after sending the summary; no answer should follow a revoked permission.
         const recheck = await supabase.rpc("tg_can_review", { p_reviewer: user.id, p_submission: job.submission_id });
         if (recheck.error) throw new Error("Cannot verify recipient access");
-        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); continue; }
+        if (!recheck.data) { await save({ cancelled_at: new Date().toISOString(), locked_until: null }); return "done"; }
         delivery = answer.telegram_chat_id && answer.telegram_message_id
           ? await copyTelegramMessage(chatId, String(answer.telegram_chat_id), String(answer.telegram_message_id))
           : { ok: false, error: "Original message unavailable" };
@@ -443,7 +453,18 @@ export async function deliverTelegramNotifications() {
       });
       console.warn("Telegram notification delayed", { jobId: job.id });
     }
-  }
+    return "done";
+  };
+  // Every job is claimed under a lock, so the workers never send one job twice.
+  const worker = async () => {
+    while (!drained && taken < maxJobs && Date.now() - started < budgetMs) {
+      taken++;
+      if (await deliverOne() === "empty") drained = true;
+    }
+  };
+  const outcomes = await Promise.allSettled(Array.from({ length: Math.max(1, workers) }, worker));
+  const crashed = outcomes.find((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
+  if (crashed) throw crashed.reason;
   // Existing jobs go first; reminders queued here are sent by the next run, at most a minute later.
   // A reminder problem must never turn a successful delivery run into a failure.
   try {

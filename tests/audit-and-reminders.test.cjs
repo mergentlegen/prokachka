@@ -20,7 +20,7 @@ function database(results) {
 }
 
 // Runs the delivery worker over the given jobs and records what reached Telegram.
-async function deliver(jobs, { results = {}, rpc = {} } = {}) {
+async function deliver(jobs, { results = {}, rpc = {}, options, sendDelayMs = 0 } = {}) {
   const db = database({ users: { data: { id: memberId, role: 'member', team_id: teamId, telegram_id: '777', first_name: 'Анна', teams: { name: 'Команда Асель' } } }, ...results });
   const queue = [...jobs];
   const rpcCalls = [];
@@ -31,16 +31,23 @@ async function deliver(jobs, { results = {}, rpc = {} } = {}) {
     return { data: 0 };
   };
   const messages = [], original = global.fetch;
-  global.fetch = async (_url, init) => { messages.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
+  let sending = 0, maxSending = 0;
+  global.fetch = async (_url, init) => {
+    sending++; maxSending = Math.max(maxSending, sending);
+    if (sendDelayMs) await new Promise((resolve) => setTimeout(resolve, sendDelayMs));
+    sending--;
+    messages.push(JSON.parse(init.body));
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
   try {
     const service = loadTs('backend/services/telegram-notifications.service.ts', {
       '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => db },
       'next/server': { after: () => {} },
       '@/backend/config/env': { serverEnv: { telegramBotToken: 'fixture', appUrl: 'https://prokachka.test' } },
     });
-    const result = await service.deliverTelegramNotifications();
+    const result = await service.deliverTelegramNotifications(options);
     const patches = db.calls.filter(({ table }) => table === 'telegram_notification_jobs').map(({ ops }) => ops.find(([op]) => op === 'update')[1]);
-    return { result, messages, patches, rpcCalls };
+    return { result, messages, patches, rpcCalls, maxSending };
   } finally { global.fetch = original; }
 }
 
@@ -93,10 +100,20 @@ test('a participant whose miles were recounted gets one message with the old and
   assert.match(messages[0].text, /https:\/\/prokachka\.test\//);
 });
 
-test('one worker run sends at most 20 messages', async () => {
+test('one worker run sends a whole mass mailing at once, several messages in parallel', async () => {
+  const jobs = Array.from({ length: 300 }, (_, index) => ({ id: 'n' + index, kind: 'task-nudge', payload: { taskId } }));
+  const { result, messages, maxSending } = await deliver(jobs, { results: { tasks: { data: { title: 'Видео', deadline_at: null } } }, rpc: { app_task_nudge_due: true }, sendDelayMs: 2 });
+  assert.equal(result.delivered, 300, 'not just 20 a minute any more');
+  assert.equal(messages.length, 300, 'each job is sent once');
+  assert.ok(maxSending > 1 && maxSending <= 5, `parallel, but within Telegram limits: ${maxSending}`);
+});
+
+test('a run stops at its job limit; the run started by a webhook stays small', async () => {
   const jobs = Array.from({ length: 30 }, (_, index) => ({ id: 'n' + index, kind: 'task-nudge', payload: { taskId } }));
-  const { rpcCalls } = await deliver(jobs, { rpc: { app_task_nudge_due: false } });
+  const { rpcCalls } = await deliver(jobs, { rpc: { app_task_nudge_due: false }, options: { maxJobs: 20, workers: 2 } });
   assert.equal(rpcCalls.filter(([name]) => name === 'tg_claim_notification').length, 20);
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../backend/services/telegram-notifications.service.ts'), 'utf8');
+  assert.match(source, /deliverTelegramNotifications\(\{ maxJobs: 20, workers: 2, budgetMs: 20_000 \}\)/);
 });
 
 test('start reminder texts and the Almaty daytime window', () => {
