@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { formatDateTime } from "@/frontend/shared/lib/format";
 import { plural } from "@/frontend/shared/lib/plural";
@@ -23,6 +23,11 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StarAward | null>(null);
   const [query, setQuery] = useState("");
+  // The summary tiles are shortcuts: «Всего звёзд» orders the list by stars, «Получили награду» keeps only them,
+  // «Выдач за всё время» jumps to the history.
+  const [view, setView] = useState<"all" | "top" | "awarded">("all");
+  const memberList = useRef<HTMLDivElement>(null);
+  const historyPanel = useRef<HTMLDivElement>(null);
 
   const members = users.filter((user) => user.role === "member" && user.id !== actorId);
   const totals = useMemo(() => {
@@ -32,7 +37,16 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
   }, [awards]);
   const totalStars = awards.reduce((sum, award) => sum + award.stars, 0);
   const awardedMembers = members.filter((user) => (totals.get(user.id) || 0) > 0).length;
-  const visibleMembers = members.filter((user) => user.name.toLocaleLowerCase("ru").includes(query.trim().toLocaleLowerCase("ru")));
+  const starsOf = (user: User) => totals.get(user.id) || 0;
+  const matchingMembers = members.filter((user) => user.name.toLocaleLowerCase("ru").includes(query.trim().toLocaleLowerCase("ru"))
+    && (view !== "awarded" || starsOf(user) > 0));
+  const visibleMembers = view === "all" ? matchingMembers : [...matchingMembers].sort((a, b) => starsOf(b) - starsOf(a));
+  const listTitle = view === "top" ? "Больше всего звёзд" : view === "awarded" ? "Получили награду" : "Выбери участника";
+
+  function showView(next: "top" | "awarded") {
+    setView(view === next ? "all" : next);
+    memberList.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function openAward(user: User) {
     setSelectedUser(user);
@@ -84,16 +98,19 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
       </div>
 
       <div className="stars-summary-grid">
-        <div className="stars-summary-card"><span>★</span><div><strong>{totalStars}</strong><small>Всего звёзд</small></div></div>
-        <div className="stars-summary-card"><span>♙</span><div><strong>{awardedMembers}</strong><small>Получили награду</small></div></div>
-        <div className="stars-summary-card"><span>◷</span><div><strong>{awards.length}</strong><small>Выдач за всё время</small></div></div>
+        <button type="button" className={`stars-summary-card${view === "top" ? " active" : ""}`} aria-pressed={view === "top"} onClick={() => showView("top")}>
+          <span aria-hidden="true">★</span><div><strong>{totalStars}</strong><small>Всего звёзд</small></div></button>
+        <button type="button" className={`stars-summary-card${view === "awarded" ? " active" : ""}`} aria-pressed={view === "awarded"} onClick={() => showView("awarded")}>
+          <span aria-hidden="true">♙</span><div><strong>{awardedMembers}</strong><small>Получили награду</small></div></button>
+        <button type="button" className="stars-summary-card" onClick={() => historyPanel.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <span aria-hidden="true">◷</span><div><strong>{awards.length}</strong><small>Выдач за всё время</small></div></button>
       </div>
 
-      <div className="admin-panel stars-member-list">
-        <div className="stars-member-heading"><h3>Выбери участника</h3></div>
+      <div className="admin-panel stars-member-list" ref={memberList}>
+        <div className="stars-member-heading"><h3>{listTitle}</h3>{view !== "all" && <button type="button" className="button button-muted" onClick={() => setView("all")}>Показать всех</button>}</div>
         <label className="stars-search">Найти участника<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Имя участника" /></label>
         {visibleMembers.length === 0 ? (
-          <div className="empty-admin"><span>★</span><p>{members.length ? "Участники не найдены." : "Нет участников, которых вы можете наградить."}</p></div>
+          <div className="empty-admin"><span>★</span><p>{!members.length ? "Нет участников, которых вы можете наградить." : view === "awarded" && !query.trim() ? "Пока никто не получил звёзд." : "Участники не найдены."}</p></div>
         ) : (
           visibleMembers.map((user) => (
             <div className="stars-member-row" key={user.id}>
@@ -105,7 +122,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
         )}
       </div>
 
-      <div className="admin-panel stars-history-panel">
+      <div className="admin-panel stars-history-panel" ref={historyPanel}>
         <div className="panel-title"><div><p className="eyebrow">Контроль</p><h2>История выдачи</h2></div><span className="ceo-count-label">{awards.length} {plural(awards.length, "запись", "записи", "записей")}</span></div>
         {awards.length === 0 ? (
           <div className="empty-admin"><span>◷</span><p>История награждений пока пуста.</p></div>

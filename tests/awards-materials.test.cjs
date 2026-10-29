@@ -177,3 +177,14 @@ test('history records the award label and mentor, never infers a tier for a lega
   assert.match(markup, /Награждение звёздами ·/);
   assert.match(markup, /★ 8 звёзд/);
 });
+
+test('the star summary tiles are buttons: order by stars, only awarded, jump to history', () => {
+  const { StarsPanel } = load('frontend/features/admin/StarsPanel.tsx', { '@/frontend/shared/api/admin-client': {} });
+  const markup = renderToStaticMarkup(React.createElement(StarsPanel, {
+    actorId: 'mentor', users: [{ id: 'a', name: 'Alice', role: 'member' }], awards: [], onChange() {}, onError() {},
+  }));
+  for (const label of ['Всего звёзд', 'Получили награду', 'Выдач за всё время']) {
+    assert.match(markup, new RegExp('<button type="button" class="stars-summary-card"[^>]*>(?:(?!</button>).)*' + label));
+  }
+  assert.equal((markup.match(/aria-pressed="false"/g) || []).length, 2, 'the two list filters show their state');
+});

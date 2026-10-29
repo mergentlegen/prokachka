@@ -1075,7 +1075,11 @@ html:has(.login-shell),body:has(.login-shell) { min-height:100%; overflow:hidden
 .stars-summary-card strong,.network-summary-card strong { display:block; font:700 22px 'Manrope',sans-serif; }
 .stars-summary-card small,.network-summary-card small { display:block; margin-top:4px; color:#75849b; font-size:11px; }
 .network-summary-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
-button.network-summary-card { width:100%; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:border-color .2s, box-shadow .2s; }
+button.network-summary-card,button.stars-summary-card { width:100%; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:border-color .2s, box-shadow .2s; }
+button.stars-summary-card:hover { border-color:#dcc28f; }
+button.stars-summary-card:focus-visible { outline:3px solid #f3dfae; outline-offset:2px; }
+button.stars-summary-card.active { border-color:#c9952f; box-shadow:0 0 0 1px #c9952f inset; }
+.stars-member-heading .button { min-height:34px; padding:0 12px; font-size:12px; }
 button.network-summary-card:hover { border-color:#c9d6f2; }
 button.network-summary-card:focus-visible { outline:3px solid #cddaff; outline-offset:2px; }
 button.network-summary-card.active { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset; }

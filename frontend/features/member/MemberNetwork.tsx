@@ -20,19 +20,19 @@ export function MemberNetwork({ users, currentUserId, canInvite, inviteUrl, invi
 
     <div className={styles.stats}>
       <div><strong>{firstLine}</strong><small>в 1-й линии</small></div>
-      <div><strong>{others.length}</strong><small>всего в сети</small></div>
+      <div><strong>{others.length}</strong><small>всего в команде</small></div>
       <div><strong>{others.filter((user) => isNewMember(user)).length}</strong><small>новых за неделю</small></div>
     </div>
 
     {canInvite && <div className={styles.invite}>
-      <div><strong>Пригласить в команду</strong><small>{others.length ? "Бессрочная ссылка. Вступление подтверждает наставник." : "В твоей сети пока никого нет. Поделись ссылкой: после подтверждения наставником человек появится здесь."}</small></div>
+      <div><strong>Пригласить в команду</strong><small>{others.length ? "Бессрочная ссылка. Вступление подтверждает наставник." : "В твоей команде пока никого нет. Поделись ссылкой: после подтверждения наставником человек появится здесь."}</small></div>
       {inviteUrl
         ? <div className={styles.inviteLink}><input aria-label="Твоя ссылка приглашения" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /><button type="button" className="button button-primary" onClick={() => onCopyInvite(inviteUrl)}>Копировать</button></div>
         : <button type="button" className="button button-primary" disabled={inviteBusy} onClick={onCreateInvite}>{inviteBusy ? "Создаём..." : "Получить ссылку"}</button>}
     </div>}
 
     {others.length > 0 && <div className={styles.controls}>
-      <label className={styles.search}><span>Поиск в своей сети</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Имя или логин" /></label>
+      <label className={styles.search}><span>Поиск в своей команде</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Имя или логин" /></label>
       {hasMiles && <label className={styles.sort}><span>Порядок</span><select value={sort} onChange={(event) => setSort(event.target.value as NetworkSort)}>
         <option value="name">По имени</option><option value="miles">Больше миль выше</option>
       </select></label>}

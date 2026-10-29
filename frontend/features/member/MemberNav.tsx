@@ -20,7 +20,7 @@ export const memberNavIcons: Record<MemberNavTab, ReactNode> = {
 
 /** The side menu on a computer: every section has its own line. */
 export const memberNavItems: Array<[MemberNavTab, string, string]> = [
-  ["home", "Обзор", "Обзор"], ["tasks", "Задания", "Задания"], ["feedback", "Обратная связь", "Отклик"], ["ranking", "Рейтинг", "Рейтинг"], ["network", "Моя сеть", "Сеть"], ["reviews", "Отзывы", "Отзывы"],
+  ["home", "Обзор", "Обзор"], ["tasks", "Задания", "Задания"], ["feedback", "Обратная связь", "Отклик"], ["ranking", "Рейтинг", "Рейтинг"], ["network", "Моя команда", "Команда"], ["reviews", "Отзывы", "Отзывы"],
 ];
 /** The bottom menu on a phone has room for five: the rarer sections live under «Ещё». */
 export const bottomNavItems: Array<[MemberNavTab, string, string]> = [

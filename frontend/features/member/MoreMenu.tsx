@@ -10,7 +10,7 @@ const icon = (path: ReactNode) => <svg viewBox="0 0 24 24" width="24" height="24
 
 // Everything the bottom menu has no room for. Sections still in the works are listed with «скоро».
 const entries: Entry[] = [
-  { key: "network", title: "Моя сеть", hint: "Кого вы пригласили в команду", tone: "blue", open: "network",
+  { key: "network", title: "Моя команда", hint: "Кого вы пригласили в команду", tone: "blue", open: "network",
     icon: icon(<><circle cx="12" cy="6" r="2.5" /><circle cx="5.5" cy="17.5" r="2.5" /><circle cx="18.5" cy="17.5" r="2.5" /><path d="M12 8.5v3M12 11.5l-5 4M12 11.5l5 4" /></>) },
   { key: "profile", title: "Профиль", hint: "Данные, Telegram, пароль", tone: "green", open: "profile",
     icon: icon(<><circle cx="12" cy="8" r="3.5" /><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" /></>) },
