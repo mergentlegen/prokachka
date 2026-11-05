@@ -36,17 +36,28 @@ if [ ! -f "$STATE/.welcome" ]; then
     && touch "$STATE/.welcome"
 fi
 
+# A deploy restarts the app, and for up to ~11 s nginx answers 502. A failed check waits and looks
+# again once, so a restart that happens to meet the timer is not reported as an outage.
+RETRY_SECONDS="${MONITOR_RETRY_SECONDS:-20}"
+site_code() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve prokachka.kz:443:127.0.0.1 "$SITE/api/health"; }
+monitor_body() {
+  printf 'url = "%s/api/internal/monitor"\nheader = "Authorization: Bearer %s"\n' "$SITE" "${TELEGRAM_DELIVERY_SECRET:-}" \
+    | curl -s --max-time 20 --resolve prokachka.kz:443:127.0.0.1 -w '\n%{http_code}' -K -
+}
+
 # 1. The application process.
+systemctl is-active --quiet prokachka || sleep "$RETRY_SECONDS"
 if systemctl is-active --quiet prokachka; then report service 0 ""; else report service 1 "служба сайта остановлена"; fi
 
 # 2. The site answers through nginx and HTTPS.
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve prokachka.kz:443:127.0.0.1 "$SITE/api/health")
+code=$(site_code)
+if [ "$code" != 200 ]; then sleep "$RETRY_SECONDS"; code=$(site_code); fi
 if [ "$code" = 200 ]; then report site 0 ""; else report site 1 "сайт не открывается (ответ сервера: $code)"; fi
 
 # 3. Database and the Telegram queue. 404 means the check is not deployed yet: skip quietly.
-body=$(printf 'url = "%s/api/internal/monitor"\nheader = "Authorization: Bearer %s"\n' "$SITE" "${TELEGRAM_DELIVERY_SECRET:-}" \
-  | curl -s --max-time 20 --resolve prokachka.kz:443:127.0.0.1 -w '\n%{http_code}' -K -)
+body=$(monitor_body)
 status=${body##*$'\n'}
+if [ "$status" != 200 ] && [ "$status" != 404 ]; then sleep "$RETRY_SECONDS"; body=$(monitor_body); status=${body##*$'\n'}; fi
 json=${body%$'\n'*}
 if [ "$status" = 200 ]; then
   report database 0 ""

@@ -37,3 +37,51 @@ test('monitor counts only sendable jobs and how long the oldest ready one waits'
   } }) } });
   assert.ok('error' in await broken.monitorSnapshot(now));
 });
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+
+// Runs the real monitor script with fake curl/systemctl/sleep; SITE_CODES are the answers of /api/health in order.
+function runMonitor(t, siteCodes) {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'prokachka-monitor-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const bin = path.join(temp, 'bin');
+  const state = path.join(temp, 'state');
+  fs.mkdirSync(bin);
+  fs.mkdirSync(state);
+  fs.writeFileSync(path.join(state, '.welcome'), '');
+  const log = path.join(temp, 'calls.log');
+  fs.writeFileSync(path.join(bin, 'systemctl'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'sleep'), '#!/usr/bin/env bash\necho "sleep $1" >> "$CALL_LOG"\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'openssl'), '#!/usr/bin/env bash\ncat > /dev/null\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'curl'), `#!/usr/bin/env bash
+args="$*"; input=""
+[[ "$args" == *"-K -"* ]] && input=$(cat)
+if [[ "$input" == *api.telegram.org* ]]; then echo "telegram $args" >> "$CALL_LOG"; printf 200; exit 0; fi
+if [[ "$input" == *internal/monitor* ]]; then printf '{"monitor":{"queue":{"waiting":0,"oldestMinutes":0}}}\n200'; exit 0; fi
+if [[ "$args" == *api/health* ]]; then
+  read -ra codes <<< "$SITE_CODES"; n=$(cat "$CALL_LOG.count" 2>/dev/null || echo 0); echo $((n + 1)) > "$CALL_LOG.count"
+  printf '%s' "\${codes[$n]:-\${codes[-1]}}"; exit 0
+fi
+printf 000
+`, { mode: 0o755 });
+  execFileSync('bash', [path.resolve(__dirname, '../scripts/prokachka-monitor.sh')], { env: { ...process.env,
+    PATH: bin + ':' + process.env.PATH, STATE_DIRECTORY: state, CALL_LOG: log, SITE_CODES: siteCodes,
+    TELEGRAM_BOT_TOKEN: 'token', ALERT_CHAT_ID: '1', TELEGRAM_DELIVERY_SECRET: secret } });
+  return { calls: fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '', siteAlert: fs.existsSync(path.join(state, 'site')) };
+}
+
+const linuxOnly = { skip: process.platform !== 'linux' };
+test('monitor stays quiet when a deploy restart meets the check', linuxOnly, (t) => {
+  const { calls, siteAlert } = runMonitor(t, '502 200');
+  assert.match(calls, /^sleep 20$/m, 'a failed check is repeated after a pause');
+  assert.doesNotMatch(calls, /telegram/, 'a short restart is not an outage');
+  assert.equal(siteAlert, false);
+});
+test('monitor alerts when the site is still down on the second look', linuxOnly, (t) => {
+  const { calls, siteAlert } = runMonitor(t, '502 502');
+  assert.match(calls, /telegram .*сайт не открывается \(ответ сервера: 502\)/);
+  assert.equal(siteAlert, true);
+});
