@@ -1,6 +1,6 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
-import { failure, ok } from "@/backend/http/api-response";
+import { databaseFailure, failure, ok } from "@/backend/http/api-response";
 import { isUuid } from "@/backend/http/security";
 import { createJoinRequest, findJoinRequests, findReviewableJoinRequests, reviewJoinRequest } from "@/backend/services/team-requests.service";
 import { auditPersonRecord, recordAudit } from "@/backend/services/audit-log.service";
@@ -30,7 +30,7 @@ export async function createTeamRequest(request: Request) {
     const result = await createJoinRequest(user.id, body.teamId, inviteToken);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("validationError" in result) return failure(result.validationError || "Заявка не может быть обработана.", 400);
-    if (result.error) return failure("Не удалось отправить заявку.");
+    if (result.error) return databaseFailure(result.error, "Не удалось отправить заявку.");
     return ok({ request: result.data }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

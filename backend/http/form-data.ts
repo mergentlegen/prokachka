@@ -1,4 +1,4 @@
-import { readLimitedBytes, RequestBodyError } from "@/backend/http/request-body";
+import { BROKEN_TEXT_MESSAGE, hasBrokenText, readLimitedBytes, RequestBodyError } from "@/backend/http/request-body";
 
 export class FormDataLimitError extends RequestBodyError {}
 
@@ -11,5 +11,10 @@ export async function readLimitedFormData(request: Request, maxBytes: number) {
     if (error instanceof RequestBodyError && error.status === 413) throw new FormDataLimitError(error.message, 413);
     throw error;
   }
-  return new Response(new Uint8Array(bytes), { headers: { "Content-Type": request.headers.get("Content-Type") || "" } }).formData();
+  const form = await new Response(new Uint8Array(bytes), { headers: { "Content-Type": request.headers.get("Content-Type") || "" } }).formData();
+  // Text fields and file names reach the database too (see readLimitedJson).
+  for (const [key, value] of form.entries()) {
+    if (hasBrokenText(key) || hasBrokenText(typeof value === "string" ? value : value.name)) throw new RequestBodyError(BROKEN_TEXT_MESSAGE);
+  }
+  return form;
 }

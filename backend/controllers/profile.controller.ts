@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/backend/http/current-user";
-import { failure, ok } from "@/backend/http/api-response";
+import { databaseFailure, failure, ok } from "@/backend/http/api-response";
 import { enforceRateLimit, isUuid } from "@/backend/http/security";
 import { createSession, findAccountById } from "@/backend/services/auth.service";
 import { normalizeAvatar, saveOwnProfile } from "@/backend/services/profile.service";
@@ -66,6 +66,10 @@ export async function listVisiblePhones(request: Request) {
   return ok({ phones: result.data });
 }
 
+// The version is the profile's own database timestamp (2026-11-04T08:10:09.123456+00:00). Date.parse alone
+// also takes "1" or "Monday 5", which the database then refuses with a server error.
+const PROFILE_VERSION = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)$/;
+
 export async function updateOwnProfile(request: Request) {
   const user = await getCurrentUser(request);
   if (!user) return failure("Сначала войдите в аккаунт.", 401);
@@ -74,12 +78,15 @@ export async function updateOwnProfile(request: Request) {
   if (blocked) return blocked;
   let form: FormData;
   try { form = await readLimitedFormData(request, 768 * 1024); }
-  catch (error) { return failure(error instanceof FormDataLimitError ? "Фотография слишком большая." : "Не удалось прочитать данные профиля.", error instanceof FormDataLimitError ? 413 : 400); }
+  catch (error) {
+    if (error instanceof FormDataLimitError) return failure("Фотография слишком большая.", 413);
+    return requestBodyFailure(error) || failure("Не удалось прочитать данные профиля.", 400);
+  }
   const names = validateProfileNames(form.get("firstName"), form.get("lastName"));
   if ("error" in names) return failure(names.error, 400);
   const action = form.get("avatarAction"), version = form.get("expectedVersion");
   if (action !== "keep" && action !== "replace" && action !== "remove") return failure("Некорректное действие с фотографией.", 400);
-  if (typeof version !== "string" || version.length > 40 || !Number.isFinite(Date.parse(version))) return failure("Обновите профиль и попробуйте снова.", 409);
+  if (typeof version !== "string" || !PROFILE_VERSION.test(version) || !Number.isFinite(Date.parse(version))) return failure("Обновите профиль и попробуйте снова.", 409);
   // The phone is optional; an absent field keeps the saved one, an empty one removes it.
   const phoneField = form.get("phone");
   const phone = phoneField === null ? undefined : normalizePhone(phoneField);
@@ -96,7 +103,7 @@ export async function updateOwnProfile(request: Request) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("conflict" in result) return failure("Профиль уже изменён в другом окне. Обновите данные и повторите сохранение.", 409);
   if ("storageError" in result) return failure("Не удалось загрузить фотографию. Попробуйте ещё раз.", 502);
-  if ("error" in result) return failure("Не удалось сохранить профиль. Попробуйте ещё раз.", 500);
+  if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить профиль. Попробуйте ещё раз.");
   if (phone && "phone" in phone) {
     const saved = await setOwnPhone(user.id, phone.phone);
     if ("validationError" in saved) return failure(saved.validationError || "Проверьте номер телефона.", 400);

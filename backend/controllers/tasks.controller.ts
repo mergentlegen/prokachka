@@ -1,6 +1,6 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
-import { failure, ok } from "@/backend/http/api-response";
+import { databaseFailure, failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { getMemberTaskFeed } from "@/backend/services/member-progress.service";
 import { deleteTask as deleteTaskRecord, findTasks, insertTask, patchTask } from "@/backend/services/tasks.service";
@@ -15,6 +15,11 @@ import { parseLevel } from "@/shared/domain/levels";
 
 function canPublish(user: Awaited<ReturnType<typeof currentUser>>) {
   return Boolean(user && (user.role === "ceo" || user.role === "admin" || user.canPublishTasks));
+}
+
+// Optional whole numbers the database stores as integers; anything else used to reach Postgres and fail there.
+function optionalInteger(value: unknown, min: number, max: number) {
+  return value === undefined || value === null || (Number.isInteger(value) && Number(value) >= min && Number(value) <= max);
 }
 
 function parseDeadline(value: unknown) {
@@ -82,6 +87,9 @@ export async function createTask(request: Request) {
     const level = body.level === undefined ? 1 : parseLevel(body.level);
     if (!level) return failure("Уровень может быть от 1 до 3.", 400);
     if (body.voiceAnswer !== undefined && typeof body.voiceAnswer !== "boolean") return failure("Некорректный способ ответа.", 400);
+    if (body.programId !== undefined && body.programId !== null && !isUuid(body.programId)) return failure("Некорректная программа.", 400);
+    if (!optionalInteger(body.position, 1, 10_000)) return failure("Некорректный номер шага.", 400);
+    if (!optionalInteger(body.deadlineHours, 1, 720)) return failure("Срок шага может быть от 1 до 720 часов.", 400);
     const result = await insertTask({ level, voiceAnswer: body.voiceAnswer === true,
       title: body.title.trim(), description: body.description.trim(), maxPoints: body.maxPoints, deadlineAt: deadline.value,
       isActive: body.isActive, teamId, publicationType: body.publicationType, programId: body.programId,
@@ -92,7 +100,7 @@ export async function createTask(request: Request) {
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("Нельзя добавить задание в чужую программу.", 403);
     if ("validationError" in result) return failure(result.validationError || "Выберите команду.", 400);
-    if (result.error) return failure("Не удалось создать задание.");
+    if (result.error) return databaseFailure(result.error, "Не удалось создать задание.");
     await recordAudit(user, { action: "task.create", targetId: String(result.data?.id || ""), targetLabel: body.title.trim(), teamId: teamId || null, details: { miles: Number(result.data?.max_points ?? body.maxPoints ?? 0), ...(body.publicationType === "sequential" ? { programStep: true } : {}) } });
     return ok({ task: result.data }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
@@ -112,6 +120,7 @@ export async function updateTask(request: Request, id: string) {
     if (body.isPinned !== undefined && typeof body.isPinned !== "boolean") return failure("Некорректный статус закрепления.", 400);
     if (body.level !== undefined && !parseLevel(body.level)) return failure("Уровень может быть от 1 до 3.", 400);
     if (body.voiceAnswer !== undefined && typeof body.voiceAnswer !== "boolean") return failure("Некорректный способ ответа.", 400);
+    if (!optionalInteger(body.deadlineHours, 1, 720)) return failure("Срок шага может быть от 1 до 720 часов.", 400);
     const deadline = Object.prototype.hasOwnProperty.call(body, "deadlineAt") ? parseDeadline(body.deadlineAt) : { value: undefined as string | null | undefined };
     if ("error" in deadline) return failure(deadline.error, 400);
     const resourceUrl = Object.prototype.hasOwnProperty.call(body, "resourceUrl") ? parseExternalUrl(body.resourceUrl) : { value: undefined as string | null | undefined };
@@ -123,7 +132,7 @@ export async function updateTask(request: Request, id: string) {
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этому заданию.", 403);
     if ("validationError" in result) return failure(result.validationError || "Некорректное изменение задания.", 400);
-    if (result.error) return failure("Не удалось обновить задание.");
+    if (result.error) return databaseFailure(result.error, "Не удалось обновить задание.");
     return ok({ task: result.data });
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }

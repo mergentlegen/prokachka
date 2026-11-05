@@ -1,5 +1,5 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
-import { failure, ok } from "@/backend/http/api-response";
+import { databaseFailure, failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
 import { readLimitedFormData } from "@/backend/http/form-data";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
@@ -97,7 +97,7 @@ export async function createAnnouncement(request: Request) {
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("validationError" in result) return failure(result.validationError || "Некорректная фотография.", 400);
     if ("storageError" in result) return failure("Не удалось загрузить фотографию в Storage.", 502);
-    if ("error" in result && result.error) return failure("Не удалось создать объявление.");
+    if ("error" in result && result.error) return databaseFailure(result.error, "Не удалось создать объявление.");
     const announcementId = String(result.data?.id || "");
     // The announcement is already published; a Telegram problem only changes the message shown to the mentor.
     const telegramQueued = body.notifyTelegram === true && announcementId ? await queueAnnouncementTelegram(user.id, announcementId) : undefined;
@@ -146,7 +146,7 @@ export async function updateAnnouncement(request: Request, id: string) {
     if ("forbidden" in result) return failure("У вас нет доступа к этому объявлению.", 403);
     if ("validationError" in result) return failure(result.validationError || "Некорректная фотография.", 400);
     if ("storageError" in result) return failure("Не удалось загрузить фотографию в Storage.", 502);
-    if ("error" in result && result.error) return failure("Не удалось изменить объявление.");
+    if ("error" in result && result.error) return databaseFailure(result.error, "Не удалось изменить объявление.");
     return ok({ announcement: result.data });
   } catch (error) {
     return requestBodyFailure(error) || failure("Некорректные данные.", 400);

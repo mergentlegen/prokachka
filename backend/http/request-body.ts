@@ -42,11 +42,32 @@ export async function readLimitedBytes(request: Request, maxBytes: number, timeo
   } finally { clearTimeout(timer); reader.releaseLock(); }
 }
 
+// Postgres cannot store a NUL character or half of an emoji (a lone UTF-16 surrogate), and refusing
+// them deep in the database turns a typo or a probe into a server error.
+const BROKEN_TEXT = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+export const BROKEN_TEXT_MESSAGE = "В тексте есть недопустимые символы. Уберите их и попробуйте ещё раз.";
+
+export function hasBrokenText(value: string) {
+  return BROKEN_TEXT.test(value);
+}
+
+function containsBrokenText(value: unknown): boolean {
+  if (typeof value === "string") return hasBrokenText(value);
+  if (!value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some(containsBrokenText);
+  return Object.entries(value).some(([key, item]) => hasBrokenText(key) || containsBrokenText(item));
+}
+
 export async function readLimitedJson(request: Request) {
   const bytes = await readLimitedBytes(request, requestLimits.get(request) ?? 128 * 1024);
+  // Same loose type as JSON.parse gives: every controller checks the fields it reads.
+  let value: ReturnType<typeof JSON.parse>;
   try {
-    const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not_an_object");
-    return value;
   } catch { throw new RequestBodyError("Некорректные данные запроса."); }
+  let broken: boolean;
+  try { broken = containsBrokenText(value); } catch { throw new RequestBodyError("Некорректные данные запроса."); }
+  if (broken) throw new RequestBodyError(BROKEN_TEXT_MESSAGE);
+  return value;
 }

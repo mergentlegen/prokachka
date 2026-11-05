@@ -1,5 +1,5 @@
 import { readLimitedJson, requestBodyFailure } from "@/backend/http/request-body";
-import { failure, ok } from "@/backend/http/api-response";
+import { databaseFailure, failure, ok } from "@/backend/http/api-response";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { isUuid } from "@/backend/http/security";
 import { prepareCompanyVoice } from "@/backend/services/telegram-submission.service";
@@ -13,7 +13,7 @@ import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyPro
 function resultResponse(result: Awaited<ReturnType<typeof startReadyProgramAttempt>>) {
   if ("unavailable" in result) return failure("База данных не настроена.", 503);
   if ("validationError" in result) return failure(result.validationError, 409);
-  if ("error" in result) return failure("Не удалось сохранить прогресс готовой программы.");
+  if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить прогресс готовой программы.");
   return ok({ attempt: result.data });
 }
 
@@ -35,7 +35,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       const result = await safetyWatchAction(user.id, taskId, body.operation as SafetyWatchOperation, Number(body.step || 0), payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс игры.", 409);
-      if ("error" in result) return failure("Не удалось сохранить игру. Попробуйте ещё раз.");
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить игру. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
     if (action === "first-year") {
@@ -46,7 +46,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       const result = await firstYearAction(user.id, taskId, body.operation as "start" | "save" | "complete", Number(body.step || 0), body.payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс игры.", 409);
-      if ("error" in result) return failure("Не удалось сохранить игру. Попробуйте ещё раз.");
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить игру. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
     if (action === "dream-route") {
@@ -57,7 +57,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       const result = await dreamRouteAction(user.id, taskId, body.operation as "start" | "save" | "complete", Number(body.step || 0), body.payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс маршрута.", 409);
-      if ("error" in result) return failure("Не удалось сохранить маршрут. Попробуйте ещё раз.");
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить маршрут. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
     if (action === "count-dream") {
@@ -68,7 +68,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       const result = await countYourDreamAction(user.id, taskId, body.operation as "start" | "save" | "complete", Number(body.step || 0), body.payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Некорректные ответы тренажёра.", 409);
-      if ("error" in result) return failure("Не удалось сохранить прогресс тренажёра. Попробуйте ещё раз.");
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить прогресс тренажёра. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
     if (action === "captain") {
@@ -79,7 +79,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       const result = await captainCruiseAction(user.id, taskId, body.operation as CaptainAction, body.index as number | undefined, body.payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных или Telegram пока не настроены.", 503);
       if ("validationError" in result) return failure(result.validationError || "Отправка пока недоступна.", "linkRequired" in result ? 422 : 409);
-      if ("error" in result) return failure("Не удалось сохранить тренировку. Попробуйте ещё раз.");
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить тренировку. Попробуйте ещё раз.");
       return "url" in result ? ok({ url: result.url, expiresAt: result.expiresAt }) : ok({ attempt: result.data });
     }
     if (action !== "start" && action !== "advance" && action !== "answer" && action !== "restart-quiz" && action !== "complete" && action !== "save-story" && action !== "voice-link") return failure("Неизвестное действие программы.", 400);
@@ -87,7 +87,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       const result = await prepareCompanyVoice(user.id, taskId);
       if ("unavailable" in result) return failure("Telegram-бот или база данных пока не настроены.", 503);
       if ("validationError" in result) return failure(result.validationError || "Голосовое сейчас недоступно.", "linkRequired" in result ? 422 : 409);
-      if ("error" in result) return failure("Не удалось подготовить отправку голосового.");
+      if ("error" in result) return databaseFailure(result.error, "Не удалось подготовить отправку голосового.");
       return ok({ url: result.url, expiresAt: result.expiresAt });
     }
     if (action === "save-story") {

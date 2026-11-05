@@ -58,6 +58,8 @@ export async function createJoinRequest(userId: string, teamId: string, inviteTo
     invitationId = String(invitation.data.id);
   }
   const result = await supabase.from("team_join_requests").insert({ user_id: userId, team_id: teamId, invited_by_user_id: invitedByUserId || null, invitation_id: invitationId || null }).select().single();
+  // One pending request per person (team_join_requests_one_pending_idx): a second one is a repeat, not a failure.
+  if (result.error?.code === "23505") return { validationError: "Заявка уже отправлена. Дождись ответа наставника." };
   return result.error ? { error: result.error } : { data: result.data };
 }
 
