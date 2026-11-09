@@ -101,15 +101,21 @@ test('the level switch lists the current level first and earlier levels as archi
   assert.match(html, /архив/);
 });
 
-test('the course card names the level and how to reach the next one', () => {
-  const { StarCourseCard } = loadTs('frontend/features/member/StarCourseCard.tsx');
-  const first = renderToStaticMarkup(React.createElement(StarCourseCard, { miles: 40, stars: 2, rank: 3, level: 1, onOpenRanking() {} }));
-  assert.match(first, /300 XP — переход на уровень 2/);
-  const second = renderToStaticMarkup(React.createElement(StarCourseCard, { miles: 0, stars: 0, rank: 1, level: 2, onOpenRanking() {} }));
+test('the score card shows miles or stars, the place and the miles left to level 2', () => {
+  const { ScoreCard } = loadTs('frontend/features/member/ScoreCard.tsx');
+  const card = (props) => renderToStaticMarkup(React.createElement(ScoreCard, { metric: 'points', miles: 90, stars: 3, rank: 3, level: 1, onOpenRanking() {}, ...props }));
+  const first = card();
+  assert.match(first, /Общий результат/);
+  assert.match(first, /<strong>90<\/strong>/);
+  assert.match(first, /До уровня «Капитан» — 10 миль/);
+  assert.match(first, /aria-valuenow="90"/);
+  assert.match(first, /3 место в рейтинге/);
+  assert.match(card({ metric: 'stars' }), /<strong>3<\/strong>.*★ звезды/);
+  assert.doesNotMatch(card({ miles: 100 }), /До уровня/, 'nothing left at 100');
+  const second = card({ miles: 0, level: 2 });
   assert.match(second, /Уровень 2 · Капитан/);
-  assert.match(second, /0\/100 миль/);
-  const last = renderToStaticMarkup(React.createElement(StarCourseCard, { miles: 100, stars: 10, rank: 1, level: 3, onOpenRanking() {} }));
-  assert.match(last, /Опыт набран ✓/);
+  assert.doesNotMatch(second, /До уровня/);
+  assert.doesNotMatch(first + second, /XP|Опыт/);
 });
 
 test('«Ответили N из M» counts those on the task’s level and anyone who already answered', () => {
@@ -157,16 +163,48 @@ test('the admin card moves a participant up or back after a confirmation', async
   } finally { harness.unmount(); }
 });
 
+test('the rating API returns team ratings by miles and by stars, the viewer’s level and a pending congratulation', async () => {
+  const miles = [{ id: 'a', name: 'Анна', points: 100 }, { id: 'me', name: 'Я', points: 40 }];
+  const stars = [{ id: 'me', name: 'Я', points: 3 }, { id: 'a', name: 'Анна', points: 0 }];
+  const calls = [];
+  const api = (user, level) => loadTs('backend/controllers/ranking.controller.ts', {
+    '@/backend/http/current-user': { getCurrentUser: async () => user },
+    '@/backend/services/ranking.service': {
+      findRanking: async (scope) => { calls.push(['miles', scope]); return { data: miles }; },
+      findStarRanking: async (scope) => { calls.push(['stars', scope]); return { data: stars }; },
+      findMemberLevel: async (id) => { calls.push(['level', id]); return level; }, markMemberLevelSeen: async () => ({ data: true }),
+    },
+  });
+  const rating = async (user, level = { level: 1, levelUp: null }) => (await (await api(user, level).listRanking(new Request('https://example.test/api/ranking'))).json());
+  const first = await rating({ id: 'me', role: 'member', teamId: 'team' });
+  assert.deepEqual(first.ranking.map((entry) => entry.name), ['Анна', 'Я'], 'by miles, the whole team');
+  assert.deepEqual(first.starRanking.map((entry) => entry.name), ['Я', 'Анна'], 'by stars');
+  assert.equal(first.level, 1);
+  assert.equal(first.levelUp, null);
+  assert.deepEqual(calls, [['miles', { kind: 'team', teamId: 'team' }], ['stars', { kind: 'team', teamId: 'team' }], ['level', 'me']]);
+  const second = await rating({ id: 'me', role: 'member', teamId: 'team' }, { level: 2, levelUp: 2 });
+  assert.equal(second.level, 2);
+  assert.equal(second.levelUp, 2, 'the congratulation that was not shown yet');
+  assert.equal((await rating({ id: 'm', role: 'admin', teamId: 'team' }, { level: 2, levelUp: 2 })).levelUp, null, 'only participants are congratulated');
+});
+
+test('level 2 comes at 100 miles: the same number on the site and in the database', () => {
+  const fs = require('node:fs');
+  assert.equal(loadTs('shared/domain/levels.ts').LEVEL_UP_MILES, 100);
+  const sql = fs.readFileSync('supabase/20261113-levels-100-miles.sql', 'utf8');
+  assert.match(sql, /app_level_totals\(p_user, 1::smallint\) t\) < 100/);
+  assert.doesNotMatch(sql.replace(/^--.*$/gm, ''), /\* 20|300/, 'no XP formula left');
+});
+
 test('Telegram: the participant is congratulated, the mentor learns who moved up', () => {
   const { levelUpText } = loadTs('backend/services/telegram-notifications.service.ts');
   const member = levelUpText(2, null, 'https://prokachka.kz/');
-  assert.match(member, /ты на уровне 2/);
+  assert.match(member, /Ты на уровне 2!/);
   assert.match(member, /Ты на безоплатном членстве/);
   const mentor = levelUpText(2, 'Алия Бекова', 'https://prokachka.kz/admin?section=network');
   assert.match(mentor, /Алия Бекова — новый уровень: 2 \(Капитан\)/);
-  assert.match(member, /300 XP набрано/);
-  assert.match(mentor, /Набрано 300 XP: 100 миль и 10 звёзд/);
-  assert.doesNotMatch(member + mentor, /Звёздный курс/);
+  assert.match(mentor, /Теперь у него новые задания/);
+  assert.doesNotMatch(member + mentor, /Звёздный курс|XP/);
 });
 
 test('levels join users by user_id: member_levels has two links to users (user_id, granted_by)', () => {

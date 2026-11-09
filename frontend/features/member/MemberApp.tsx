@@ -13,10 +13,8 @@ import { unlinkTelegram } from "@/frontend/shared/api/profile-client";
 import { Toast } from "@/frontend/shared/Toast";
 import { MemberNetwork } from "@/frontend/features/member/MemberNetwork";
 import { HomeOverview } from "./HomeOverview";
-import { RankingBoard } from "./RankingBoard";
-import { StarCourseCard } from "./StarCourseCard";
-import { COURSE_MAX } from "@/shared/domain/star-course";
-import { MAX_LEVEL } from "@/shared/domain/levels";
+import { RankingBoard, type RatingMetric } from "./RankingBoard";
+import { ScoreCard } from "./ScoreCard";
 import { LevelArchive, LevelSwitch } from "./LevelArchive";
 import { LevelUpScreen } from "./LevelUpScreen";
 import { markLevelSeen } from "@/frontend/shared/api/client";
@@ -64,7 +62,7 @@ export function MemberApp() {
   const [feedbackVersion, setFeedbackVersion] = useState(0);
   const [feedbackUnread, setFeedbackUnread] = useState(0);
   const [feedbackTaskId, setFeedbackTaskId] = useState<string | null>(null);
-  const { store, ranking: teamRanking, level: dataLevel, levelUp, network: networkUsers, refreshData, dataLoading, dataError } = useMemberData(user, tab);
+  const { store, ranking: teamRanking, starRanking, level: dataLevel, levelUp, network: networkUsers, refreshData, dataLoading, dataError } = useMemberData(user, tab);
   const [previousTab, setPreviousTab] = useState<Exclude<MemberTab, "profile">>("home");
   const closeProfile = useCallback(() => setTab(previousTab), [previousTab]);
   function navigate(next: MemberTab) {
@@ -168,13 +166,14 @@ export function MemberApp() {
     setTaskFilter("done");
     setTab("tasks");
   }
-  // Place, miles and stars all come from XP («Опыт»); miles and stars are the participant's own totals.
-  const myEntry = user ? teamRanking.find((member) => member.id === user.id) : undefined;
+  // Two team ratings: by miles (the place everywhere) and by stars.
+  const [ratingType, setRatingType] = useState<RatingMetric>("points");
+  const ranking = ratingType === "stars" ? starRanking : teamRanking;
   const currentRank = user ? teamRanking.findIndex((member) => member.id === user.id) + 1 : 0;
-  const currentPoints = myEntry?.miles ?? 0;
-  const currentStars = myEntry?.stars ?? 0;
+  const currentPoints = user ? teamRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
+  const currentStars = user ? starRanking.find((member) => member.id === user.id)?.points ?? 0 : 0;
   // Each level has its own tasks; earlier levels open as a read-only archive.
-  const memberLevel = myEntry?.level ?? dataLevel ?? 1;
+  const memberLevel = dataLevel ?? 1;
   const [archiveLevel, setArchiveLevel] = useState<number | null>(null);
   const viewingArchive = archiveLevel && archiveLevel < memberLevel ? archiveLevel : null;
   // The congratulation for a new level is shown once; the server remembers it was seen.
@@ -333,8 +332,8 @@ export function MemberApp() {
   return <><main className={`app-shell member-shell member-tab-${tab === "profile" ? previousTab : tab}`}>
     <header className="topbar"><a className="brand" href="/" aria-label="На главную"><img className="brand-logo" src="/brand/logo.svg" alt="Прокачка" /></a><div className="topbar-actions">{hasMentorAccess(user) && <a className="mentor-link" href="/admin">Панель наставника</a>}<button className="logout-link" onClick={logout}>Выйти</button><button className="avatar-button" onClick={() => navigate("profile")} aria-label="Открыть профиль"><Avatar name={user.name} src={user.avatarUrl} className="header-avatar" eager /></button></div></header>
 <div className="member-layout"><MemberSidebar tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} /><div className="member-main">
-    <section className="welcome-section page-width"><div><h1>Привет, {user.name.split(" ")[0]} <span className="wave">⌁</span></h1></div><StarCourseCard miles={currentPoints} stars={currentStars} rank={currentRank} level={memberLevel} onOpenRanking={() => navigate("ranking")} /></section>
-<div className="page-width content-grid"><SectionBoundary loading={tab !== "profile" && dataLoading} error={tab !== "profile" ? dataError : undefined} onRetry={() => void refreshData()}><section className="main-column"><div className="member-section member-section-announcements"><HomeOverview userId={user.id} tasks={activeTasks} submissions={store.submissions} ranking={teamRanking} feedbackUnread={feedbackUnread} now={now} onOpen={(next) => { if (next === "tasks") setTaskFilter("todo"); navigate(next); }} />
+    <section className="welcome-section page-width"><div><h1>Привет, {user.name.split(" ")[0]} <span className="wave">⌁</span></h1></div><ScoreCard metric={ratingType} miles={currentPoints} stars={currentStars} rank={currentRank} level={memberLevel} onOpenRanking={() => { setRatingType("points"); navigate("ranking"); }} /></section>
+<div className="page-width content-grid"><SectionBoundary loading={tab !== "profile" && dataLoading} error={tab !== "profile" ? dataError : undefined} onRetry={() => void refreshData()}><section className="main-column"><div className="member-section member-section-announcements"><HomeOverview userId={user.id} tasks={activeTasks} submissions={store.submissions} ranking={teamRanking} feedbackUnread={feedbackUnread} now={now} onOpen={(next) => { if (next === "ranking") setRatingType("points"); if (next === "tasks") setTaskFilter("todo"); navigate(next); }} />
         <AnnouncementsBlock announcements={store.announcements} userId={user.id} /></div><div className="member-section member-section-more"><MoreMenu onOpen={navigate} /></div><div className="member-section member-section-reviews"><button type="button" className="member-back-more" onClick={() => navigate("more")}><span aria-hidden="true">‹</span> Ещё</button>{tab === "reviews" && <ReviewsPanel canWrite={Boolean(user.teamId)} onNotice={setToast} />}</div><div className="member-section member-section-network"><button type="button" className="member-back-more" onClick={() => navigate("more")}><span aria-hidden="true">‹</span> Ещё</button><MemberNetwork users={networkUsers} currentUserId={user.id} canInvite={Boolean(user.teamId)} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={() => void createInviteLink()} onCopyInvite={(url) => void copyInviteLink(url)} /></div><div className="member-section member-section-feedback">{tab === "feedback" && <FeedbackPanel viewerId={user.id} refreshKey={feedbackVersion} onOpenTask={openTaskFromFeedback} selectedTaskId={feedbackTaskId} selectedThreadId={feedbackTaskId ? null : typeof window !== "undefined" ? new URLSearchParams(window.location?.search || "").get("feedback") : null} />}</div><div className="member-section member-section-tasks">{memberLevel > 1 && <LevelSwitch level={memberLevel} viewing={viewingArchive ?? memberLevel} onChange={(next) => setArchiveLevel(next < memberLevel ? next : null)} />}{viewingArchive ? <LevelArchive level={viewingArchive} latest={latestByTask} onFeedback={openFeedback} /> : <><div className="section-heading"><div><p className="eyebrow">Практика</p><h2>Актуальные задания</h2></div><div className="task-switch"><button className={taskView === "regular" ? "active" : ""} onClick={() => setTaskView("regular")}>Задания</button><button className={taskView === "programs" ? "active" : ""} onClick={() => setTaskView("programs")}>Программы</button></div><span className="task-count">{taskView === "programs" ? `${programModules.length} ${plural(programModules.length, "программа", "программы", "программ")}` : `${visibleTasks.length} ${plural(visibleTasks.length, "задание", "задания", "заданий")}`}</span></div>
         {taskView === "programs" ? <ProgramModules modules={programModules} tasks={visibleTasks} passedTasks={store.passedTasks || []} latest={latestByTask} selectedId={programTab} onSelect={setProgramTab} onFeedback={openFeedback}
           renderTask={(task) => <TaskCard task={task} submission={latestByTask.get(task.id)} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} inModule />} /> : <>
@@ -342,11 +341,11 @@ export function MemberApp() {
         {visibleTasks.length === 0 ? <EmptyState text="Пока нет активных заданий." /> : <div className="task-list">{shownTasks.map((task) => {
       const latest = store.submissions.filter((submission) => submission.userId === user.id && submission.taskId === task.id).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))[0];
       return <TaskCard key={task.id} task={task} submission={latest} onSubmit={submitTask} onFeedback={openFeedback} onInteractiveComplete={completeInteractive} onInteractiveProgress={() => void refreshData()} />;
-    })}</div>}</>}</>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={teamRanking} userId={user.id} level={memberLevel} /></aside></SectionBoundary></div></div></div>
+    })}</div>}</>}</>}<TelegramConnect telegramId={user.telegramId} busy={telegramBusy} onLink={linkTelegram} onRefresh={checkTelegram} /></div></section><aside className="side-column member-section member-section-ranking"><RankingBoard ranking={ranking} metric={ratingType} onMetric={setRatingType} userId={user.id} /></aside></SectionBoundary></div></div></div>
     <MemberBottomNav tab={tab} onChange={navigate} feedbackUnread={feedbackUnread} />
     {tab === "profile" && <MemberProfile loading={dataLoading} error={dataError} onRetry={() => void refreshData()} user={user} store={store} rank={currentRank} level={memberLevel} points={currentPoints} stars={store.starAwards.filter((award) => award.userId === user.id).reduce((sum, award) => sum + award.stars, 0)} telegramBusy={telegramBusy} onLinkTelegram={linkTelegram} onRefreshTelegram={checkTelegram} inviteUrl={inviteUrl} inviteBusy={inviteBusy} onCreateInvite={createInviteLink} onCopyInvite={copyInviteLink} onProfileSaved={(updated) => { setUser(mapAuthUserToUser(updated)); setToast("Профиль обновлён."); void refreshData(); }} onNotice={setToast} onOpenDone={openDoneTasks} onOpenRanking={() => navigate("ranking")} onUnlinkTelegram={unlinkMemberTelegram} onClose={closeProfile} onLogout={logout} />}
     {showLogin && <div className="modal-backdrop" onClick={() => setShowLogin(false)}><div className="simple-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowLogin(false)}>×</button><p className="eyebrow">Нужна идентификация</p><h2>Сначала представься</h2><p>Войди или создай аккаунт, чтобы отправить работу.</p><button className="primary-button full" onClick={() => { setShowLogin(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Перейти ко входу</button></div></div>}
-    {toast && <Toast message={toast} onClose={() => setToast("")} />}<PullToRefresh onRefresh={refreshAll} /><CelebrationWatcher userId={user.id} submissions={store.submissions} rank={currentRank} courseDone={Boolean(myEntry && memberLevel >= MAX_LEVEL && myEntry.points >= COURSE_MAX)} />
+    {toast && <Toast message={toast} onClose={() => setToast("")} />}<PullToRefresh onRefresh={refreshAll} /><CelebrationWatcher userId={user.id} submissions={store.submissions} rank={currentRank} />
     {showLevelUp && <LevelUpScreen level={showLevelUp} onTeam={() => closeLevelUp(true)} onClose={() => closeLevelUp(false)} />}
   </main><WelcomeVideoGate user={user} /></>;
 }

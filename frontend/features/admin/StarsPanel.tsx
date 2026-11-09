@@ -93,7 +93,7 @@ export function StarsPanel({ actorId, users, awards, onChange, onError }: Props)
       <div className="stars-admin-intro">
         <div>
           <h2>Награждение звёздами</h2>
-          <p>Starter · Classic · Premium. Каждая звезда = +20 XP (в опыт идут до 10 звёзд).</p>
+          <p>Starter · Classic · Premium. Звёзды суммируются в рейтинге.</p>
         </div>
       </div>
 

@@ -69,7 +69,7 @@ const launch = [
 
 const queue = [["ТА", "Тимур Ахметов", "Список контактов", "2 дня"], ["ОС", "Ольга Смирнова", "Видео о себе", "5 ч"], ["АБ", "Алия Бекова", "Первая встреча", "20 мин"]] as const;
 const funnel = [["Видео о себе", 46], ["Гайд по старту", 41], ["Список контактов", 33], ["Первая встреча", 24], ["Разбор встречи", 12]] as const;
-const ranking = [["1", "Алия Бекова", 212], ["2", "Руслан Ибраев", 198], ["3", "Ольга Смирнова", 174], ["4", "Вы", 160]] as const;
+const ranking = [["1", "Алия Бекова", 92], ["2", "Руслан Ибраев", 84], ["3", "Ольга Смирнова", 71], ["4", "Вы", 60]] as const;
 
 const memberPoints = [
   [icons.steps, "Шаг за шагом", "Следующий шаг программы открывается, когда пройден предыдущий."],
@@ -206,21 +206,21 @@ export function Landing() {
           <article className={styles.feature} data-reveal>
             <div className={styles.featureCopy}>
               <h3>Мотивация, которая работает без вас</h3>
-              <p>Мили за задания и звёзды за достижения складываются в опыт — до 300 XP. Рейтинг показывает, сколько XP до следующего места, а 300 XP открывают уровень «Капитан» с новыми заданиями и значком.</p>
+              <p>Мили за задания и звёзды за достижения — два рейтинга команды. Рейтинг показывает, сколько миль до следующего места, а 100 миль открывают уровень «Капитан» с новыми заданиями и значком.</p>
             </div>
             <div className={`${styles.panel} ${styles.course}`} aria-hidden="true">
               <div className={styles.courseTop}>
                 <div className={styles.coinStage}>
                   <div className={styles.coin}>
                     <span className={styles.coinFace}><Mark className={styles.coinMark} /><small>Капитан</small></span>
-                    <span className={`${styles.coinFace} ${styles.coinBack}`}><b>300</b><small>XP</small></span>
+                    <span className={`${styles.coinFace} ${styles.coinBack}`}><b>100</b><small>миль</small></span>
                   </div>
                 </div>
                 <div className={styles.courseMeter}>
-                  <small>Опыт</small>
-                  <b>160 <span>из 300 XP</span></b>
-                  <i><b style={{ width: "53%" }} /></i>
-                  <small>До уровня «Капитан» — 140 XP</small>
+                  <small>Мили</small>
+                  <b>60 <span>из 100 миль</span></b>
+                  <i><b style={{ width: "60%" }} /></i>
+                  <small>До уровня «Капитан» — 40 миль</small>
                 </div>
               </div>
               <ol className={styles.ranking}>

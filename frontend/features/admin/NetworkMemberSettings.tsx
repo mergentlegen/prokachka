@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { NetworkMember } from "@/shared/domain/types";
 import { Avatar } from "@/frontend/shared/Avatar";
 import { buildNetworkTree, networkDescendantIds } from "@/frontend/shared/lib/network-tree";
-import { MAX_LEVEL, levelLabel } from "@/shared/domain/levels";
+import { LEVEL_UP_MILES, MAX_LEVEL, levelLabel } from "@/shared/domain/levels";
 import styles from "./NetworkMemberSettings.module.css";
 
 export type NetworkUserPatch = { parentUserId?: string | null; canReview?: boolean; canPublishTasks?: boolean; level?: number };
@@ -92,7 +92,7 @@ export function NetworkMemberSettings({ user, users, busy, onSave }: {
           {(user.level ?? 1) < MAX_LEVEL && <button type="button" className="button button-edit" disabled={busy} onClick={() => setPending({ kind: "level", level: (user.level ?? 1) + 1 })}>Перевести на {(user.level ?? 1) + 1}</button>}
         </span>
       </div>
-      <small className={styles.hint}>Сам переход происходит при 300 XP. Кнопки — для особых случаев.</small>
+      <small className={styles.hint}>На уровень 2 участник переходит сам при {LEVEL_UP_MILES} милях. Кнопки — для особых случаев.</small>
     </div>
     <div className={styles.switches}>
       {(Object.keys(permissions) as Permission[]).map((key) => <label className={styles.switch} key={key}>

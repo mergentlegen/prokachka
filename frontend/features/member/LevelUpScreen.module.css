@@ -4,7 +4,6 @@
 .close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 2; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #ffffff1a; color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
 .content { position: relative; display: grid; justify-items: center; gap: 14px; max-width: 520px; text-align: center; }
 .badge { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 18px; border-radius: 99px; background: linear-gradient(135deg, #f3d48e, #d69a2c); color: #3b2a07; font-family: 'Manrope', system-ui, sans-serif; font-size: 16px; font-weight: 800; box-shadow: 0 10px 30px #d69a2c55; animation: pop .6s cubic-bezier(.2, 1.4, .4, 1) .15s both; }
-.course { margin: 6px 0 0; color: #b9c8e8; font-size: 14px; font-weight: 600; }
 .content h2 { margin: 0; font-family: 'Manrope', system-ui, sans-serif; font-size: clamp(28px, 6vw, 40px); font-weight: 800; line-height: 1.15; letter-spacing: -.02em; text-wrap: balance; }
 .text { margin: 0; color: #e3eaf8; font-size: 18px; line-height: 1.5; text-wrap: balance; }
 .team { min-height: 54px; margin-top: 10px; padding: 0 28px; border: 0; border-radius: 14px; background: #fff; color: var(--navy); font-family: 'Manrope', system-ui, sans-serif; font-size: 17px; font-weight: 800; cursor: pointer; box-shadow: 0 12px 32px #0006; }

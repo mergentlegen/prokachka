@@ -9,6 +9,9 @@ begin
   insert into public.users(id,name,first_name,last_name,email,login,password_hash,role,team_id)
     values (mentor_id,'Mentor','Mentor','Test',mentor_id||'@test.invalid',mentor_id::text,'test','admin',team_id),
       (member_id,'Member','Member','Test',member_id||'@test.invalid',member_id::text,'test','member',team_id);
+  -- 25000 miles would move the member to level 2 (tests/levels-100-miles.sql checks that); here a mentor's «вернуть»
+  -- keeps them on level 1, because older migrations replayed before this test do not know the level-up message.
+  insert into public.member_levels(user_id,level,revoked_at) values(member_id,2,now());
 
   insert into public.tasks(team_id,title,description,max_points,publication_type)
     values(team_id,'Large reward','Test task',25000,'evergreen') returning id into task_key;

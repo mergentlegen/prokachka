@@ -42,7 +42,7 @@ test('missing production account cannot reuse an old signed session', async () =
 test('teamless account cannot trigger globally scoped rating queries', async () => {
   const controller = load('backend/controllers/ranking.controller.ts', {
     [currentKey]: { getCurrentUser: async () => ({ id: 'member', role: 'member' }) },
-    '@/backend/services/ranking.service': { findCourseStandings: () => assert.fail('global read'), findPendingLevelUp: () => assert.fail('global read'), markMemberLevelSeen: () => assert.fail('global write') },
+    '@/backend/services/ranking.service': { findRanking: () => assert.fail('global read'), findStarRanking: () => assert.fail('global read'), findMemberLevel: () => assert.fail('global read'), markMemberLevelSeen: () => assert.fail('global write') },
   });
   const response = await controller.listRanking(req());
   assert.equal(response.status, 200);
@@ -53,12 +53,13 @@ test('ranking passes explicit fresh team scope and does not silently hide query 
   const controller = load('backend/controllers/ranking.controller.ts', {
     [currentKey]: { getCurrentUser: async () => ({ id: 'member', role: 'member', teamId: 'fresh' }) },
     '@/backend/services/ranking.service': {
-      findCourseStandings: async (scope) => { calls.push(scope); return { error: new Error('DB unavailable') }; },
-      findPendingLevelUp: async () => null, markMemberLevelSeen: async () => ({ data: true }),
+      findRanking: async (scope) => { calls.push(scope); return { error: new Error('DB unavailable') }; },
+      findStarRanking: async (scope) => { calls.push(scope); return { data: [] }; },
+      findMemberLevel: async () => ({ level: 1, levelUp: null }), markMemberLevelSeen: async () => ({ data: true }),
     },
   });
   assert.equal((await controller.listRanking(req())).status, 500);
-  assert.deepEqual(calls, [{ kind: 'team', teamId: 'fresh' }]);
+  assert.deepEqual(calls, [{ kind: 'team', teamId: 'fresh' }, { kind: 'team', teamId: 'fresh' }]);
 });
 test('teamless mentor is rejected by both request controller and service before any DB operation', async () => {
   const actor = { id: 'mentor', role: 'admin' };
