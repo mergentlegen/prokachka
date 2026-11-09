@@ -70,7 +70,7 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     key: "captain-cruise", title: CAPTAIN_CRUISE_TITLE, eyebrow: "Тренажёр поиска круиза",
     description: "Пройди путь от поиска до выбора каюты: направления, линии, даты, пассажиры и цена. Затем покажи настоящий круиз наставнику.",
     badge: "Без дедлайна", taskCount: 1,
-    tasks: [{ title: CAPTAIN_CRUISE_TITLE, description: "Пройди тренировку и получи 19 миль. Найди круиз в своём кабинете inCruises и отправь скриншот наставникам через Telegram — ещё 1 миля автоматически.", maxPoints: CAPTAIN_CRUISE_REWARD, publicationType: "evergreen", interactiveKind: "captain-cruise" }],
+    tasks: [{ title: CAPTAIN_CRUISE_TITLE, description: "Пройди тренировку и получи 9 миль. Найди круиз в своём кабинете inCruises и отправь скриншот наставникам через Telegram — ещё 1 миля автоматически.", maxPoints: CAPTAIN_CRUISE_REWARD, publicationType: "evergreen", interactiveKind: "captain-cruise" }],
   },
   {
     key: "count-your-dream", title: "Посчитай свою мечту", eyebrow: "Интерактивный расчёт мечты",

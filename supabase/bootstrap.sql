@@ -59,3 +59,4 @@
 \ir 20261109-voice-answers-flow.sql
 \ir 20261110-starter-rules-xp.sql
 \ir 20261111-production-parity.sql
+\ir 20261112-captain-cruise-v2.sql

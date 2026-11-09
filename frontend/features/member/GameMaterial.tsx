@@ -55,7 +55,7 @@ export function CaptainCruiseMaterial({ onBack }: { onBack: () => void }) {
       <ol className={styles.answers}>{CAPTAIN_STAGES.filter((stage) => stage.options.length > 0).map((stage) => <li key={stage.title}><b>{stage.title}</b><span>{stage.explanation}</span></li>)}</ol>
     </Section>
     <Section title="Круизные линии клуба">
-      <ul className={styles.rows}>{CRUISE_LINES.map(([name, premium, text]) => <li key={name}><b>{name}{premium && <span className={styles.tag}>👑 премиум</span>}</b><span>{text}</span></li>)}</ul>
+      <ul className={styles.rows}>{CRUISE_LINES.map(([name, mark, text]) => <li key={name}><b>{name}{mark === "crown" ? <span className={styles.tag}>👑 премиум</span> : mark === "river" && <span className={styles.tag}>🌊 речные</span>}</b><span>{text}</span></li>)}</ul>
     </Section>
     <Section title="Как читать карточку круиза">
       <ul className={styles.rows}>{CRUISE_CARD_ROWS.map(([key, icon, label, text]) => <li key={key}><b>{icon} {label}</b><span>{text}</span></li>)}</ul>

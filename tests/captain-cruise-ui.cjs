@@ -8,7 +8,7 @@ if (!artifacts) throw new Error('Set a temporary PROKACHKA_UI_ARTIFACT_DIR');
 fs.mkdirSync(artifacts, { recursive: true });
 const base = process.env.PROKACHKA_UI_BASE || 'http://localhost:3107', title = 'Капитан ищет свой круиз';
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
-const keys = [0,2,1,1,2,-1,-1,1,1,1,2,1,1,1,0], weights = [2,1,1,1,1,1,2,1,1,1,1,1,1,3,1];
+const keys = [0,2,1,1,1,2,-1,-1,1,1,1,2,1,1,1,0], weights = [1,0,0,0,0,2,1,0,0,1,0,1,0,1,1,1];
 (async () => {
   // Production rejects localhost Host. Resolve its allowed hostname locally,
   // inside this browser only, keeping every API and Telegram interaction mocked.
@@ -21,7 +21,7 @@ const keys = [0,2,1,1,2,-1,-1,1,1,1,2,1,1,1,0], weights = [2,1,1,1,1,1,2,1,1,1,1
       const sourcePage = await reference.newPage();
       await sourcePage.goto(require('node:url').pathToFileURL(process.env.PROKACHKA_CAPTAIN_REFERENCE).href);
       for (const name of ['intro','home','search','lines','dest','card','cruise','guests','cabin','twist']) {
-        await sourcePage.evaluate(name => { S.screen = name; S.dir = 'Европа'; S.phase = 3; S.miles = 19; render(); }, name);
+        await sourcePage.evaluate(name => { S.screen = name; S.dir = 'Европа'; S.phase = 3; S.miles = 9; render(); }, name);
         await sourcePage.screenshot({ path: path.join(artifacts, 'original-'+name+'-375.png'), fullPage: true });
       }
       await reference.close();
@@ -36,7 +36,7 @@ const keys = [0,2,1,1,2,-1,-1,1,1,1,2,1,1,1,0], weights = [2,1,1,1,1,1,2,1,1,1,1
       if (!url.pathname.startsWith('/api/')) return route.continue();
       const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
       if (url.pathname === '/api/auth/session') return json(200, { user: { id: id(100), name: 'Участник Тест', role: 'member', teamId: id(200), parentUserId: id(300), telegramId: linked ? '111' : undefined } });
-      if (url.pathname === '/api/tasks') return json(200, { tasks: [{ id: id(1), title, description: 'Поиск круиза, 19 + 1 миля.', team_id: id(200), is_active: true, publication_type: 'evergreen', interactive_kind: 'captain-cruise', max_points: 20, created_at: '2026-09-27T10:00:00Z' }] });
+      if (url.pathname === '/api/tasks') return json(200, { tasks: [{ id: id(1), title, description: 'Поиск круиза, 9 + 1 миля.', team_id: id(200), is_active: true, publication_type: 'evergreen', interactive_kind: 'captain-cruise', max_points: 10, created_at: '2026-09-27T10:00:00Z' }] });
       if (url.pathname === '/api/submissions') return json(200, { submissions });
       if (url.pathname === '/api/telegram/link') { linked = true; return json(200, { linked: false, url: 'https://t.me/fixture_bot?start=link_fixture' }); }
       if (url.pathname.includes('/ready-programs/') && url.pathname.endsWith('/attempt')) {
@@ -48,7 +48,7 @@ const keys = [0,2,1,1,2,-1,-1,1,1,1,2,1,1,1,0], weights = [2,1,1,1,1,1,2,1,1,1,1
           if (correct) { attempt.index++; attempt.trainingPoints += weights[body.index]; if (body.payload.direction) attempt.direction = body.payload.direction; if (body.payload.guests) attempt.guests = body.payload.guests; }
         }
         if (body.operation === 'retry') attempt.failed = false;
-        if (body.operation === 'finish') { assert.equal(attempt.index, 15); assert.equal(submissions.length, 0); const s = { id: id(10), user_id: id(100), task_id: id(1), points: 19, status: 'accepted', submission_source: 'interactive', interactive_completed: false, created_at: new Date().toISOString() }; submissions.push(s); attempt = { ...attempt, trainingDone: true, earnedPoints: 19, submission: s }; }
+        if (body.operation === 'finish') { assert.equal(attempt.index, 16); assert.equal(submissions.length, 0); const s = { id: id(10), user_id: id(100), task_id: id(1), points: 9, status: 'accepted', submission_source: 'interactive', interactive_completed: false, created_at: new Date().toISOString() }; submissions.push(s); attempt = { ...attempt, trainingDone: true, earnedPoints: 9, submission: s }; }
         if (['save-details','telegram-link'].includes(body.operation)) attempt.details = body.payload.details;
         if (body.operation === 'telegram-link') return linked ? json(200, { url: 'https://t.me/fixture_bot?start=captain_fixture' }) : json(422, { message: 'Сначала привяжите свой Telegram.' });
         return json(200, { attempt });
@@ -80,37 +80,37 @@ const keys = [0,2,1,1,2,-1,-1,1,1,1,2,1,1,1,0], weights = [2,1,1,1,1,1,2,1,1,1,1
     await screen('search'); await layouts('captain-search');
     await button('Поиск').click(); await screen('search'); assert.equal(attempt.index, 2);
     await button('Круизная линия').click(); await screen('lines'); await layouts('captain-lines');
-    assert.equal(await simulator.locator('button').filter({ hasText: /ⓘ/ }).count(), 14);
-    await button(/Disney Cruise Line/).click(); await page.getByRole('status').filter({hasText:'герои Disney'}).waitFor();
-    await button('Я посчитал(а) →').click(); for (const index of [2,3,4]) await quiz(index);
+    assert.equal(await simulator.locator('button').filter({ hasText: /ⓘ/ }).count(), 15);
+    await button(/AmaWaterways/).click(); await page.getByText(/Речные круизы: путешествие по рекам/).waitFor(); await layouts('captain-lines-open');
+    await button('Я посчитал(а) →').click(); for (const index of [2,3,4,5]) await quiz(index);
     await button('Круизное направление').click(); await screen('dest'); await layouts('captain-directions');
     await page.getByRole('searchbox').fill('Европа'); assert.equal(await simulator.locator('button').filter({ hasText: /^Европа$/ }).count(), 1);
     await button('Европа').click(); await button('Поиск').click(); await screen('card');
-    await button('7 Nights Western Mediterranean From Civitavecchia (Rome)').click(); assert.equal(attempt.index, 6);
+    await button('7 Nights Western Mediterranean From Civitavecchia (Rome)').click(); assert.equal(attempt.index, 7);
     const rows = simulator.locator('button[class*="info"],button[class*="price"]');
     assert.equal(await rows.count(), 6);
     for (let j = 0; j < 6; j++) await rows.nth(j).click();
     await page.getByRole('button', {name:'7 Nights Western Mediterranean From Civitavecchia (Rome)', exact:true}).waitFor();
     await layouts('captain-card');
-    await button('7 Nights Western Mediterranean From Civitavecchia (Rome)').click(); await quiz(7); await quiz(8); await screen('cruise');
-    await button('Book Cruise').click(); await screen('cruise'); assert.equal(attempt.index, 9); await layouts('captain-cruise');
+    await button('7 Nights Western Mediterranean From Civitavecchia (Rome)').click(); await quiz(8); await quiz(9); await screen('cruise');
+    await button('Book Cruise').click(); await screen('cruise'); assert.equal(attempt.index, 10); await layouts('captain-cruise');
     const categories = simulator.locator('button[class*="cat"]');
     for (let j = 0; j < 4; j++) await categories.nth(j).click();
-    await quiz(9); await button('Проверь себя').click(); await quiz(10); await button('Book Cruise').click(); await screen('guests');
+    await quiz(10); await button('Проверь себя').click(); await quiz(11); await button('Book Cruise').click(); await screen('guests');
     await button('Добавить: Дети и подростки').click(); await button('Добавить: Дети и подростки').click(); await layouts('captain-guests');
-    await button('Продолжить →').click(); await quiz(11); await quiz(12); await screen('cabin'); await quiz(13); await layouts('captain-cabin');
+    await button('Продолжить →').click(); await quiz(12); await quiz(13); await screen('cabin'); await quiz(14); await layouts('captain-cabin');
     assert.equal(submissions.length, 0);
     await button(/Deluxe Ocean View/).click(); await screen('twist');
-    await page.getByText('19 ✈️ миль', {exact:true}).waitFor(); assert.equal(attempt.trainingPoints, 19); assert.equal(submissions.length, 1); await layouts('captain-final');
+    await page.getByText('9 ✈️ миль', {exact:true}).waitFor(); assert.equal(attempt.trainingPoints, 9); assert.equal(submissions.length, 1); await layouts('captain-final');
     await page.getByLabel('Круизная линия', { exact: true }).fill('MSC Cruises'); await page.getByLabel('Цена за всех', { exact: true }).fill('$5,564.48');
-    await button('📤 Отправить наставнику · +1 миля').click(); await button('Привязать Telegram').waitFor();
+    await button('📤 Отправить наставнику · +1 ✈️').click(); await button('Привязать Telegram').waitFor();
     await button('Привязать Telegram').click(); await page.getByRole('heading', { name: 'Fake Telegram' }).waitFor();
-    assert.equal(attempt.earnedPoints, 19); await open();
+    assert.equal(attempt.earnedPoints, 9); await open();
     assert.equal(await page.getByLabel('Круизная линия', { exact: true }).inputValue(), 'MSC Cruises');
-    await button('📤 Отправить наставнику · +1 миля').click(); await page.getByRole('heading', { name: 'Fake Telegram' }).waitFor();
-    assert.deepEqual(visits, ['link_fixture','captain_fixture']); assert.equal(submissions.length, 1); assert.equal(submissions[0].points, 19);
-    attempt.screenshotSent = true; attempt.earnedPoints = 20; submissions[0].points = 20; submissions[0].interactive_completed = true;
-    await open(); await page.getByText('20 ✈️ миль', { exact: true }).waitFor(); assert.equal(await button('📤 Отправить наставнику · +1 миля').count(), 0);
-    assert.deepEqual(errors, []); console.log('Captain UI: original simulator screens, gated practice, manual retry, 5 widths, resume, Telegram linking and 19+1 passed.');
+    await button('📤 Отправить наставнику · +1 ✈️').click(); await page.getByRole('heading', { name: 'Fake Telegram' }).waitFor();
+    assert.deepEqual(visits, ['link_fixture','captain_fixture']); assert.equal(submissions.length, 1); assert.equal(submissions[0].points, 9);
+    attempt.screenshotSent = true; attempt.earnedPoints = 10; submissions[0].points = 10; submissions[0].interactive_completed = true;
+    await open(); await page.getByText('10 ✈️ миль', { exact: true }).waitFor(); assert.equal(await button('📤 Отправить наставнику · +1 ✈️').count(), 0);
+    assert.deepEqual(errors, []); console.log('Captain UI: original simulator screens, gated practice, manual retry, 5 widths, resume, Telegram linking and 9+1 passed.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

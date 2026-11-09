@@ -41,7 +41,7 @@ test('simulator games open a reading page built from their own data', () => {
   const captain = render('CaptainCruiseMaterial');
   assert.match(captain, /Disney Cruise Line/);
   assert.match(captain, /Сколько круизных линий в клубе\?/);
-  assert.match(captain, /Верно — 14 круизных линий/);
+  assert.match(captain, /Верно — 15 круизных линий/); assert.match(captain, /AmaWaterways 🌊 речные/);
   const safety = render('SafetyWatchMaterial');
   assert.match(safety, /Пускаем на борт\?/);
   assert.match(safety, /Правильно: ✅ Пустить/);

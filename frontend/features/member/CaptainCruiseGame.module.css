@@ -7,8 +7,7 @@
 .mrow .m{background:var(--navy);color:#fff;border-radius:20px;padding:5px 12px}
 .pbar{height:8px;background:#e5e7eb;border-radius:9px;overflow:hidden;margin-top:8px}
 .pbar i{display:block;height:100%;background:var(--orange);transition:width .4s}
-.coach{background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:12px 14px;margin:8px 0 12px;font-size:15px;line-height:1.45}
-.coach b{color:#c2410c}
+.tip{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;margin-top:14px;line-height:1.5;font-size:14px}
 .phone{border:2px solid #d1d5db;border-radius:26px;padding:10px;background:var(--bg)}
 .hdr{background:var(--navy);border-radius:18px;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 12px}
 .logo{display:flex;align-items:center;gap:4px;font-weight:800;font-size:19px}
@@ -42,6 +41,7 @@
 .row{padding:13px 4px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .row:last-child{border-bottom:0}
 .crown{background:#1f2937;color:#fff;border-radius:8px;padding:2px 8px;font-size:14px;margin-left:8px}
+.river{background:#dbeafe;border-radius:8px;padding:2px 8px;font-size:14px;margin-left:8px}
 .badge{background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap}
 .ok{color:var(--green);font-weight:700}
 .ship{height:120px;border-radius:14px;background:linear-gradient(#8fb8d8,#2b5f8a);display:grid;place-items:center;font-size:54px;position:relative}
@@ -142,14 +142,36 @@
 .opt:disabled { opacity:1; }
 .opt.correct { border-color:var(--green); background:#f0fdf4; }
 .failure { color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:12px; margin-top:12px; }
-.toast { opacity:1; bottom:max(22px,env(safe-area-inset-bottom)); max-width:min(88%,440px); }
+.toast { opacity:1; bottom:max(150px,env(safe-area-inset-bottom)); max-width:min(88%,440px); }
 .stars { color:#f5b301; font-size:24px; }
 .game .recap { text-align:left; line-height:1.6; }
 .game .note { font-size:13px; color:var(--muted); line-height:1.45; }
 .save { width:100%; border:0; background:transparent; color:var(--muted); padding:14px 0 0; text-decoration:underline; font:inherit; }
 .srOnly { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+/* Descriptions open right under the row that was tapped. */
+.game .sel { background:#fff7ed; }
+.row { border-radius:10px; padding-inline:8px; }
+.row .st { flex:none; }
+.row.seen .st { color:var(--green); font-weight:700; }
+.river { display:inline-block; }
+.desc { background:#fff7ed; border-left:3px solid var(--orange); border-radius:0 10px 10px 0; padding:10px 12px; margin:2px 0 8px 8px; font-size:15px; line-height:1.45; animation:descOpen .25s; }
+@keyframes descOpen { from { opacity:0; transform:translateY(-4px); } to { opacity:1; } }
+/* The task pinned to the bottom of the game, with «Покажи, куда нажать». */
+.taskbar { position:sticky; bottom:0; z-index:10; margin:16px -16px 0; background:#fff7ed; border-top:2px solid #fdba74; border-radius:18px 18px 0 0; box-shadow:0 -6px 20px rgba(15,23,42,.12); padding:12px 16px max(12px,env(safe-area-inset-bottom)); }
+.taskbar.taskDone { background:#f0fdf4; border-color:#86efac; }
+.tt { font-size:15px; line-height:1.4; }
+.tt b { color:#c2410c; }
+.taskDone .tt b { color:#15803d; }
+.tb { display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:10px; }
+.dots { font-size:13px; color:var(--muted); letter-spacing:1px; }
+.dots b { color:var(--navy); letter-spacing:0; }
+.show { background:var(--navy); color:#fff; border:0; border-radius:10px; padding:8px 12px; font-size:14px; font-weight:600; white-space:nowrap; margin-left:auto; min-height:40px; }
+.taskDone .show { background:#22c55e; }
+.flash { animation:flash .6s 3; outline:3px solid var(--orange); outline-offset:2px; }
+@keyframes flash { 50% { outline-color:transparent; } }
 @media(max-width:360px) {
+ .taskbar { margin-inline:-10px; padding-inline:10px; } .show { padding-inline:8px; font-size:13px; }
  .wrap { padding-inline:10px; } .phone { padding:8px; } .hdr { padding:10px 8px; } .icons { gap:3px; } .logo { font-size:17px; } .ic,.av { width:28px; height:30px; } .profile { width:80px; height:80px; }
  .card { padding:12px; } .cnt { padding:10px; } .cnt strong { font-size:15px; } .cnt .muted { font-size:13px; } .ctl { gap:5px; } .mrow { font-size:13px; } .m { padding:5px 8px; } .grid3 { gap:5px; } .tile { font-size:12px; padding-inline:3px; }
 }
-@media(prefers-reduced-motion:reduce) { .pbar i { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .pbar i { transition:none; } .desc,.flash { animation:none; } }
