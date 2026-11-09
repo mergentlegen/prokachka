@@ -1,4 +1,4 @@
-// Compresses one uploaded task video per run. Node 22+, no npm dependencies; needs ffmpeg and ffprobe.
+// Compresses one uploaded task video per run. Node 24+, no npm dependencies; needs ffmpeg and ffprobe.
 // Run every minute from cron under flock:
 //   node --env-file=/etc/prokachka/prokachka.env scripts/process-task-videos.cjs
 // Works at the lowest CPU priority on one thread so the site stays fast. Never logs URLs or keys.

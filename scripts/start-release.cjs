@@ -5,7 +5,7 @@ const { parseEnv } = require('node:util');
 function validateRuntime(metadata, env, ci = false) {
   if (metadata.platform !== process.platform || metadata.arch !== process.arch ||
       metadata.nodeMajor !== Number(process.versions.node.split('.')[0])) {
-    throw new Error('Release requires the same OS, architecture and Node.js major as CI (Linux x64, Node 22).');
+    throw new Error('Release requires the same OS, architecture and Node.js major as CI (Linux x64, Node 24).');
   }
   if (!/^[a-f0-9]{40}-\d+-\d+$/.test(metadata.release || '')) throw new Error('Invalid release ID');
   if (ci) return;

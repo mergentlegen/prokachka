@@ -114,8 +114,14 @@ test('JSON limits count actual bytes, reject malformed objects, and terminate st
 test('multipart limits reject oversized bodies without Content-Length and preserve valid forms', async () => {
   const { readLimitedFormData } = load('backend/http/form-data.ts');
   const form = new FormData(); form.set('file', new Blob(['%PDF-' + 'x'.repeat(512)], { type: 'application/pdf' }), 'test.pdf');
-  await assert.rejects(() => readLimitedFormData(new Request('http://localhost', { method: 'POST', body: form }), 128), error => error.status === 413);
-  const result = await readLimitedFormData(new Request('http://localhost', { method: 'POST', body: form }), 4096);
+  // The form goes in as ready bytes, like an upload from the network: a FormData body in Node 24's
+  // own fetch keeps writing after the reader stops and crashes the test (ERR_INVALID_STATE).
+  const encoded = new Response(form);
+  const headers = { 'content-type': encoded.headers.get('content-type') };
+  const bytes = new Uint8Array(await encoded.arrayBuffer());
+  const upload = () => new Request('http://localhost', { method: 'POST', body: bytes, headers });
+  await assert.rejects(() => readLimitedFormData(upload(), 128), error => error.status === 413);
+  const result = await readLimitedFormData(upload(), 4096);
   assert.equal(result.get('file').name, 'test.pdf');
 });
 

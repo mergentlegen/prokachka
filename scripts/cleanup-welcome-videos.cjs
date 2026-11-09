@@ -1,4 +1,4 @@
-// Node 22+, no npm dependencies. Use the production env file; never log URLs/tokens.
+// Node 24+, no npm dependencies. Use the production env file; never log URLs/tokens.
 // node --env-file=/var/www/prokachka/.env.production scripts/cleanup-welcome-videos.cjs
 async function cleanup({ env = process.env, request = fetch } = {}) {
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
