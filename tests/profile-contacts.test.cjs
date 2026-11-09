@@ -58,7 +58,6 @@ test('the profile shows four stat tiles and no programs, miles statement or task
     './MemberProfile.module.css': new Proxy({}, { get: (_target, key) => key }),
     '@/frontend/shared/ModalSheet': { ModalSheet: pass },
     '@/frontend/shared/SectionBoundary': { SectionBoundary: pass },
-    '@/frontend/features/telegram/TelegramConnect': { TelegramConnect: () => null },
     '@/frontend/shared/api/profile-client': { loadProfileExtras: async () => ({}) },
   });
   const store = {
@@ -77,6 +76,40 @@ test('the profile shows four stat tiles and no programs, miles statement or task
   assert.match(markup, /<strong>1<\/strong><span>выполнено<\/span>/, 'only accepted work counts');
   assert.match(markup, /<strong>2<\/strong><span>звезды<\/span>/);
   assert.doesNotMatch(markup, /Мои программы|Откуда мои мили|История заданий/);
+});
+
+test('the profile below the stats: three newest stars, an invite card, settings rows and a quiet logout', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const pass = ({ children }) => React.createElement(React.Fragment, null, children);
+  const { MemberProfile } = loadTs('frontend/features/member/MemberProfile.tsx', {
+    './MemberProfile.module.css': new Proxy({}, { get: (_target, key) => key }),
+    '@/frontend/shared/ModalSheet': { ModalSheet: pass },
+    '@/frontend/shared/SectionBoundary': { SectionBoundary: pass },
+    '@/frontend/shared/api/profile-client': { loadProfileExtras: async () => ({}) },
+  });
+  const award = (id, stars, day) => ({ id, userId: 'me', stars, kind: 'classic', mentorName: 'Асель', comment: '', createdAt: `2026-10-${day}T10:00:00Z` });
+  const store = { tasks: [], programs: [], programProgress: [], users: [], announcements: [], submissions: [],
+    starAwards: [award('a', 1, '01'), award('b', 2, '05'), award('c', 2, '09'), award('d', 5, '12')] };
+  const render = (props) => renderToStaticMarkup(React.createElement(MemberProfile, {
+    user: { id: 'me', name: 'Алия Бекова', role: 'member', teamId: 'team', telegramId: '42', createdAt: '2026-01-01' }, store, rank: 3, points: 90, stars: 10,
+    telegramBusy: false, onLinkTelegram() {}, onRefreshTelegram() {}, inviteUrl: 'https://prokachka.kz/?invite=abc', inviteBusy: false, onCreateInvite() {}, onCopyInvite() {},
+    onProfileSaved() {}, onNotice() {}, onOpenDone() {}, onOpenRanking() {}, onUnlinkTelegram() {}, onClose() {}, onLogout() {}, ...props,
+  }));
+  const markup = render();
+  assert.equal((markup.match(/<li><b>★/g) || []).length, 3, 'only the three newest awards at first');
+  assert.match(markup, /Показать все \(4\)/);
+  assert.ok(markup.indexOf('★ 5') < markup.indexOf('★ 2'), 'newest first');
+  assert.match(markup, /aria-label="Редактировать профиль"/, 'the edit button keeps its full name for screen readers');
+  assert.match(markup, /До уровня «Капитан» — 10 миль/);
+  assert.match(markup, /Пригласить в команду[\s\S]*value="https:\/\/prokachka.kz\/\?invite=abc"[\s\S]*Копировать[\s\S]*Поделиться[\s\S]*QR-код/);
+  assert.match(markup, /aria-label="Настройки"[\s\S]*Telegram[\s\S]*Подключён[\s\S]*Отвязать[\s\S]*Телефон[\s\S]*Пароль[\s\S]*Сменить/);
+  assert.match(markup, /<button type="button">Выйти из аккаунта<\/button>/);
+  assert.doesNotMatch(markup, /button-danger[^>]*>Выйти/, 'logout is no longer a big red block');
+  const unlinked = render({ user: { id: 'me', name: 'Алия Бекова', role: 'member', teamId: 'team', createdAt: '2026-01-01' }, inviteUrl: '' });
+  assert.match(unlinked, /Привязать[\s\S]*Проверить/);
+  assert.match(unlinked, /Получить ссылку/);
+  assert.doesNotMatch(render({ level: 2 }), /До уровня/);
 });
 
 test('unlinking Telegram works only for the signed-in account', async () => {
