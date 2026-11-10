@@ -184,6 +184,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/captain-cruise-v2.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261113-levels-100-miles.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/levels-100-miles.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261114-feedback-fast-access.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/feedback-fast-access.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |
