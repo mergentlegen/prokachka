@@ -92,10 +92,7 @@ export function FeedbackPanel({ viewerId, mentor = false, refreshKey = 0, select
     async function loadInbox() {
       try {
         if (mentor) {
-          const [{ threads }, { groups: loadedGroups }] = await Promise.all([
-            request<{ threads: Thread[] }>("/api/feedback?scope=mentor&view=inbox&filter=reply&offset=0", { cache: "no-store" }),
-            request<{ groups: TaskGroup[] }>("/api/feedback?scope=mentor&view=tasks&filter=all&offset=0", { cache: "no-store" }),
-          ]);
+          const { threads, groups: loadedGroups } = await request<{ threads: Thread[]; groups: TaskGroup[] }>("/api/feedback?scope=mentor&view=panel", { cache: "no-store" });
           if (!active) return;
           setWaiting({ items: threads, more: threads.length === PAGE });
           setGroups({ items: loadedGroups, more: loadedGroups.length === PAGE });

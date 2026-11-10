@@ -62,3 +62,4 @@
 \ir 20261112-captain-cruise-v2.sql
 \ir 20261113-levels-100-miles.sql
 \ir 20261114-feedback-fast-access.sql
+\ir 20261115-advisor-hardening.sql

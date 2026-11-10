@@ -26,9 +26,10 @@ function controller(user, calls) {
   return loadTs('backend/controllers/feedback.controller.ts', {
     '@/backend/http/current-user': { getCurrentUser: async () => user },
     '@/backend/services/feedback.service': {
-      countFeedback: async () => ({ data: {} }), listFeedback: async () => ({ data: [] }), listFeedbackTaskGroups: async () => ({ data: [] }),
+      countFeedback: async () => ({ data: {} }), listFeedback: async () => ({ data: [] }),
+      listFeedbackTaskGroups: async (_user, offset, onlyReply) => { calls.push(['tasks', offset, onlyReply]); return { data: [{ key: 't1' }] }; },
       listFeedbackForTask: async () => ({ data: [] }), getFeedback: async () => ({ data: {} }), sendFeedback: async () => ({ data: {} }), markFeedbackRead: async () => ({ data: true }),
-      listMentorThreads: async (_user, query, offset, onlyReply) => { calls.push(['inbox', query, offset, onlyReply]); return { data: [] }; },
+      listMentorThreads: async (_user, query, offset, onlyReply) => { calls.push(['inbox', query, offset, onlyReply]); return { data: [{ id: 'th1' }] }; },
       dismissFeedbackReply: async (threadId) => { calls.push(['dismiss', threadId]); return { data: true }; },
     },
     '@/backend/services/telegram-notifications.service': { scheduleTelegramDelivery: () => {} },
@@ -45,6 +46,24 @@ test('the waiting list and the name search across tasks are for mentors only', a
   const member = controller({ id, role: 'member', canReview: false }, []);
   assert.equal((await member.feedbackList(new Request('https://example.test/api/feedback?scope=mentor&view=inbox'))).status, 403);
   assert.equal((await member.feedbackList(new Request('https://example.test/api/feedback?view=inbox'))).status, 403);
+});
+
+test('the mentor panel opens with one request: the waiting list and the task cards together', async () => {
+  const calls = [];
+  const api = controller({ id, role: 'admin' }, calls);
+  const response = await api.feedbackList(new Request('https://example.test/api/feedback?scope=mentor&view=panel'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, threads: [{ id: 'th1' }], groups: [{ key: 't1' }] });
+  assert.deepEqual(calls.sort(), [['inbox', '', 0, true], ['tasks', 0, false]]);
+  const member = controller({ id, role: 'member', canReview: false }, []);
+  assert.equal((await member.feedbackList(new Request('https://example.test/api/feedback?scope=mentor&view=panel'))).status, 403);
+  assert.equal((await member.feedbackList(new Request('https://example.test/api/feedback?view=panel'))).status, 403);
+  const failing = loadTs('backend/controllers/feedback.controller.ts', {
+    '@/backend/http/current-user': { getCurrentUser: async () => ({ id, role: 'admin' }) },
+    '@/backend/services/feedback.service': { listMentorThreads: async () => ({ data: [] }), listFeedbackTaskGroups: async () => ({ error: { message: 'down' } }) },
+    '@/backend/services/telegram-notifications.service': { scheduleTelegramDelivery: () => {} },
+  });
+  assert.equal((await failing.feedbackList(new Request('https://example.test/api/feedback?scope=mentor&view=panel'))).status, 503);
 });
 
 test('«Ответ не нужен» is refused to participants and passed through for mentors', async () => {
@@ -95,8 +114,7 @@ test('mentor: who waits longest is listed with the wait, and the conversation ha
   const detail = { id: 'th1', taskId: 't1', taskTitle: 'Видео-приветствие', memberId: 'u2', memberName: 'Тимур Ахметов', people, needsReply: true, memberSeenSeq: 3,
     events: [event(1, 'submission', 'u2'), event(2, 'message', 'lead'), event(3, 'message', 'u2')] };
   const { harness, FeedbackPanel } = panel({
-    '/api/feedback?scope=mentor&view=inbox&filter=reply': { threads: [waitingThread] },
-    '/api/feedback?scope=mentor&view=tasks': { groups: [{ key: 't1', title: 'Видео-приветствие', participants: 3, needsReply: 1, unread: 1, lastAt: at(-DAY) }] },
+    '/api/feedback?scope=mentor&view=panel': { threads: [waitingThread], groups: [{ key: 't1', title: 'Видео-приветствие', participants: 3, needsReply: 1, unread: 1, lastAt: at(-DAY) }] },
     '/api/feedback/th1/read': { read: true },
     '/api/feedback/th1/dismiss': { dismissed: true },
     '/api/feedback/th1?scope=mentor': { thread: detail },

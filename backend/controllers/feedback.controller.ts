@@ -30,8 +30,14 @@ export async function feedbackList(request: Request) {
   const taskKey = params.get("taskKey");
   if (taskKey && !isUuid(taskKey)) return failure("Некорректное задание.", 400);
   const view = params.get("view");
-  if (view && view !== "tasks" && view !== "inbox") return failure("Некорректный вид списка.", 400);
+  if (view && view !== "tasks" && view !== "inbox" && view !== "panel") return failure("Некорректный вид списка.", 400);
   if ((view || taskKey) && scope !== "mentor") return denied();
+  if (view === "panel") {
+    // What the mentor panel shows on opening, in one answer: who waits for a reply and the task cards.
+    const [waiting, groups] = await Promise.all([listMentorThreads(user, "", 0, true), listFeedbackTaskGroups(user, 0, false)]);
+    if ("unavailable" in waiting || "error" in waiting || "unavailable" in groups || "error" in groups) return unavailable();
+    return ok({ threads: waiting.data, groups: groups.data });
+  }
   const onlyReply = params.get("filter") === "reply";
   const query = (params.get("q") || "").trim();
   if (query.length > 80) return failure("Слишком длинный поиск.", 400);

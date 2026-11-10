@@ -186,6 +186,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/levels-100-miles.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261114-feedback-fast-access.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/feedback-fast-access.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261115-advisor-hardening.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/advisor-hardening.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |
@@ -227,9 +229,19 @@ jobs:
           trap 'kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
           node "$SMOKE_DIR/scripts/smoke-test.cjs" http://127.0.0.1:3100 "$PROKACHKA_RELEASE_ID"
           kill -0 "$SERVER_PID"
+          # The same build in a real Chrome: landing, sign-in, participant feed. API answers are fixtures.
+          PROKACHKA_BROWSER_URL=http://127.0.0.1:3100 PROKACHKA_BROWSER_SHOTS=.next npm run test:browser
+          kill -0 "$SERVER_PID"
       - name: Print boot log on failure
         if: failure()
         run: test ! -f .next/smoke.log || cat .next/smoke.log
+      - name: Keep what the browser showed on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-failure-${{ github.run_attempt }}
+          path: .next/browser-failure-*.png
+          if-no-files-found: ignore
       - name: Upload the tested package
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
