@@ -101,7 +101,9 @@ test('the built site works in a real browser: landing, sign-in, participant feed
     // A guest sees the landing page with a way in.
     const guest = await openSite(browser);
     await guest.page.goto(ORIGIN + '/', { waitUntil: 'load' });
-    await guest.page.getByRole('heading', { level: 1, name: /Система обучения новичков/ }).waitFor();
+    await guest.page.getByRole('heading', { level: 1, name: /Новичок знает, что делать завтра/ }).waitFor();
+    // The product pictures are real files that load, not broken frames (the build adds its id after the name).
+    assert.ok(await guest.page.locator('img[src^="/landing/program.webp"]').first().evaluate((image) => image.complete && image.naturalWidth > 0), 'the first product screen did not load');
     assert.ok(await guest.page.locator('a[href*="auth="]').count() > 0, 'the landing page has no way to sign in or register');
     assert.deepEqual(guest.state.problems, [], 'the landing page has browser errors');
     await guest.close();

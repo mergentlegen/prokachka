@@ -53,6 +53,8 @@ const nextConfig: NextConfig = {
       // so they are cached for a while and quietly refreshed in the background, not forever.
       { source: "/fonts/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=604800" }] },
       { source: "/brand/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }] },
+      // The landing's product pictures: retaken under the same names when the interface changes.
+      { source: "/landing/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }] },
       // PDF attachments open in the browser's built-in viewer, which the page CSP (object-src 'none') can block.
       { source: "/api/tasks/:id/attachments/:attachmentId/:fileName*", headers: [
         { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
