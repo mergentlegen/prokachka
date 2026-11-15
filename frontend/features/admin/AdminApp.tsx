@@ -288,7 +288,8 @@ export function AdminApp() {
       // A copy keeps the deadline only while it is still ahead.
       hasDeadline: Boolean(source?.deadlineAt) && !(copyFrom && Date.parse(copyFrom.deadlineAt || "") <= Date.now()),
       deadline: copyFrom && Date.parse(copyFrom.deadlineAt || "") <= Date.now() ? "" : toLocalDateTime(source?.deadlineAt),
-      level: source?.level ?? 1,
+      // Separate tasks are for level 1 only; levels 2 and 3 have programs only.
+      level: 1,
       voiceAnswer: Boolean(source?.voiceAnswer),
     });
     setTaskAttachments(task?.attachments || []);
@@ -503,10 +504,10 @@ export function AdminApp() {
       const newStep = !modal.task && modal.program ? modal.program : null;
       let reopened = 0;
       const taskRecord = modal.task
-        ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, voiceAnswer: taskDraft.voiceAnswer, ...(modal.task.programId ? {} : { level: taskDraft.level }) })
+        ? await updateAdminTask(modal.task.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, voiceAnswer: taskDraft.voiceAnswer })
         : newStep
           ? await addProgramStep(newStep.id, { title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints }).then(async (added) => { reopened = added.reopened; return taskDraft.voiceAnswer ? updateAdminTask(added.task.id, { voiceAnswer: true }) : added.task; })
-          : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, level: taskDraft.level, voiceAnswer: taskDraft.voiceAnswer });
+          : await createAdminTask({ title, description, resourceUrl: taskDraft.resourceUrl.trim() || null, maxPoints, deadlineAt, level: 1, voiceAnswer: taskDraft.voiceAnswer });
       let saved: Task = { ...taskRecord, attachments: taskAttachments, video: modal.task?.video };
       for (let index = 0; index < taskFiles.length; index += 1) {
         try {

@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { ProgramModule, Submission, Task } from "@/shared/domain/types";
 import { loadMemberLevelArchive } from "@/frontend/shared/api/client";
-import { levelTitle } from "@/shared/domain/levels";
+import { levelHasOnlyPrograms, levelTitle } from "@/shared/domain/levels";
 import { plural } from "@/frontend/shared/lib/plural";
 import { ProgramModules } from "./ProgramModules";
 import { TaskCard } from "./TaskCard";
@@ -29,7 +29,10 @@ export function LevelArchive({ level, latest, onFeedback, onSubmit, onProgress }
   /** Sends a returned work again (opens Telegram). */ onSubmit: (task: Task) => Promise<void>; /** A returned test was sent again from the site. */ onProgress?: () => void }) {
   const [archive, setArchive] = useState<{ level: number; data: Archive } | null>(null);
   const [error, setError] = useState<{ level: number; message: string } | null>(null);
-  const [view, setView] = useState<"regular" | "programs">("regular");
+  const [chosenView, setView] = useState<"regular" | "programs">("regular");
+  // Level 2 and higher have programs only.
+  const onlyPrograms = levelHasOnlyPrograms(level);
+  const view = onlyPrograms ? "programs" : chosenView;
   const [programTab, setProgramTab] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -43,9 +46,9 @@ export function LevelArchive({ level, latest, onFeedback, onSubmit, onProgress }
   const steps = data ? data.tasks.filter((task) => task.publicationType === "sequential") : [];
   const card = (task: Task, inModule = false): ReactNode => <TaskCard key={task.id} task={task} submission={latest.get(task.id)} onSubmit={() => onSubmit(task)} onFeedback={onFeedback} onInteractiveProgress={onProgress} readOnly inModule={inModule} />;
   return <div className={styles.archive}>
-    <p className={styles.note}><span aria-hidden="true">📚</span>Архив уровня {level}: задания, программы, игры, видео и материалы можно пересмотреть. Новые ответы здесь не отправляются — только работы, которые наставник вернул на доработку.</p>
-    <div className="section-heading"><div><p className="eyebrow">Уровень {level} · архив</p><h2>Прошлые задания</h2></div>
-      <div className="task-switch"><button className={view === "regular" ? "active" : ""} onClick={() => setView("regular")}>Задания</button><button className={view === "programs" ? "active" : ""} onClick={() => setView("programs")}>Программы</button></div>
+    <p className={styles.note}><span aria-hidden="true">📚</span>Архив уровня {level}: {onlyPrograms ? "программы, видео и материалы" : "задания, программы, игры, видео и материалы"} можно пересмотреть. Новые ответы здесь не отправляются — только работы, которые наставник вернул на доработку.</p>
+    <div className="section-heading"><div><p className="eyebrow">Уровень {level} · архив</p><h2>{onlyPrograms ? "Прошлые программы" : "Прошлые задания"}</h2></div>
+      {!onlyPrograms && <div className="task-switch"><button className={view === "regular" ? "active" : ""} onClick={() => setView("regular")}>Задания</button><button className={view === "programs" ? "active" : ""} onClick={() => setView("programs")}>Программы</button></div>}
       {data && <span className="task-count">{view === "programs" ? `${data.programModules.length} ${plural(data.programModules.length, "программа", "программы", "программ")}` : `${regular.length} ${plural(regular.length, "задание", "задания", "заданий")}`}</span>}
     </div>
     {error?.level === level ? <p className={styles.empty}>{error.message}</p>

@@ -5,7 +5,6 @@ import type { Task, TaskAttachment } from "@/shared/domain/types";
 import type { QuizQuestion } from "@/shared/domain/task-quiz";
 import { MAX_MILES } from "@/shared/domain/miles";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
-import { LevelPicker } from "./LevelPicker";
 import { QuizEditor } from "./QuizEditor";
 import { TaskVideoField, taskVideoProblem } from "./TaskVideoField";
 import { MAX_TASK_PDFS, PdfFileList, addPdfFiles } from "./TaskFilePicker";
@@ -155,7 +154,7 @@ export function TaskEditorFields({ mode, value, onChange, materials, quiz, stepD
 
     <section className={styles.section} aria-label="Настройки">
       <SectionHead number={interactive ? 4 : 5} title="Настройки" />
-      {mode === "task" && <LevelPicker value={value.level} disabled={disabled} onChange={(level) => onChange("level", level)} />}
+      {mode === "task" && <p className={styles.levelNote}>Отдельные задания — для участников уровня 1. Для уровня 2 и выше создайте программу: там только программы.</p>}
       <div className={styles.choice} role="group" aria-label="Награда в милях">
         <span className={styles.choiceLabel}>Награда</span>
         <div className={styles.choiceOptions}>

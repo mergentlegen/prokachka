@@ -48,7 +48,3 @@
 /* Inside the catalog window: no frame of its own, the window is the frame. */
 .embedded { overflow:visible; border:0; border-radius:0; background:transparent; }
 .embeddedIntro { margin:0 0 4px; color:#5b6b85; font-size:14px; line-height:1.55; }
-/* Which level the game is for: chosen before adding, or changed while it is in the tasks. */
-.level { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:-8px 0 14px; color:#64748b; font-size:13px; font-weight:700; }
-.level select { min-height:40px; padding:6px 10px; border:1px solid #dde4f0; border-radius:9px; background:#fff; color:#25324a; font:inherit; font-size:14px; }
-.level select:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }

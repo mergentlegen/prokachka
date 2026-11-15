@@ -37,11 +37,12 @@ test('the editor has five blocks in the order the participant sees the task', ()
   assert.ok(order.every((index) => index > 0), 'all five blocks are there');
   assert.deepEqual([...order].sort((a, b) => a - b), order);
   for (const tile of ['<b>Видео</b>', '<b>PDF</b>', '<b>Ссылка</b>']) assert.ok(html.includes(tile), tile);
-  assert.match(html, /Для кого/);
+  assert.doesNotMatch(html, /Для кого/, 'a separate task is for level 1 only');
+  assert.match(html, /Отдельные задания — для участников уровня 1/);
   assert.match(html, /aria-pressed="true"[^>]*><b>10<\/b><small>миль/, 'miles are picked with ready buttons');
   assert.match(html, /<b>Без срока<\/b>/);
   const step = render({ mode: 'step', stepDeadlineHours: 72 });
-  assert.doesNotMatch(step, /Для кого/, 'a program step follows the program level');
+  assert.doesNotMatch(step, /Для кого|Отдельные задания — для участников/, 'a program step follows the program level');
   assert.match(step, /3 дня на шаг/);
   const withQuiz = render({ quiz: quiz([question]) });
   assert.match(withQuiz, /Только тест на сайте/);

@@ -47,3 +47,5 @@
   .choiceOptions { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .inlineField { max-width:none; }
 }
+/* A separate task is for level 1 only: levels 2 and 3 have programs only. */
+.levelNote { margin:0; padding:10px 12px; border-radius:10px; background:#f5f7fb; color:#44536b; font-size:13px; line-height:1.45; }

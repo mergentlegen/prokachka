@@ -2,6 +2,7 @@ import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 import { readyProgramByKey } from "@/shared/domain/ready-programs";
+import { levelHasOnlyPrograms } from "@/shared/domain/levels";
 import type { ReadyProgramKey, TaskInteractiveKind, TaskPublicationType } from "@/shared/domain/types";
 import { removeAttachmentPaths } from "@/backend/services/task-attachments.service";
 
@@ -35,13 +36,13 @@ export async function createProgram(input: ProgramInput) {
 export async function findReadyProgramPublications(teamId: string, audienceRootId: string | null = null) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const query = supabase.from("task_programs").select("id,template_key,is_active,publisher_id,audience_root_id,is_pinned,pinned_at,created_at,level").eq("team_id", teamId).not("template_key", "is", null);
+  const query = supabase.from("task_programs").select("id,template_key,is_active,publisher_id,audience_root_id,is_pinned,pinned_at,created_at").eq("team_id", teamId).not("template_key", "is", null);
   const result = await readPages((audienceRootId ? query.eq("audience_root_id", audienceRootId) : query.is("audience_root_id", null)).order("id"));
   return result.error ? { error: result.error } : { data: result.data || [] };
 }
 
-/** `level`: where the game lives (1–3). Left out, a new publication goes to level 1 and an existing one keeps its level. */
-export async function publishReadyProgram(input: { teamId: string; key: ReadyProgramKey; publisherId?: string; audienceRootId?: string | null; level?: number }) {
+/** Ready games live on level 1 only: from level 2 on there are programs only (a game can be a program step there). */
+export async function publishReadyProgram(input: { teamId: string; key: ReadyProgramKey; publisherId?: string; audienceRootId?: string | null }) {
   const template = readyProgramByKey(input.key);
   if (!template) return { validationError: "Готовая программа не найдена." };
   const supabase = getSupabaseAdmin();
@@ -57,9 +58,9 @@ export async function publishReadyProgram(input: { teamId: string; key: ReadyPro
     if (activated.error) return { error: activated.error };
     if (activated.data?.forbidden || !activated.data?.data) return { validationError: "У вас нет доступа к публикации в этой области." };
     let program = activated.data.data as Record<string, unknown>;
-    // Added again on another level: the game (and its step) moves there.
-    if (input.level && input.level !== Number(program.level ?? 1)) {
-      const moved = await supabase.rpc("app_set_program_level", { p_id: program.id, p_level: input.level, p_actor: input.publisherId || null, p_ceo: !input.publisherId });
+    // A publication left on a higher level comes back to level 1.
+    if (Number(program.level ?? 1) !== 1) {
+      const moved = await supabase.rpc("app_set_program_level", { p_id: program.id, p_level: 1, p_actor: input.publisherId || null, p_ceo: !input.publisherId });
       if (moved.error) return { error: moved.error };
       if (moved.data?.forbidden || !moved.data?.data) return { validationError: "У вас нет доступа к публикации в этой области." };
       program = moved.data.data as Record<string, unknown>;
@@ -81,7 +82,6 @@ export async function publishReadyProgram(input: { teamId: string; key: ReadyPro
     templateKey: template.key,
     publisherId: input.publisherId,
     audienceRootId: input.audienceRootId,
-    level: input.level ?? 1,
     tasks: template.tasks.map((task) => ({ ...task })),
   });
   if ("error" in result && result.error?.code === "23505") {
@@ -99,6 +99,11 @@ export async function updateProgram(id: string, changes: { title?: string; deadl
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const { level, ...input } = changes;
+  if (levelHasOnlyPrograms(level)) {
+    const current = await supabase.from("task_programs").select("template_key").eq("id", id).maybeSingle();
+    if (current.error) return { error: current.error };
+    if (current.data?.template_key) return { validationError: "Готовая игра — только для уровня 1. На уровне 2 и выше добавьте её шагом программы." };
+  }
   if (level !== undefined) {
     const moved = await supabase.rpc("app_set_program_level", { p_id: id, p_level: level, p_actor: actor.id === "ceo" ? null : actor.id, p_ceo: actor.role === "ceo" });
     if (moved.error) return { error: moved.error };

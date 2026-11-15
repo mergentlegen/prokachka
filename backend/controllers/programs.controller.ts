@@ -87,6 +87,7 @@ export async function patchProgram(request: Request, id: string) {
     const result = await updateProgram(id, { title: body.title, deadlineHours: body.deadlineHours === undefined ? undefined : Number(body.deadlineHours), isActive: body.isActive, isPinned: body.isPinned, level: body.level === undefined ? undefined : parseLevel(body.level) ?? undefined }, user);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("У вас нет доступа к этой программе.", 403);
+    if ("validationError" in result) return failure(String(result.validationError), 400);
     if (result.error) return failure("Не удалось обновить программу.");
     const title = typeof result.data?.title === "string" ? result.data.title : undefined;
     if (before && title && before.label !== title) await recordAudit(user, { action: "program.rename", targetId: id, targetLabel: title, teamId: before.teamId, details: { name: [before.label, title] } });

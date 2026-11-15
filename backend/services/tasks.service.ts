@@ -1,6 +1,7 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { validMiles } from "@/shared/domain/miles";
+import { levelHasOnlyPrograms } from "@/shared/domain/levels";
 import { descendants, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
 import { removeAttachmentPaths } from "@/backend/services/task-attachments.service";
 
@@ -40,6 +41,7 @@ export async function insertTask(input: Required<Pick<TaskInput, "title" | "desc
       return { forbidden: true as const };
     }
   }
+  if (!input.programId && levelHasOnlyPrograms(input.level)) return { validationError: "На уровне 2 и выше только программы: добавьте задание шагом программы." };
   const maxPoints = input.maxPoints === undefined ? 0 : Number(input.maxPoints);
   if (!validMiles(maxPoints)) return { validationError: "Некорректное количество миль." };
   const result = await supabase.from("tasks").insert({
@@ -70,6 +72,7 @@ export async function patchTask(id: string, input: TaskInput, actor?: TaskViewer
   if (current.data.interactive_kind && !gameStep) return { validationError: "Готовую игру нельзя изменять как обычное задание. Используйте каталог готовых заданий." };
   if (input.isPinned !== undefined && current.data.program_id) return { validationError: "Закрепляйте программу целиком." };
   if (input.level !== undefined && current.data.program_id) return { validationError: "Уровень шага задаётся программой." };
+  if (levelHasOnlyPrograms(input.level as number | undefined)) return { validationError: "На уровне 2 и выше только программы: добавьте задание шагом программы." };
   const patch: Record<string, unknown> = {};
   if (typeof input.title === "string") patch.title = input.title.trim();
   if (typeof input.description === "string") patch.description = input.description.trim();

@@ -57,7 +57,7 @@ test('the feed shows the tasks of the participant’s level; an earlier level op
   const current = await service.getMemberTaskFeed('m', 'team', '2026-01-01T00:00:00.000Z');
   assert.equal(current.level, 2);
   assert.equal(current.viewLevel, 2);
-  assert.deepEqual(current.data.map((task) => task.id).sort(), ['captain-step', 'two']);
+  assert.deepEqual(current.data.map((task) => task.id), ['captain-step'], 'level 2 has programs only: a separate task there is not shown');
   assert.deepEqual(inserted.map((row) => [row.program_id, row.unlocked_at]), [['captains', '2026-10-20T10:00:00.000Z']], 'a level 2 program starts on the day of level 2');
   inserted.length = 0;
   tables.member_program_progress = [];

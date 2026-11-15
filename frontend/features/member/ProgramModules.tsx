@@ -16,6 +16,8 @@ type Props = {
   renderTask: (task: Task) => ReactNode; onFeedback: (taskId: string) => void;
   /** An earlier level (the archive): every step opens for reading, also those never reached. */
   readAll?: boolean;
+  /** Shown when there are no programs. */
+  emptyText?: string;
 };
 
 function LockIcon() {
@@ -24,7 +26,7 @@ function LockIcon() {
 
 // Programs as modules: a block per program with its progress; a tap opens every step in order. Passed steps stay
 // with their miles, the current one is the usual task card, the next ones show only their title until the previous step is accepted.
-export function ProgramModules({ modules, tasks, passedTasks = [], latest, selectedId, onSelect, renderTask, onFeedback, readAll = false }: Props) {
+export function ProgramModules({ modules, tasks, passedTasks = [], latest, selectedId, onSelect, renderTask, onFeedback, readAll = false, emptyText = "Пока нет программ." }: Props) {
   const [openStep, setOpenStep] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
@@ -38,7 +40,7 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
     const timer = window.setTimeout(() => { if (head && head.getBoundingClientRect().top < 0) head.scrollIntoView({ block: "start", behavior: "smooth" }); }, 340);
     return () => window.clearTimeout(timer);
   }, [openId]);
-  if (!ordered.length) return <div className="empty-state"><span>◌</span><p>Пока нет программ.</p></div>;
+  if (!ordered.length) return <div className="empty-state"><span>◌</span><p>{emptyText}</p></div>;
   return <div ref={list} className={styles.modules}>
     {ordered.map((module) => {
       const states = programStepStates(module, latest);

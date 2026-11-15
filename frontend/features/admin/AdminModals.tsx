@@ -19,7 +19,7 @@ function editorSummary(draft: TaskDraft, step: boolean, stepDeadlineHours: numbe
   if (missing.length) return `Нужно заполнить: ${missing.join(", ")}`;
   const miles = formatMiles(Number(draft.maxPoints) || 0);
   if (step) return `${miles} · ${stepDeadlineHours ? `${deadlineLabel(stepDeadlineHours)} на шаг` : "срок программы"}`;
-  return `${miles} · ${draft.hasDeadline ? "с дедлайном" : "без срока"} · уровень ${draft.level}`;
+  return `${miles} · ${draft.hasDeadline ? "с дедлайном" : "без срока"}`;
 }
 
 export function TaskEditorModal({ taskId, task, program, programDeadlineHours, draft, editing, busy, busyLabel, attachments, files, onFilesChange, onRemoveAttachment, video, quiz, onChange, onClose, onSubmit, notice }: {

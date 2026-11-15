@@ -61,10 +61,10 @@ test('the archive feed lists every step of the level so their materials open; no
   assert.equal(archive.nextLevel, null, 'the level 2 hint is only for players');
 });
 
-test('players see what waits on level 2: names and numbers only', () => {
+test('players see what waits on level 2: program names and numbers only', () => {
   const { levelPreview } = loadTs('backend/services/member-progress.service.ts', serviceMocks);
-  const { levelPreviewText } = loadTs('shared/domain/levels.ts');
-  const now = Date.parse('2026-11-15T10:00:00Z');
+  const { levelPreviewText, levelHasOnlyPrograms } = loadTs('shared/domain/levels.ts');
+  assert.deepEqual([1, 2, 3].map(levelHasOnlyPrograms), [false, true, true]);
   const programs = [
     { id: 'cap', title: 'Капитанский старт', level: 2, is_active: true },
     { id: 'empty', title: 'Без шагов', level: 2, is_active: true },
@@ -75,23 +75,20 @@ test('players see what waits on level 2: names and numbers only', () => {
     ...[1, 2, 3, 4, 5, 6].map((position) => ({ id: 'c' + position, program_id: 'cap', publication_type: 'sequential', level: 2, position, description: 'секрет' })),
     { id: 'g', program_id: 'game', publication_type: 'evergreen', level: 2, interactive_kind: 'dream-plan' },
     { id: 'open', publication_type: 'evergreen', level: 2 },
-    { id: 'gone', publication_type: 'fixed', level: 2, deadline_at: '2026-11-01T00:00:00Z' },
-    { id: 'mine', publication_type: 'evergreen', level: 1 },
   ];
-  const preview = levelPreview(tasks, programs, () => true, now);
-  assert.deepEqual(preview, { level: 2, programs: [{ title: 'Капитанский старт', steps: 6 }], tasks: 2 });
+  const preview = levelPreview(tasks, programs, () => true);
+  assert.deepEqual(preview, { level: 2, programs: [{ title: 'Капитанский старт', steps: 6 }] }, 'separate tasks and games are not counted: level 2 has programs only');
   assert.doesNotMatch(JSON.stringify(preview), /секрет/, 'no content of level 2 leaks');
-  assert.equal(levelPreviewText(preview), 'программа «Капитанский старт» · 6 шагов и 2 задания');
-  assert.equal(levelPreviewText({ level: 2, programs: [], tasks: 1 }), '1 задание');
-  assert.equal(levelPreviewText({ level: 2, programs: [{ title: 'А', steps: 1 }, { title: 'Б', steps: 2 }, { title: 'В', steps: 3 }], tasks: 0 }), 'программа «А» · 1 шаг и ещё 2 программы');
-  assert.equal(levelPreview(tasks, programs, (row) => row.id !== 'cap' && row.program_id !== 'cap' && row.id !== 'open' && row.id !== 'game' && row.program_id !== 'game', now), null, 'another branch’s level 2 is not counted');
+  assert.equal(levelPreviewText(preview), 'программа «Капитанский старт» · 6 шагов');
+  assert.equal(levelPreviewText({ level: 2, programs: [{ title: 'А', steps: 1 }, { title: 'Б', steps: 2 }, { title: 'В', steps: 3 }] }), 'программа «А» · 1 шаг и ещё 2 программы');
+  assert.equal(levelPreview(tasks, programs, (row) => row.id !== 'cap' && row.program_id !== 'cap'), null, 'another branch does not count');
   assert.equal(levelPreviewText(null), '');
 });
 
 test('the score card of a player names what waits on level 2', () => {
   const { ScoreCard } = loadTs('frontend/features/member/ScoreCard.tsx');
   const card = (props) => renderToStaticMarkup(React.createElement(ScoreCard, { metric: 'points', miles: 40, stars: 0, rank: 2, level: 1, onOpenRanking() {}, ...props }));
-  assert.match(card({ nextLevel: { level: 2, programs: [{ title: 'Капитанский старт', steps: 6 }], tasks: 0 } }), /Там ждёт программа «Капитанский старт» · 6 шагов/);
+  assert.match(card({ nextLevel: { level: 2, programs: [{ title: 'Капитанский старт', steps: 6 }] } }), /Там ждёт программа «Капитанский старт» · 6 шагов/);
   assert.doesNotMatch(card(), /Там ждёт/);
 });
 
@@ -99,8 +96,8 @@ test('the level 2 hint reaches the member store only in a clean shape', () => {
   const source = fs.readFileSync('frontend/shared/api/client.ts', 'utf8');
   assert.match(source, /nextLevel: mapLevelPreview\(/);
   const { mapLevelPreview } = loadTs('frontend/shared/api/client.ts');
-  assert.deepEqual(mapLevelPreview({ level: 2, programs: [{ title: 'А', steps: 3 }, { title: 'Б', steps: 0 }, null], tasks: '2' }), { level: 2, programs: [{ title: 'А', steps: 3 }], tasks: 2 });
-  assert.equal(mapLevelPreview({ level: 2, programs: [], tasks: 0 }), undefined);
+  assert.deepEqual(mapLevelPreview({ level: 2, programs: [{ title: 'А', steps: 3 }, { title: 'Б', steps: 0 }, null], tasks: 2 }), { level: 2, programs: [{ title: 'А', steps: 3 }] });
+  assert.equal(mapLevelPreview({ level: 2, programs: [], tasks: 3 }), undefined);
   assert.equal(mapLevelPreview(null), undefined);
 });
 
@@ -205,70 +202,55 @@ test('mentors filter tasks and programs by level once there is more than one lev
   assert.match(panel, /useLevelFilter\(customPrograms\)/);
 });
 
-test('a ready game is published on the chosen level; adding it again on another level moves it', async () => {
+test('from level 2 on there are programs only: separate tasks and ready games stay on level 1', async () => {
   const calls = [];
-  let existing = null;
-  const query = { select() { return this; }, eq() { return this; }, is() { return this; }, not() { return this; }, order() { return this; },
-    async maybeSingle() { return { data: existing, error: null }; }, then(resolve) { resolve({ data: [{ id: 'task' }], error: null }); } };
-  const service = loadTs('backend/services/programs.service.ts', {
-    '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => ({ from: () => query,
-      rpc: async (name, args) => { calls.push([name, args]);
-        if (name === 'app_update_program') return { data: { data: { id: 'ready', level: 1 } }, error: null };
-        if (name === 'app_set_program_level') return { data: { data: { id: 'ready', level: args.p_level } }, error: null };
-        return { data: { program: { id: 'ready' }, tasks: [{ id: 'task' }] }, error: null }; } }) },
-    '@/backend/services/network.service': {}, '@/backend/infrastructure/supabase/read-pages': {},
-  });
-  await service.publishReadyProgram({ teamId: 'team', key: 'dream-plan', publisherId: 'mentor', level: 2 });
-  assert.equal(calls[0][0], 'app_create_program_level');
-  assert.equal(calls[0][1].p_level, 2);
-  calls.length = 0; existing = { id: 'ready', level: 1 };
-  const moved = await service.publishReadyProgram({ teamId: 'team', key: 'dream-plan', publisherId: 'mentor', level: 3 });
+  const found = []; // what the next lookups of a program row return, in order
+  const query = (table) => ({ table, select() { return this; }, eq() { return this; }, is() { return this; }, not() { return this; }, order() { return this; },
+    async maybeSingle() { return { data: found.shift() ?? null, error: null }; },
+    insert(row) { calls.push(['insert', row]); return { select: () => ({ single: async () => ({ data: row, error: null }) }) }; },
+    then(resolve) { resolve({ data: [{ id: 'task' }], error: null }); } });
+  const supabase = { from: (table) => query(table), rpc: async (name, args) => { calls.push([name, args]);
+    if (name === 'app_update_program') return { data: { data: { id: 'ready', level: 2 } }, error: null };
+    if (name === 'app_set_program_level') return { data: { data: { id: 'ready', level: args.p_level } }, error: null };
+    return { data: { program: { id: 'ready' }, tasks: [{ id: 'task' }] }, error: null }; } };
+  const mocks = { '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => supabase }, '@/backend/services/network.service': {}, '@/backend/infrastructure/supabase/read-pages': {}, '@/backend/services/task-attachments.service': {} };
+  const programs = loadTs('backend/services/programs.service.ts', mocks);
+  // A ready game is published on level 1; one left on a higher level comes back to level 1.
+  await programs.publishReadyProgram({ teamId: 'team', key: 'dream-plan', publisherId: 'mentor' });
+  assert.equal(calls[0][0], 'app_create_program', 'a new ready game goes to level 1');
+  calls.length = 0; found.push({ id: 'ready', level: 2 });
+  const back = await programs.publishReadyProgram({ teamId: 'team', key: 'dream-plan', publisherId: 'mentor' });
   assert.deepEqual(calls.map(([name]) => name), ['app_update_program', 'app_set_program_level']);
-  assert.equal(moved.data.program.level, 3);
-  calls.length = 0;
-  await service.publishReadyProgram({ teamId: 'team', key: 'dream-plan', publisherId: 'mentor' });
-  assert.deepEqual(calls.map(([name]) => name), ['app_update_program'], 'without a level the game keeps its level');
+  assert.equal(back.data.program.level, 1);
+  // A ready game cannot be moved to level 2; an ordinary program can.
+  calls.length = 0; found.push({ template_key: 'dream-plan' });
+  assert.match((await programs.updateProgram('ready', { level: 2 }, { id: 'mentor', role: 'admin', teamId: 'team' })).validationError, /только для уровня 1/);
+  assert.equal(calls.length, 0, 'nothing is moved');
+  found.push({ template_key: null });
+  await programs.updateProgram('custom', { level: 2 }, { id: 'mentor', role: 'admin', teamId: 'team' });
+  assert.equal(calls[0][0], 'app_set_program_level');
+  // A separate task cannot be created on level 2; on level 1 it can.
+  const tasks = loadTs('backend/services/tasks.service.ts', mocks);
+  assert.match((await tasks.insertTask({ title: 'Т', description: 'Д', teamId: 'team', level: 2 })).validationError, /только программы/);
+  assert.equal((await tasks.insertTask({ title: 'Т', description: 'Д', teamId: 'team', level: 1, maxPoints: 5 })).data.level, 1);
+  const source = fs.readFileSync('backend/services/tasks.service.ts', 'utf8');
+  assert.match(source, /if \(levelHasOnlyPrograms\(input\.level as number \| undefined\)\) return \{ validationError/, 'moving a separate task to level 2 is refused');
 });
 
-test('the ready games API checks the level', async () => {
-  const published = [];
-  const controller = loadTs('backend/controllers/ready-programs.controller.ts', {
-    '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'mentor', role: 'admin', teamId: '11111111-1111-4111-8111-111111111111' }) },
-    '@/backend/services/programs.service': { findReadyProgramPublications: async () => ({ data: [] }), publishReadyProgram: async (input) => { published.push(input); return { data: { program: { id: 'p' }, tasks: [] } }; } },
-  });
-  const post = (body) => controller.postReadyProgram(new Request('http://local/api/ready-programs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
-  assert.equal((await post({ key: 'dream-plan', level: 4 })).status, 400);
-  assert.equal((await post({ key: 'dream-plan', level: 2 })).status, 201);
-  assert.equal(published[0].level, 2);
-  await post({ key: 'dream-plan' });
-  assert.equal(published[1].level, undefined);
+test('the ready games catalog has no level choice; the programs API reports a refused move', () => {
+  const panel = fs.readFileSync('frontend/features/admin/ReadyProgramsPanel.tsx', 'utf8');
+  assert.doesNotMatch(panel, /<select|LEVELS/);
+  assert.doesNotMatch(fs.readFileSync('backend/controllers/ready-programs.controller.ts', 'utf8'), /level/);
+  assert.match(fs.readFileSync('backend/controllers/programs.controller.ts', 'utf8'), /"validationError" in result\) return failure\(String\(result\.validationError\), 400\)/);
 });
 
-test('ready games catalog: the level is chosen before adding and changes a published game at once', async () => {
-  const harness = hookHarness(), calls = [];
-  const { READY_PROGRAMS } = loadTs('shared/domain/ready-programs.ts');
-  let publication = null, props, tree;
-  const api = {
-    loadReadyPrograms: async () => READY_PROGRAMS.map(({ tasks: _tasks, ...item }) => ({ ...item, published: false })),
-    publishReadyProgram: async (key, level) => { calls.push(['publish', key, level]); publication = { id: 'ready', templateKey: key, publisherId: 'mentor', isActive: true, level }; return { program: publication, tasks: [] }; },
-    updateAdminProgram: async (id, patch) => { calls.push([id, patch]); publication = { ...publication, ...patch }; return publication; },
-  };
-  const { ReadyProgramsPanel } = loadTs('frontend/features/admin/ReadyProgramsPanel.tsx', { react: harness.react, '@/frontend/shared/api/admin-client': api });
-  const messages = [];
-  props = { programs: [], tasks: [], actorId: 'mentor', canManageAll: true, onError: (text) => messages.push(text), onChange(programs, tasks) { props = { ...props, programs, tasks }; harness.render(props); } };
-  harness.mount(ReadyProgramsPanel, props);
-  tree = await harness.settle();
-  const select = () => nodes(tree, (node) => node.type === 'select')[0];
-  try {
-    select().props.onChange({ target: { value: '2' } }); tree = await harness.settle();
-    assert.equal(select().props.value, 2);
-    nodes(tree, (node) => node.type === 'button' && node.props['aria-label']?.startsWith('Добавить в задания'))[0].props.onClick();
-    tree = await harness.settle();
-    assert.equal(calls[0][0], 'publish');
-    assert.equal(calls[0][2], 2, 'published on the chosen level');
-    assert.match(messages.at(-1), /уровня 2/);
-    select().props.onChange({ target: { value: '3' } }); tree = await harness.settle();
-    assert.deepEqual(calls[1], ['ready', { level: 3 }]);
-    assert.match(messages.at(-1), /теперь для уровня 3/);
-  } finally { harness.unmount(); }
+test('a participant on level 2 sees programs only, without the «Задания» switch', () => {
+  const app = fs.readFileSync('frontend/features/member/MemberApp.tsx', 'utf8');
+  assert.match(app, /const shownView = onlyPrograms \? "programs" : taskView;/);
+  assert.match(app, /\{!onlyPrograms && <div className="task-switch">/);
+  assert.match(app, /Программы уровня \$\{memberLevel\} скоро появятся/);
+  const { ProgramModules } = loadTs('frontend/features/member/ProgramModules.tsx');
+  assert.match(renderToStaticMarkup(React.createElement(ProgramModules, { modules: [], tasks: [], latest: new Map(), selectedId: null, onSelect() {}, onFeedback() {}, renderTask: () => null, emptyText: 'Программы уровня 2 скоро появятся.' })), /Программы уровня 2 скоро появятся\./);
+  const archive = fs.readFileSync('frontend/features/member/LevelArchive.tsx', 'utf8');
+  assert.match(archive, /const view = onlyPrograms \? "programs" : chosenView;/);
 });

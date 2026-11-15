@@ -180,11 +180,10 @@ export async function loadMemberData(userId: string, keys: readonly MemberDatase
 /** What waits on level 2, as the server sends it; anything malformed is dropped. */
 export function mapLevelPreview(value: unknown): LevelPreview | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const row = value as { level?: unknown; programs?: unknown; tasks?: unknown };
+  const row = value as { level?: unknown; programs?: unknown };
   const programs = Array.isArray(row.programs) ? row.programs.filter((item): item is { title: string; steps: number } => Boolean(item) && typeof item.title === "string" && Number(item.steps) > 0)
     .map((item) => ({ title: item.title, steps: Number(item.steps) })) : [];
-  const tasks = Math.max(0, Number(row.tasks) || 0);
-  return programs.length || tasks ? { level: Number(row.level) || 2, programs, tasks } : undefined;
+  return programs.length ? { level: Number(row.level) || 2, programs } : undefined;
 }
 export async function loadMemberLevelArchive(level: number) {
   const response = await request<{ tasks: ApiRow[]; programs?: ApiRow[]; passedTasks?: ApiRow[] }>(`/api/tasks?view=member&level=${level}`, { cache: "no-store" });

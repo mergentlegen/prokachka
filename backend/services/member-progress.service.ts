@@ -1,7 +1,7 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { ancestors, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
-import type { LevelPreview } from "@/shared/domain/levels";
+import { levelHasOnlyPrograms, type LevelPreview } from "@/shared/domain/levels";
 
 function addHours(value: string, hours: number) { return new Date(new Date(value).getTime() + hours * 60 * 60 * 1000).toISOString(); }
 
@@ -33,18 +33,14 @@ export function programModules(programs: Row[], tasks: Row[], progressByProgram:
  * What waits on level 2 for a player: program names with their number of steps and how many separate tasks and games.
  * Only names and numbers — the content opens with the level.
  */
-export function levelPreview(tasks: Row[], programs: Row[], visible: (row: Row) => boolean, now = Date.now()): LevelPreview | null {
+export function levelPreview(tasks: Row[], programs: Row[], visible: (row: Row) => boolean): LevelPreview | null {
   const onNext = (row: Row) => Number(row.level) === 2 && row.is_active !== false && visible(row);
-  const shown = programs.filter(onNext);
-  const titled = shown.filter((program) => !program.template_key).map((program) => ({
+  // Level 2 has programs only, so only their names and number of steps are told.
+  const titled = programs.filter((program) => onNext(program) && !program.template_key).map((program) => ({
     title: String(program.title || ""),
     steps: tasks.filter((task) => String(task.program_id) === String(program.id) && task.publication_type === "sequential" && task.is_active !== false).length,
   })).filter((program) => program.steps > 0);
-  // Separate tasks still open, and ready games (one task each in their own hidden program).
-  const games = new Set(shown.filter((program) => program.template_key).map((program) => String(program.id)));
-  const separate = tasks.filter((task) => onNext(task) && (!task.program_id || games.has(String(task.program_id)))
-    && task.publication_type !== "sequential" && (!task.deadline_at || new Date(String(task.deadline_at)).getTime() > now)).length;
-  return titled.length || separate ? { level: 2, programs: titled, tasks: separate } : null;
+  return titled.length ? { level: 2, programs: titled } : null;
 }
 
 /** The participant's level and when each level started (level 1: joining the team). */
@@ -79,8 +75,10 @@ export async function getMemberTaskFeed(userId: string, teamId: string, teamJoin
   // Programs and dated tasks of a level count from the day the participant reached it.
   const joinedAt = levels.startedAt.get(viewLevel) ?? teamJoinedAt;
   const onLevel = (row: { level?: unknown }) => (Number(row.level) || 1) === viewLevel;
-  const tasks = (tasksResult.data || []).filter((task) => onLevel(task) && isAudienceVisible(network.data, userId, task.audience_root_id));
-  const programs = (programsResult.data || []).filter((program) => onLevel(program) && isAudienceVisible(network.data, userId, program.audience_root_id));
+  // From level 2 on a level has programs only: separate tasks and ready games there are never shown.
+  const onlyPrograms = levelHasOnlyPrograms(viewLevel);
+  const tasks = (tasksResult.data || []).filter((task) => onLevel(task) && (!onlyPrograms || task.publication_type === "sequential") && isAudienceVisible(network.data, userId, task.audience_root_id));
+  const programs = (programsResult.data || []).filter((program) => onLevel(program) && (!onlyPrograms || !program.template_key) && isAudienceVisible(network.data, userId, program.audience_root_id));
   const existing = new Map((progressResult.data || []).map((row) => [String(row.program_id), row]));
   const missing = archive ? [] : programs.filter((program) => !existing.has(String(program.id)));
   if (missing.length) {

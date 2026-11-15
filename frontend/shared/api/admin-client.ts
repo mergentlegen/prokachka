@@ -95,13 +95,13 @@ export async function reorderProgramSteps(programId: string, taskIds: string[]) 
   await request<ApiResponse<{ saved: boolean }>>(`/api/programs/${encodeURIComponent(programId)}/order`, { method: "PUT", body: JSON.stringify({ taskIds }) });
 }
 export async function deleteAdminProgram(id: string): Promise<boolean> { const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>("/api/programs/" + id, { method: "DELETE" }); return Boolean(response.storageCleanupWarning); }
-export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; publishedPinned?: boolean; publishedPinnedAt?: string; publishedCreatedAt?: string; publishedLevel?: number; canManage?: boolean };
+export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; publishedPinned?: boolean; publishedPinnedAt?: string; publishedCreatedAt?: string; canManage?: boolean };
 export async function loadReadyPrograms(): Promise<ReadyProgramStatus[]> {
   const response = await request<ApiResponse<{ readyPrograms: ReadyProgramStatus[] }>>("/api/ready-programs");
   return response.readyPrograms || [];
 }
-export async function publishReadyProgram(key: ReadyProgramKey, level = 1): Promise<{ program: TaskProgram; tasks: Task[]; alreadyPublished: boolean }> {
-  const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[]; alreadyPublished?: boolean }>>("/api/ready-programs", { method: "POST", body: JSON.stringify({ key, level }) });
+export async function publishReadyProgram(key: ReadyProgramKey): Promise<{ program: TaskProgram; tasks: Task[]; alreadyPublished: boolean }> {
+  const response = await request<ApiResponse<{ program: ApiRow; tasks: ApiRow[]; alreadyPublished?: boolean }>>("/api/ready-programs", { method: "POST", body: JSON.stringify({ key }) });
   return { program: mapProgram(response.program), tasks: response.tasks.map(mapTask), alreadyPublished: Boolean(response.alreadyPublished) };
 }
 

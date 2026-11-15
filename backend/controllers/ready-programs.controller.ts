@@ -5,7 +5,6 @@ import { isUuid } from "@/backend/http/security";
 import { findReadyProgramPublications, publishReadyProgram } from "@/backend/services/programs.service";
 import { READY_PROGRAMS, readyProgramByKey } from "@/shared/domain/ready-programs";
 import type { ReadyProgramKey } from "@/shared/domain/types";
-import { parseLevel } from "@/shared/domain/levels";
 
 function canMentor(user: Awaited<ReturnType<typeof currentUser>>) {
   return Boolean(user && (user.role === "ceo" || user.role === "admin" || user.canReview || user.canPublishTasks));
@@ -25,7 +24,7 @@ export async function listReadyPrograms(request: Request) {
   const published = new Map(result.data.map((row) => [String(row.template_key), row]));
   return ok({ readyPrograms: READY_PROGRAMS.map(({ tasks: _tasks, ...program }) => {
     const row = published.get(program.key);
-    return { ...program, published: Boolean(row), publishedProgramId: row ? String(row.id) : undefined, publishedActive: row ? Boolean(row.is_active) : undefined, publishedPinned: row ? Boolean(row.is_pinned) : false, publishedLevel: row ? Number(row.level ?? 1) : undefined, publishedCreatedAt: row ? String(row.created_at) : undefined,
+    return { ...program, published: Boolean(row), publishedProgramId: row ? String(row.id) : undefined, publishedActive: row ? Boolean(row.is_active) : undefined, publishedPinned: row ? Boolean(row.is_pinned) : false, publishedCreatedAt: row ? String(row.created_at) : undefined,
       publishedPinnedAt: row?.pinned_at ? String(row.pinned_at) : undefined,
       canManage: Boolean(row && canPublish(user) && (user.role === "admin" || user.role === "ceo" || row.publisher_id === user.id)) };
   }) });
@@ -41,10 +40,7 @@ export async function postReadyProgram(request: Request) {
     if (!readyProgramByKey(key)) return failure("Готовая программа не найдена.", 404);
     const teamId = user.role === "ceo" ? typeof body?.teamId === "string" ? body.teamId : "" : user.teamId || "";
     if (!isUuid(teamId)) return failure("Программа должна быть привязана к команде.", 400);
-    const level = body?.level === undefined ? undefined : parseLevel(body.level);
-    if (level === null) return failure("Уровень может быть от 1 до 3.", 400);
     const result = await publishReadyProgram({
-      level,
       teamId,
       key,
       publisherId: user.role === "ceo" ? undefined : user.id,
