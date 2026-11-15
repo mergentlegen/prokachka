@@ -1,5 +1,6 @@
 import type { Announcement, AnnouncementPhoto, AuthUser, NetworkMember, ProgramModule, RankEntry, StarAward, Submission, Store, Task, TaskAttachment, TaskProgram, User } from "@/shared/domain/types";
 import type { TaskVideoSummary } from "@/shared/domain/task-video";
+import type { LevelPreview } from "@/shared/domain/levels";
 import { isReadyProgramKey, isTaskInteractiveKind } from "@/shared/domain/types";
 import { mutationTopics, resourceTopics, userScope } from "@/shared/domain/live-updates";
 import { announceMutation, dataCache, localChangeEvent } from "@/frontend/shared/api/data-cache";
@@ -173,9 +174,18 @@ export async function loadMemberData(userId: string, keys: readonly MemberDatase
     read("tasks", "/api/tasks?view=member", { tasks: [] as ApiRow[], programs: [] as ApiRow[], passedTasks: [] as ApiRow[] }), read("submissions", "/api/submissions?userId=" + encodeURIComponent(userId), { submissions: [] as ApiRow[] }),
     read("ranking", "/api/ranking", { ranking: [] as RankEntry[], starRanking: [] as RankEntry[], level: undefined as number | undefined, levelUp: null as number | null }), read("announcements", "/api/announcements", { announcements: [] as ApiRow[] }), read("stars", "/api/stars", { awards: [] as ApiRow[] }), read("network", "/api/network", { users: [] as ApiRow[] }),
   ]);
-  return { store: { tasks: tasksResponse.tasks.map(mapTask), programModules: (tasksResponse.programs || []).map(mapProgramModule), passedTasks: (tasksResponse.passedTasks || []).map(mapTask), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], level: rankingResponse.level ?? (tasksResponse as { level?: number }).level, levelUp: rankingResponse.levelUp ?? null, network: networkResponse.users.map(mapNetworkMember) };
+  return { store: { tasks: tasksResponse.tasks.map(mapTask), programModules: (tasksResponse.programs || []).map(mapProgramModule), passedTasks: (tasksResponse.passedTasks || []).map(mapTask), nextLevel: mapLevelPreview((tasksResponse as { nextLevel?: unknown }).nextLevel), users: [], programs: [], programProgress: [], announcements: announcementsResponse.announcements.map(mapAnnouncement), starAwards: starsResponse.awards.map(mapStarAward), submissions: submissionsResponse.submissions.map(mapSubmission) }, ranking: rankingResponse.ranking, starRanking: rankingResponse.starRanking || [], level: rankingResponse.level ?? (tasksResponse as { level?: number }).level, levelUp: rankingResponse.levelUp ?? null, network: networkResponse.users.map(mapNetworkMember) };
 }
 /** An earlier level, read-only: its tasks, programs and passed steps. */
+/** What waits on level 2, as the server sends it; anything malformed is dropped. */
+export function mapLevelPreview(value: unknown): LevelPreview | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as { level?: unknown; programs?: unknown; tasks?: unknown };
+  const programs = Array.isArray(row.programs) ? row.programs.filter((item): item is { title: string; steps: number } => Boolean(item) && typeof item.title === "string" && Number(item.steps) > 0)
+    .map((item) => ({ title: item.title, steps: Number(item.steps) })) : [];
+  const tasks = Math.max(0, Number(row.tasks) || 0);
+  return programs.length || tasks ? { level: Number(row.level) || 2, programs, tasks } : undefined;
+}
 export async function loadMemberLevelArchive(level: number) {
   const response = await request<{ tasks: ApiRow[]; programs?: ApiRow[]; passedTasks?: ApiRow[] }>(`/api/tasks?view=member&level=${level}`, { cache: "no-store" });
   return { tasks: response.tasks.map(mapTask), programModules: (response.programs || []).map(mapProgramModule), passedTasks: (response.passedTasks || []).map(mapTask) };

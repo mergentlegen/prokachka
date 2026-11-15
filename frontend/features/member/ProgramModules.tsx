@@ -14,6 +14,8 @@ type Props = {
   /** The open program; null when every block is closed. */
   selectedId: string | null; onSelect: (programId: string | null) => void;
   renderTask: (task: Task) => ReactNode; onFeedback: (taskId: string) => void;
+  /** An earlier level (the archive): every step opens for reading, also those never reached. */
+  readAll?: boolean;
 };
 
 function LockIcon() {
@@ -22,7 +24,7 @@ function LockIcon() {
 
 // Programs as modules: a block per program with its progress; a tap opens every step in order. Passed steps stay
 // with their miles, the current one is the usual task card, the next ones show only their title until the previous step is accepted.
-export function ProgramModules({ modules, tasks, passedTasks = [], latest, selectedId, onSelect, renderTask, onFeedback }: Props) {
+export function ProgramModules({ modules, tasks, passedTasks = [], latest, selectedId, onSelect, renderTask, onFeedback, readAll = false }: Props) {
   const [openStep, setOpenStep] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
@@ -66,15 +68,18 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
             const task = state === "current" ? tasks.find((item) => item.id === step.id) : undefined;
             if (task) return <li key={step.id} className={styles.currentCard} data-stagger style={staggerStyle(index)}><p className={styles.currentLabel}>Шаг {step.number} · сейчас</p>{renderTask(task)}</li>;
             const submission = latest.get(step.id);
-            const expanded = state === "done" && openStep === step.id;
-            const note = state === "locked" ? " · закрыт" : state === "skipped" ? (module.status === "active" ? " · откроется после текущего" : " · не пройден") : "";
-            return <li key={step.id} className={`${styles.step} ${styles[state]}`} data-stagger style={staggerStyle(index)}>
-              <button type="button" className={styles.row} disabled={state !== "done"} aria-expanded={state === "done" ? expanded : undefined} onClick={() => setOpenStep(expanded ? null : step.id)}>
-                <span className={styles.mark} aria-hidden="true">{state === "done" ? "✓" : state === "locked" ? <LockIcon /> : step.number}</span>
+            const readable = passedTasks.find((item) => item.id === step.id);
+            // In the archive a step not passed opens too: its text, video, files and questions, to read.
+            const openable = state === "done" || (readAll && Boolean(readable));
+            const expanded = openable && openStep === step.id;
+            const note = state === "locked" ? (readAll ? " · не пройден" : " · закрыт") : state === "skipped" ? (module.status === "active" && !readAll ? " · откроется после текущего" : " · не пройден") : "";
+            return <li key={step.id} className={`${styles.step} ${styles[state]} ${openable && state !== "done" ? styles.readable : ""}`} data-stagger style={staggerStyle(index)}>
+              <button type="button" className={styles.row} disabled={!openable} aria-expanded={openable ? expanded : undefined} onClick={() => setOpenStep(expanded ? null : step.id)}>
+                <span className={styles.mark} aria-hidden="true">{state === "done" ? "✓" : state === "locked" && !readAll ? <LockIcon /> : step.number}</span>
                 <span className={styles.text}><small>Шаг {step.number}{note}</small><strong>{step.title}</strong></span>
                 <span className={styles.miles}>{state === "done" ? `+${formatMiles(submission?.points || 0)}` : formatMiles(step.maxPoints)}</span>
               </button>
-              {state === "done" && <Drawer open={expanded}>{passedTasks.some((item) => item.id === step.id) ? <div className={styles.passedCard}>{renderTask(passedTasks.find((item) => item.id === step.id)!)}</div> : <div className={styles.details}>
+              {openable && <Drawer open={expanded}>{readable ? <div className={styles.passedCard}>{renderTask(readable)}</div> : <div className={styles.details}>
                 {step.description ? <p className={styles.description}>{step.description}</p> : step.interactiveKind ? <p className={styles.description}>Игра пройдена.</p> : null}
                 {step.resourceUrl && <a className={styles.link} href={step.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть материал ↗</a>}
                 {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}

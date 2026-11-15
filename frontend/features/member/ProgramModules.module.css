@@ -41,6 +41,10 @@
 .locked .text strong { color:#6d7a90; }
 .locked .mark { background:#f0f3f8; color:#9aa6b8; }
 .skipped .text strong { color:#6d7a90; }
+/* Archive: a step not passed still opens for reading. */
+.readable { border-style:solid; }
+.readable .text strong { color:inherit; }
+.readable .row:hover { background:#f7f9fc; }
 
 .passedCard { padding:0 10px 10px; }
 .details { display:grid; gap:12px; padding:2px 16px 16px 58px; }

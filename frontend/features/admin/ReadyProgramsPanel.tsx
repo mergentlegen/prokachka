@@ -6,6 +6,7 @@ import { PinBadge, PinButton } from "@/frontend/shared/PublicationPin";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { READY_PROGRAMS } from "@/shared/domain/ready-programs";
+import { LEVELS } from "@/shared/domain/levels";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import styles from "./ReadyProgramsPanel.module.css";
 
@@ -43,6 +44,8 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CatalogFilter>("all");
   const [reload, setReload] = useState(0);
+  // The level chosen on a card before «Добавить в задания».
+  const [chosenLevels, setChosenLevels] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +63,7 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
   const catalog = readyPrograms.map((item) => {
     const program = publications.get(item.key);
     return program ? {
-      ...item, published: true, publishedProgramId: program.id, publishedActive: program.isActive, publishedPinned: program.isPinned, publishedPinnedAt: program.pinnedAt, publishedCreatedAt: program.createdAt,
+      ...item, published: true, publishedProgramId: program.id, publishedActive: program.isActive, publishedPinned: program.isPinned, publishedPinnedAt: program.pinnedAt, publishedCreatedAt: program.createdAt, publishedLevel: program.level ?? 1,
       canManage: canManageAll || program.publisherId === actorId,
     } : item;
   }).sort((a, b) => comparePublications(
@@ -73,17 +76,20 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
     (filter === "all" || (filter === "published" ? item.publishedActive : !item.publishedActive))
   );
 
+  const levelOf = (item: ReadyProgramStatus) => item.publishedActive ? item.publishedLevel ?? 1 : chosenLevels[item.key] ?? item.publishedLevel ?? 1;
+
   async function changePublication(item: ReadyProgramStatus) {
     if (busyKey || (item.published && !item.canManage)) return;
     setBusyKey(item.key);
     setActionError(null);
+    const level = levelOf(item);
     try {
       let updated: TaskProgram;
       let addedTasks: Task[] = [];
       if (item.publishedProgramId) {
-        updated = await updateAdminProgram(item.publishedProgramId, { isActive: !item.publishedActive });
+        updated = await updateAdminProgram(item.publishedProgramId, item.publishedActive ? { isActive: false } : { isActive: true, level });
       } else {
-        const result = await publishReadyProgram(item.key);
+        const result = await publishReadyProgram(item.key, level);
         if (!canManageAll && result.program.publisherId !== actorId) throw new Error("Публикацией этого задания управляет другой наставник.");
         updated = result.program.isActive ? result.program : await updateAdminProgram(result.program.id, { isActive: true });
         addedTasks = result.tasks;
@@ -91,11 +97,26 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
       const taskIds = new Set(addedTasks.map((task) => task.id));
       onChange([updated, ...programs.filter((program) => program.id !== updated.id)], [...addedTasks, ...tasks.filter((task) => !taskIds.has(task.id))]);
       setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? {
-        ...entry, published: true, publishedActive: updated.isActive, publishedProgramId: updated.id, publishedPinned: updated.isPinned, publishedPinnedAt: updated.pinnedAt, publishedCreatedAt: updated.createdAt, canManage: true,
+        ...entry, published: true, publishedActive: updated.isActive, publishedProgramId: updated.id, publishedLevel: updated.level ?? 1, publishedPinned: updated.isPinned, publishedPinnedAt: updated.pinnedAt, publishedCreatedAt: updated.createdAt, canManage: true,
       } : entry));
-      onError(updated.isActive ? "«" + item.title + "» добавлено в задания участников." : "«" + item.title + "» убрано из заданий. Результаты и мили сохранены.");
+      onError(updated.isActive ? `«${item.title}» добавлено в задания участников${(updated.level ?? 1) > 1 ? ` уровня ${updated.level}` : ""}.` : "«" + item.title + "» убрано из заданий. Результаты и мили сохранены.");
     } catch (error) {
       setActionError({ key: item.key, message: error instanceof Error ? error.message : "Не удалось изменить публикацию. Попробуйте ещё раз." });
+    } finally { setBusyKey(""); }
+  }
+
+  // A game already in the tasks moves to another level at once; miles for passing it count on that level.
+  async function moveLevel(item: ReadyProgramStatus, level: number) {
+    if (!item.publishedActive) { setChosenLevels((current) => ({ ...current, [item.key]: level })); return; }
+    if (busyKey || !item.publishedProgramId || !item.canManage || level === (item.publishedLevel ?? 1)) return;
+    setBusyKey(item.key); setActionError(null);
+    try {
+      const updated = await updateAdminProgram(item.publishedProgramId, { level });
+      onChange([...programs.filter((program) => program.id !== updated.id), updated], tasks.map((task) => task.programId === updated.id ? { ...task, level: level > 1 ? level : undefined } : task));
+      setReadyPrograms((current) => current.map((entry) => entry.key === item.key ? { ...entry, publishedLevel: updated.level ?? 1 } : entry));
+      onError(`«${item.title}» теперь для уровня ${level}. Мили тех, кто уже прошёл игру, считаются в рейтинге этого уровня.`);
+    } catch (error) {
+      setActionError({ key: item.key, message: error instanceof Error ? error.message : "Не удалось перенести игру на другой уровень." });
     } finally { setBusyKey(""); }
   }
 
@@ -147,6 +168,11 @@ export function ReadyProgramsPanel({ programs, tasks, actorId, canManageAll, onC
           <h3>{item.title}</h3>
           <p className={styles.description}>{item.description}</p>
           <div className={styles.meta}>{active && item.publishedPinned && <PinBadge />}<span>{item.badge}</span><span className={styles.reward}>+{formatMiles(rewards.get(item.key) ?? 0)}</span></div>
+          {!managedByAnother && <label className={styles.level}>Для кого
+            <select value={levelOf(item)} disabled={Boolean(busyKey) || statusPending} onChange={(event) => void moveLevel(item, Number(event.target.value))}>
+              {LEVELS.map((level) => <option key={level} value={level}>Уровень {level}</option>)}
+            </select>
+          </label>}
           <div className={styles.actions}>
             {managedByAnother ? <p className={styles.ownerNote}>Публикацией управляет другой наставник.</p> :
               <button type="button" className={active ? styles.removeButton : "button button-primary"}

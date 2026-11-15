@@ -26,6 +26,25 @@ export function deadlineLine(task: Task, now = Date.now()): { text: string; tone
   return info ? { text: info.text, tone: info.tone === "expired" ? "past" : info.tone } : { text: "", tone: "none" };
 }
 
+/** The levels that have tasks, in order: the filter shows only when there is more than one. */
+export function taskLevels(items: { level?: number }[]) {
+  return [...new Set(items.map((item) => item.level ?? 1))].sort((a, b) => a - b);
+}
+
+/** «Все уровни · Уровень 1 · Уровень 2» above a list; `value` null = all. A level that no longer has items falls back to all. */
+export function useLevelFilter<T extends { level?: number }>(items: T[]) {
+  const [level, setLevel] = useState<number | null>(null);
+  const levels = taskLevels(items);
+  const value = level !== null && levels.includes(level) ? level : null;
+  const shown = value === null ? items : items.filter((item) => (item.level ?? 1) === value);
+  const filter = levels.length > 1 ? <div className={styles.levels} role="group" aria-label="Уровень">
+    {[null, ...levels].map((option) => <button key={option ?? "all"} type="button" aria-pressed={value === option} className={value === option ? styles.levelOn : ""} onClick={() => setLevel(option)}>
+      {option === null ? "Все уровни" : `Уровень ${option}`} <b>{option === null ? items.length : items.filter((item) => (item.level ?? 1) === option).length}</b>
+    </button>)}
+  </div> : null;
+  return { shown, filter };
+}
+
 export type MenuItem = { label: string; icon: ReactNode; danger?: boolean; onSelect: () => void };
 
 // "⋯": the rarer actions of a task, so the card keeps one visible button.
@@ -101,8 +120,9 @@ export function TasksView({ store, actorId, canManageAll, busyId, ...actions }: 
   const [now] = useState(() => Date.now());
   const readyProgramIds = new Set(store.programs.filter((program) => program.templateKey).map((program) => program.id));
   const tasks = store.tasks.filter((task) => !task.interactiveKind && !readyProgramIds.has(task.programId || "") && task.publicationType !== "sequential").sort(compareTaskFeed);
+  const { shown: onLevel, filter: levelFilter } = useLevelFilter(tasks);
   const search = query.trim().toLocaleLowerCase("ru");
-  const found = search ? tasks.filter((task) => task.title.toLocaleLowerCase("ru").includes(search)) : tasks;
+  const found = search ? onLevel.filter((task) => task.title.toLocaleLowerCase("ru").includes(search)) : onLevel;
   const running = found.filter((task) => taskState(task, now) === "running");
   const past = found.filter((task) => taskState(task, now) !== "running");
   const showPast = pastOpen || (Boolean(search) && past.length > 0);
@@ -111,6 +131,7 @@ export function TasksView({ store, actorId, canManageAll, busyId, ...actions }: 
   if (!tasks.length) return <div className="admin-panel"><div className="empty-admin"><p>Заданий пока нет.</p></div></div>;
   return <div className={styles.view}>
     <label className="admin-search"><span className="sr-label">Поиск задания</span><input id="admin-task-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти задание по названию" /></label>
+    {levelFilter}
     {search && !found.length ? <div className="admin-panel"><div className="empty-admin"><p>Ничего не нашлось. Попробуйте другое слово.</p></div></div> : <>
       <section className={styles.group} aria-label="Сейчас идут">
         <h2 className={styles.groupTitle}>Сейчас идут <span>{running.length}</span></h2>

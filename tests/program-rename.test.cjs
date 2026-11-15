@@ -56,7 +56,7 @@ test('program steps keep one ⋯ menu; arrows appear only in «Изменить 
   const ActionsMenu = () => null;
   const { ProgramsPanel } = loadTs('frontend/features/admin/ProgramsPanel.tsx', {
     react: harness.react,
-    './AdminTasksView': { ActionsMenu, pinIcon: null },
+    './AdminTasksView': { ActionsMenu, pinIcon: null, useLevelFilter: (items) => ({ shown: items, filter: null }) },
     '@/frontend/shared/api/admin-client': {},
   });
   const program = (id, title, extra = {}) => ({ id, title, deadlineHours: 24, isActive: true, publisherId: 'mentor', createdAt: '2026-10-01', updatedAt: '2026-10-01', ...extra });

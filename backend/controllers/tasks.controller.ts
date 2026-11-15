@@ -43,7 +43,8 @@ export async function listTasks(request: Request) {
     const result = await getMemberTaskFeed(user.id, teamId, user.teamJoinedAt, requestedLevel);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("error" in result) return failure("Не удалось загрузить задания.");
-    return withTaskDetails(result.data, user, false, { programs: "programs" in result ? result.programs : [], level: "level" in result ? result.level : 1, viewLevel: "viewLevel" in result ? result.viewLevel : 1 }, "passed" in result ? result.passed : []);
+    return withTaskDetails(result.data, user, false, { programs: "programs" in result ? result.programs : [], level: "level" in result ? result.level : 1, viewLevel: "viewLevel" in result ? result.viewLevel : 1,
+      ...("nextLevel" in result && result.nextLevel ? { nextLevel: result.nextLevel } : {}) }, "passed" in result ? result.passed : []);
   }
   if ((user.role === "admin" || user.role === "member") && !user.teamId) return ok({ tasks: [] });
   const result = await findTasks(user.role === "ceo" ? undefined : user.teamId, user);

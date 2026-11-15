@@ -44,6 +44,42 @@ export function VoicePendingNotice({ url, expiresAt, onExpired }: { url: string;
   </div>;
 }
 
+/**
+ * The questions of a task of an earlier level, to read: no correct answers (others may still be on that level),
+ * the participant's own saved or sent choices marked, nothing can be sent.
+ */
+export function QuizPreview({ taskId }: { taskId: string }) {
+  const [quiz, setQuiz] = useState<MemberQuiz | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    loadMemberQuiz(taskId).then((next) => { if (active) setQuiz(next); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Не удалось загрузить вопросы."); });
+    return () => { active = false; };
+  }, [taskId]);
+  return quiz ? <QuizPreviewList quiz={quiz} /> : error ? <p className={styles.error} role="alert">{error}</p> : <p className={styles.muted}>Загружаем вопросы…</p>;
+}
+
+export function QuizPreviewList({ quiz }: { quiz: Pick<MemberQuiz, "questions" | "answers"> }) {
+  return <section className={styles.quiz} aria-label="Вопросы к заданию">
+    <h4>Вопросы · {quiz.questions.length}</h4>
+    <p className={styles.muted}>Задание прошлого уровня: вопросы можно прочитать, ответить здесь уже нельзя.</p>
+    <ol className={styles.list}>
+      {quiz.questions.map((question, index) => {
+        const answer = quiz.answers[question.id] || {};
+        return <li key={question.id} className={styles.question}>
+          <p className={styles.prompt}><b>{index + 1}.</b> {question.prompt}</p>
+          {question.kind === "text" ? answer.text ? <p className={styles.ownText}><small>Ваш ответ</small>{answer.text}</p> : <p className={styles.muted}>Ответ своими словами.</p>
+            : <ul className={styles.options}>{(question.options || []).map((option, position) => {
+              const chosen = (answer.choice || []).includes(position);
+              return <li key={position} className={`${styles.option} ${styles.static} ${chosen ? styles.checked : ""}`}><span>{option}</span>{chosen && <small className={styles.mine}>ваш выбор</small>}</li>;
+            })}</ul>}
+        </li>;
+      })}
+    </ol>
+  </section>;
+}
+
 export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onVoicePending }: { taskId: string; videoWatched: boolean;
   /** The answer is the test plus a voice message: sending opens the bot, the test waits for the voice. */ voice?: boolean;
   onSubmitted: (result: QuizResult) => void; onVoicePending?: (link: { url: string; expiresAt: string }) => void }) {

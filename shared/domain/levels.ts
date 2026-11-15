@@ -33,3 +33,23 @@ export function levelBadges(level: number) {
     ...(level >= 3 ? [{ key: "level-3", icon: "★", title: "Уровень 3", note: "за переход на уровень 3" }] : []),
   ];
 }
+
+/** What waits on level 2 for a player: program names with their steps and how many separate tasks and games. */
+export type LevelPreview = { level: number; programs: { title: string; steps: number }[]; tasks: number };
+
+const count = (value: number, one: string, few: string, many: string) => {
+  const tens = value % 100, units = value % 10;
+  return `${value} ${tens > 10 && tens < 20 ? many : units === 1 ? one : units >= 2 && units <= 4 ? few : many}`;
+};
+
+/** «программа «Х» · 6 шагов и 2 задания» — names and numbers only; the content opens with the level. */
+export function levelPreviewText(preview: LevelPreview | null | undefined) {
+  if (!preview) return "";
+  const [first, ...others] = preview.programs;
+  const parts = [
+    ...(first ? [`программа «${first.title}» · ${count(first.steps, "шаг", "шага", "шагов")}`] : []),
+    ...(others.length ? [`ещё ${count(others.length, "программа", "программы", "программ")}`] : []),
+    ...(preview.tasks ? [count(preview.tasks, "задание", "задания", "заданий")] : []),
+  ];
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} и ${parts[parts.length - 1]}` : parts[0] || "";
+}

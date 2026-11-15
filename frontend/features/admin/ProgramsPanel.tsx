@@ -7,7 +7,7 @@ import { PROGRAM_GAMES, type ProgramGame } from "@/shared/domain/program-games";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { FormSheet } from "@/frontend/shared/FormSheet";
 import { Drawer, staggerStyle } from "@/frontend/shared/Drawer";
-import { ActionsMenu, pinIcon, type MenuItem } from "./AdminTasksView";
+import { ActionsMenu, pinIcon, useLevelFilter, type MenuItem } from "./AdminTasksView";
 import { actionIcons } from "./AdminIcons";
 import { comparePublications } from "@/shared/domain/publication-order";
 import { formatMiles } from "@/frontend/shared/lib/format";
@@ -44,6 +44,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<TaskProgram | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const { shown: levelPrograms, filter: levelFilter } = useLevelFilter(customPrograms);
 
   async function addGame(program: TaskProgram, game: ProgramGame) {
     if (busyId) return;
@@ -193,12 +194,13 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
       </div></Drawer>
     </section>;
   };
-  const activePrograms = customPrograms.filter((program) => program.isActive);
-  const hiddenPrograms = customPrograms.filter((program) => !program.isActive);
+  const activePrograms = levelPrograms.filter((program) => program.isActive);
+  const hiddenPrograms = levelPrograms.filter((program) => !program.isActive);
 
   return <>
     <p className="admin-muted">Участник проходит шаги по порядку: следующий открывается, когда предыдущий принят. Нажмите на программу, чтобы увидеть шаги и кто на каком шаге.</p>
     {customPrograms.length === 0 ? <div className="admin-panel"><div className="empty-admin"><p>Программ пока нет. Создайте первую программу.</p></div></div> : <div className={styles.list}>
+      {levelFilter}
       {activePrograms.length ? activePrograms.map(programCard) : <p className={styles.emptySteps}>Активных программ нет. Покажите скрытую или создайте новую.</p>}
       {hiddenPrograms.length > 0 && <>
         <button type="button" className={styles.fold} aria-expanded={hiddenOpen} onClick={() => setHiddenOpen(!hiddenOpen)}>Скрытые <span>{hiddenPrograms.length}</span><i aria-hidden="true" /></button>

@@ -19,13 +19,20 @@ import { FirstYearGame } from "./FirstYearGame";
 import { SafetyWatchGame } from "./SafetyWatchGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
-import { QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
+import { QuizPreview, QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
+import { CaptainCruiseMaterial, FirstYearMaterial, MaterialButton, SafetyWatchMaterial } from "./GameMaterial";
 import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
 
-export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false, readOnly = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean; /** An earlier level: materials only, nothing can be sent. */ readOnly?: boolean }) {
+// Games of an earlier level that were never played: the ones with a reading page open it.
+const ARCHIVE_MATERIAL: Record<string, typeof FirstYearMaterial> = {
+  "captain-cruise": CaptainCruiseMaterial, "safety-watch": SafetyWatchMaterial, "first-year": FirstYearMaterial,
+};
+
+export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false, readOnly = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean; /** An earlier level: materials only; only a work the mentor returned can be sent again. */ readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [material, setMaterial] = useState(false);
   const [sending, setSending] = useState(false);
   const [linkOpened, setLinkOpened] = useState(false);
   const isInteractive = Boolean(task.interactiveKind);
@@ -45,7 +52,13 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const countdown = deadlineInfo(deadline);
   const step = !inModule && task.publicationType === "sequential" && task.position ? task.position : undefined;
   const resource = externalHref(task.resourceUrl);
-  const canSubmit = !readOnly && task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
+  // In the archive (an earlier level) nothing new is sent; a work the mentor returned for changes still can be.
+  const locked = readOnly && status !== "revision";
+  // A passed game opens as usual (its result and material); an unplayed game of an earlier level is not started.
+  const gameDone = isInteractive && status === "accepted" && submission?.interactiveCompleted !== false;
+  const showGame = !readOnly || gameDone;
+  const ArchiveMaterial = readOnly && !gameDone ? ARCHIVE_MATERIAL[task.interactiveKind || ""] : undefined;
+  const canSubmit = !locked && task.isActive && status !== "pending" && status !== "accepted" && (!expired || task.publicationType === "sequential");
   // A voice task opens Telegram for one voice message.
   const submitLabel = task.voiceAnswer
     ? status === "revision" ? "🎙️ Записать голосовое заново" : expired ? "🎙️ Записать голосовое с опозданием" : "🎙️ Записать голосовое"
@@ -61,7 +74,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     try { await onSubmit(task.id); } finally { setSending(false); }
   }
   function action(inDetail = false) {
-    if (readOnly && status !== "accepted" && status !== "pending") return <span className={styles.waiting}>Архив · только просмотр</span>;
+    if (locked && status !== "accepted" && status !== "pending") return <span className={styles.waiting}>Архив · только просмотр</span>;
     if (captainPending) return <button className={styles.submit} onClick={() => setOpen(true)}>Отправить скриншот · +1 миля</button>;
     if (surveyInProgress) return <button className={styles.submit} onClick={() => setOpen(true)}>Продолжить опросник</button>;
     if (status === "accepted") return <strong className={styles.accepted}>+{formatMiles(submission?.points || 0)}</strong>;
@@ -85,22 +98,24 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
       {deadline && (countdown && canSubmit && !captainPending && !surveyInProgress
         ? <p className={`${styles.countdown} ${styles[countdown.tone]}`}><span>{countdown.text}</span><small>{countdown.tone === "expired" ? "можно отправить с опозданием" : `до ${formatDateTime(deadline)}`}</small></p>
         : <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>{expired ? "Срок истёк: " : "До "}{formatDateTime(deadline)}</p>)}
-      <div className={styles.actions}>{status === "accepted" && !captainPending && !surveyInProgress && !(readOnly && isInteractive)
+      <div className={styles.actions}>{status === "accepted" && !captainPending && !surveyInProgress && !(readOnly && isInteractive && !gameDone)
           ? <button className={`${styles.read} ${styles.readMaterial}`} onClick={() => setOpen(true)} aria-haspopup="dialog"><span className={styles.readIcon} aria-hidden="true">📖</span>{isInteractive ? "Материал игры" : "Материал задания"}</button>
           : <button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isSurvey ? "Открыть опросник" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>}{action()}</div>
     </article>
     {open && <ModalSheet title={isInteractive ? task.title : "Задание"} variant={isInteractive ? "immersive" : "default"} onClose={() => setOpen(false)}>
       <div className={`${styles.detail} ${isInteractive ? styles.interactiveDetail : ""}`}>
-        {(!isInteractive || readOnly) && <><div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
+        {(!isInteractive || !showGame) && <><div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
         <h3>{task.title}</h3>
         <div className={styles.description}>{task.description}</div></>}
         {deadline && <p className={`${styles.deadline} ${expired ? styles.expired : ""}`}>Срок: {formatDateTime(deadline)}{expired && canSubmit && <span>Можно отправить с опозданием.</span>}</p>}
-        {readOnly && isInteractive && <p className={styles.waiting}>Игры прошлого уровня в архиве не запускаются.</p>}
+        {!showGame && <p className={styles.waiting}>Игра прошлого уровня: пройти её уже нельзя{ArchiveMaterial ? ", но материал можно прочитать." : "."}</p>}
+        {ArchiveMaterial && (material ? <ArchiveMaterial onBack={() => setMaterial(false)} archive />
+          : <MaterialButton onClick={() => setMaterial(true)} hint="Игра прошлого уровня — только чтение" />)}
         {/* Materials come first (video, PDF, link), then the game or the test, then the answer. */}
         {task.video?.playable && <ProtectedVideo taskId={task.id} onCompleted={() => setVideoWatched(true)} />}
         <TaskAttachments taskId={task.id} attachments={task.attachments} />
         {resource && <ResourceCard url={resource} onOpen={openedResource} />}
-        {!readOnly && <>{task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {showGame && <>{task.interactiveKind === "dream-plan" && <DreamPlanGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "first-year" && <FirstYearGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "safety-watch" && <SafetyWatchGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
@@ -113,12 +128,13 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
           : voicePending && canSubmit ? <VoicePendingNotice url={voicePending.url} expiresAt={voicePending.expiresAt} onExpired={() => setVoicePending(null)} />
           : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} voice={task.voiceAnswer} onVoicePending={setVoicePending} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
         {isQuiz && status === "accepted" && <QuizReview taskId={task.id} />}
+        {isQuiz && readOnly && !canSubmit && !quizSent && status !== "accepted" && <QuizPreview taskId={task.id} />}
         {!isQuiz && !isInteractive && submission?.answerText && <div className={styles.answer}><strong>Ваш ответ</strong><p>{submission.answerText}</p></div>}
         {linkOpened && canSubmit && !isQuiz && <div className={styles.returnHint} role="status"><strong>Уже выполнили?</strong><p>Нажмите «{submitLabel}» ниже. Без этого наставник не увидит работу, не даст обратную связь и не начислит мили.</p></div>}
         {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
         {submission && !isInteractive && onFeedback && <button type="button" className={styles.read} onClick={() => { setOpen(false); onFeedback(task.id); }}>Открыть переписку с наставником →</button>}
         {submission && !isInteractive && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}
-        {(!isInteractive || readOnly) && !(isQuiz && (canSubmit || quizSent)) && <div className={styles.detailAction}>{action(true)}</div>}
+        {(!isInteractive || !showGame) && !(isQuiz && (canSubmit || quizSent)) && <div className={styles.detailAction}>{action(true)}</div>}
       </div>
     </ModalSheet>}
   </>;

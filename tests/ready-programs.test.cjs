@@ -163,7 +163,7 @@ test("catalog add/remove/re-add reuses the publication and preserves task identi
     assert.equal(props.programs[0].isActive, false);
     assert.equal(props.tasks[0], task);
     await press("Добавить в задания");
-    assert.deepEqual(calls, ["publish", ["ready", { isActive: false }], ["ready", { isActive: true }]]);
+    assert.deepEqual(calls, ["publish", ["ready", { isActive: false }], ["ready", { isActive: true, level: 1 }]]);
     assert.equal(props.programs.length, 1); assert.equal(props.tasks.length, 1);
     assert.doesNotMatch(renderToStaticMarkup(tree), />(?:Изменить|Скрыть|Удалить)</);
   } finally { harness.unmount(); }

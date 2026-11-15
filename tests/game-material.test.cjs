@@ -60,6 +60,7 @@ test('a passed task or program step shows a clear «Материал задан�
   assert.match(card({ task, submission: accepted }), /📖<\/span>Материал задания/);
   assert.match(card({ task: { ...task, interactiveKind: 'safety-watch' }, submission: accepted }), /📖<\/span>Материал игры/);
   assert.doesNotMatch(card({ task }), /Материал задания/, 'a task not yet done keeps «Подробнее»');
-  assert.doesNotMatch(card({ task: { ...task, interactiveKind: 'safety-watch' }, submission: accepted, readOnly: true }), /Материал игры/, 'archive games do not start, so no such button');
+  assert.match(card({ task: { ...task, interactiveKind: 'safety-watch' }, submission: accepted, readOnly: true }), /📖<\/span>Материал игры/, 'a game passed on an earlier level keeps its material');
+  assert.doesNotMatch(card({ task: { ...task, interactiveKind: 'safety-watch' }, readOnly: true }), /Материал игры/, 'an archive game never played does not start');
   assert.match(read('frontend/features/member/TaskCard.module.css'), /\.read\.readMaterial \{[^}]*border:1\.5px solid var\(--blue\)/);
 });

@@ -1,6 +1,7 @@
 import { readPages } from "@/backend/infrastructure/supabase/read-pages";
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { ancestors, findTeamNetwork, isAudienceVisible } from "@/backend/services/network.service";
+import type { LevelPreview } from "@/shared/domain/levels";
 
 function addHours(value: string, hours: number) { return new Date(new Date(value).getTime() + hours * 60 * 60 * 1000).toISOString(); }
 
@@ -8,7 +9,8 @@ type Row = Record<string, unknown>;
 
 // Every program of the participant with all its visible steps, so the page can show what is done and what is ahead.
 // Steps not reached yet travel without their text: it opens together with the step.
-export function programModules(programs: Row[], tasks: Row[], progressByProgram: ReadonlyMap<string, Row>) {
+// `readAll`: an earlier level (the archive), where every step can be read again, also those never reached.
+export function programModules(programs: Row[], tasks: Row[], progressByProgram: ReadonlyMap<string, Row>, readAll = false) {
   return programs.filter((program) => !program.template_key).flatMap((program) => {
     const steps = tasks.filter((task) => task.publication_type === "sequential" && String(task.program_id) === String(program.id))
       .sort((a, b) => Number(a.position) - Number(b.position) || String(a.id).localeCompare(String(b.id)));
@@ -21,10 +23,28 @@ export function programModules(programs: Row[], tasks: Row[], progressByProgram:
       current_task_id: !completed && current >= 0 ? String(steps[current].id) : null, completed_at: completed ? progress?.completed_at ?? null : null,
       steps: steps.map((task, index) => ({
         id: String(task.id), number: index + 1, title: String(task.title || ""), max_points: Number(task.max_points || 0), interactive_kind: task.interactive_kind ?? null,
-        ...(index < current ? { description: String(task.description || ""), resource_url: task.resource_url ?? null } : {}),
+        ...(readAll || index < current ? { description: String(task.description || ""), resource_url: task.resource_url ?? null } : {}),
       })),
     }];
   });
+}
+
+/**
+ * What waits on level 2 for a player: program names with their number of steps and how many separate tasks and games.
+ * Only names and numbers — the content opens with the level.
+ */
+export function levelPreview(tasks: Row[], programs: Row[], visible: (row: Row) => boolean, now = Date.now()): LevelPreview | null {
+  const onNext = (row: Row) => Number(row.level) === 2 && row.is_active !== false && visible(row);
+  const shown = programs.filter(onNext);
+  const titled = shown.filter((program) => !program.template_key).map((program) => ({
+    title: String(program.title || ""),
+    steps: tasks.filter((task) => String(task.program_id) === String(program.id) && task.publication_type === "sequential" && task.is_active !== false).length,
+  })).filter((program) => program.steps > 0);
+  // Separate tasks still open, and ready games (one task each in their own hidden program).
+  const games = new Set(shown.filter((program) => program.template_key).map((program) => String(program.id)));
+  const separate = tasks.filter((task) => onNext(task) && (!task.program_id || games.has(String(task.program_id)))
+    && task.publication_type !== "sequential" && (!task.deadline_at || new Date(String(task.deadline_at)).getTime() > now)).length;
+  return titled.length || separate ? { level: 2, programs: titled, tasks: separate } : null;
 }
 
 /** The participant's level and when each level started (level 1: joining the team). */
@@ -117,11 +137,13 @@ export async function getMemberTaskFeed(userId: string, teamId: string, teamJoin
       group.slice(1).forEach((task) => excluded.add(String(task.id)));
     }
   }
-  const modules = programModules(programs, tasks, existing);
+  const modules = programModules(programs, tasks, existing, archive);
   // Passed program steps stay open for reading: their text, video, files and the test with its answers.
+  // In the archive every step of the level's programs does, also those the participant never reached.
   const passedIds = new Set(modules.flatMap((module) => module.steps.filter((step) => "description" in step).map((step) => step.id)));
   const passed = tasks.filter((task) => passedIds.has(String(task.id))).map((task) => ({ ...task, program_title: programsById.get(String(task.program_id))?.title }));
-  return { level, viewLevel, programs: modules, passed, data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
+  const nextLevel = level === 1 && !archive ? levelPreview(tasksResult.data || [], programsResult.data || [], (row) => isAudienceVisible(network.data, userId, row.audience_root_id)) : null;
+  return { level, viewLevel, programs: modules, passed, nextLevel, data: eligible.filter((task) => !excluded.has(String(task.id))).map((task) => {
     const program = programsById.get(String(task.program_id));
     const publication = { ...task, is_pinned: program ? Boolean(program.is_pinned) : Boolean(task.is_pinned), pinned_at: program ? program.pinned_at : task.pinned_at };
     if (task.publication_type !== "sequential") return publication;
@@ -131,7 +153,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, teamJoin
   }) };
 }
 
-/** Materials of the current level, then of earlier levels: those stay open as a read-only archive. */
+/** Materials of the current level, then of earlier levels: those stay open as a read-only archive (every task and step there). */
 export async function memberFeedShowsTask(userId: string, teamId: string, teamJoinedAt: string | undefined, taskId: string) {
   const feed = await getMemberTaskFeed(userId, teamId, teamJoinedAt);
   if (feedShowsTask(feed, taskId)) return true;

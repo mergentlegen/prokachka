@@ -1,5 +1,6 @@
 import type { StarAwardKind } from "./star-awards";
 import type { TaskVideoSummary } from "./task-video";
+import type { LevelPreview } from "./levels";
 
 export type UserRole = "ceo" | "admin" | "member";
 export type SubmissionStatus = "pending" | "accepted" | "revision";
@@ -81,5 +82,7 @@ export type Store = {
   users: User[]; tasks: Task[]; programs: TaskProgram[]; programProgress: MemberProgramProgress[]; programModules?: ProgramModule[];
   /** Program steps the participant has passed, whole, to read again. */
   passedTasks?: Task[];
+  /** A player's glimpse of level 2: program names and numbers, no content. */
+  nextLevel?: LevelPreview;
   announcements: Announcement[]; starAwards: StarAward[]; submissions: Submission[];
 };

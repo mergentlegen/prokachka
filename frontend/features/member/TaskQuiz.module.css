@@ -11,6 +11,12 @@
 .option input { flex: 0 0 auto; width: 20px; height: 20px; margin: 0; accent-color: var(--blue); }
 .option span { overflow-wrap: anywhere; }
 .checked { border-color: #9db3ea; background: #f1f5ff; }
+/* Read-only questions of an archived task. */
+.static { justify-content: space-between; margin: 0; cursor: default; list-style: none; }
+ul.options { margin: 0; padding: 0; }
+.mine { flex: 0 0 auto; color: var(--blue); font-size: 12px; font-weight: 600; }
+.ownText { display: grid; gap: 4px; margin: 0; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 12px; background: #fff; color: #33445f; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+.ownText small { color: var(--muted); font-size: 12px; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }
 .error { margin: 0; color: #b23e4d; font-size: 13px; font-weight: 600; }
 .send { min-height: 52px; padding: 12px 18px; border: 0; border-radius: 14px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
