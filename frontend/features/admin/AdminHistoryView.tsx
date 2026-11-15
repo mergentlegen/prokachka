@@ -112,7 +112,7 @@ function PersonSheet({ person, tasks, programs, store, onOpenTask, onOpenProgram
       {results.length === 0 ? <Empty text="Заданий пока нет." /> : <div className={styles.list}>
         {results.map((item) => <button key={item.task.id} type="button" className={styles.row} onClick={() => onOpenTask(item.task)}>
           <span className={styles.rowMain}><strong>{item.task.title}</strong><small>{deadlineLine(item.task).text}</small></span>
-          <span className={`${styles.chip} ${styles[participantTone[item.status]]}`}>{participantStatusText(item.status)}{item.status === "accepted" ? ` · +${formatMiles(item.submission?.points || 0)}` : ""}</span>
+          <span className={`${styles.chip} ${styles[participantTone[item.status]]}`}>{participantStatusText(item.status)}{item.status === "accepted" ? ` · +${formatMiles(item.submission?.points || 0)}${item.submission?.autoAccepted ? " · автоматически" : ""}` : ""}</span>
           <i className={styles.arrow} aria-hidden="true">→</i>
         </button>)}
       </div>}

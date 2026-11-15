@@ -2,15 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import { loadMemberQuiz, saveQuizDraft, submitTaskQuiz, type MemberQuiz } from "@/frontend/shared/api/task-quiz-client";
-import { firstUnanswered, type QuizAnswers } from "@/shared/domain/task-quiz";
+import { firstUnanswered, quizIsTestOnly, type QuizAnswers } from "@/shared/domain/task-quiz";
 import { plural } from "@/frontend/shared/lib/plural";
+import { formatMiles } from "@/frontend/shared/lib/format";
 import styles from "./TaskQuiz.module.css";
 
 const DRAFT_DELAY_MS = 1200;
 
-// Questions answered on the site. They open after the task video and are sent to the mentor as a normal answer.
-/** Shown after sending, also once the card has refreshed to "на проверке". */
-export function QuizSentNotice({ score, total }: { score: number; total: number }) {
+// Questions answered on the site. They open after the task video.
+// A test answered without mistakes counts at once; anything else is sent to the mentor as a normal answer.
+export type QuizResult = { score: number; total: number; accepted?: boolean; points?: number };
+
+/** Shown after sending, also once the card has refreshed to "на проверке" or "принято". */
+export function QuizSentNotice({ score, total, accepted = false, points = 0 }: QuizResult) {
+  if (accepted) return <div className={styles.sent} role="status">
+    <span aria-hidden="true">✓</span>
+    <div><strong>Без ошибок — задание засчитано</strong><p>Тест: {score} из {total} верно. {points > 0 ? `+${formatMiles(points)}. ` : ""}Наставник проверять не будет.</p></div>
+  </div>;
   return <div className={styles.sent} role="status">
     <span aria-hidden="true">✓</span>
     <div><strong>Ответы отправлены наставнику</strong><p>{total ? `Тест: ${score} из ${total} верно. ` : ""}Наставник проверит ответы и напишет обратную связь.</p></div>
@@ -38,7 +46,7 @@ export function VoicePendingNotice({ url, expiresAt, onExpired }: { url: string;
 
 export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onVoicePending }: { taskId: string; videoWatched: boolean;
   /** The answer is the test plus a voice message: sending opens the bot, the test waits for the voice. */ voice?: boolean;
-  onSubmitted: (result: { score: number; total: number }) => void; onVoicePending?: (link: { url: string; expiresAt: string }) => void }) {
+  onSubmitted: (result: QuizResult) => void; onVoicePending?: (link: { url: string; expiresAt: string }) => void }) {
   const [quiz, setQuiz] = useState<MemberQuiz | null>(null);
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [error, setError] = useState("");
@@ -77,7 +85,7 @@ export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onV
         window.location.assign(sent.voice.url);
         return;
       }
-      onSubmitted({ score: sent.score, total: sent.total });
+      onSubmitted({ score: sent.score, total: sent.total, accepted: sent.accepted === true, points: sent.points || 0 });
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось отправить ответы. Попробуйте ещё раз."); }
     finally { setSending(false); }
   }
@@ -88,6 +96,7 @@ export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onV
     <div><strong>{quiz.questions.length} {plural(quiz.questions.length, "вопрос", "вопроса", "вопросов")} после видео</strong><p>Досмотрите видео до конца — вопросы откроются здесь.</p></div>
   </div>;
 
+  const testOnly = quizIsTestOnly(quiz.questions, voice);
   return <section className={styles.quiz} aria-label="Вопросы к заданию">
     <h4>Вопросы · {quiz.questions.length}</h4>
     <ol className={styles.list}>
@@ -118,7 +127,8 @@ export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onV
       })}
     </ol>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? (voice ? "Открываем Telegram…" : "Отправляем…") : voice ? "🎙️ Ответить и записать голосовое" : "Отправить наставнику"}</button>
+    <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? (voice ? "Открываем Telegram…" : "Отправляем…") : voice ? "🎙️ Ответить и записать голосовое" : testOnly ? "Отправить ответы" : "Отправить наставнику"}</button>
     {voice && <p className={styles.muted}>После ответов откроется Telegram: запишите голосовое в течение 30 минут — работа уйдёт наставнику вместе с ответами.</p>}
+    {testOnly && <p className={styles.muted}>Без ошибок — задание засчитается сразу. Если где-то ошибётесь, ответы проверит наставник.</p>}
   </section>;
 }

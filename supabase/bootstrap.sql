@@ -63,3 +63,4 @@
 \ir 20261113-levels-100-miles.sql
 \ir 20261114-feedback-fast-access.sql
 \ir 20261115-advisor-hardening.sql
+\ir 20261116-quiz-auto-accept.sql

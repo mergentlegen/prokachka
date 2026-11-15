@@ -78,9 +78,9 @@ export async function sendTaskQuiz(request: Request, taskId: string) {
     if ("error" in result) return failure("Не удалось отправить ответы. Попробуйте ещё раз.", 503);
     // A voice task: the answers wait for the voice message in Telegram.
     if ("voice" in result.data) return ok({ voice: result.data.voice, score: result.data.score, total: result.data.total });
-    // Mentors were queued for a "new work" message by the database; deliver it now.
+    // Mentors were queued for a "new work" message by the database (a test accepted at once may queue a level-up instead); deliver it now.
     scheduleTelegramDelivery();
-    return ok({ submission: result.data.submission, score: result.data.score, total: result.data.total }, 201);
+    return ok({ submission: result.data.submission, score: result.data.score, total: result.data.total, accepted: result.data.accepted, points: result.data.points }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 

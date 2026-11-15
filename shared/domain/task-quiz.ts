@@ -11,6 +11,14 @@ export const QUIZ_KIND_LABELS: Record<QuizKind, string> = { single: "Один в
 
 const isChoice = (kind: QuizKind) => kind === "single" || kind === "multiple";
 
+/**
+ * The answer is only the test: choice questions, no written question, no voice message.
+ * Such a test answered without mistakes counts at once (the database decides: app_task_quiz_submit); anything else waits for a mentor.
+ */
+export function quizIsTestOnly(questions: Pick<QuizQuestion, "kind">[], voiceAnswer: boolean) {
+  return !voiceAnswer && questions.length > 0 && questions.every((question) => isChoice(question.kind));
+}
+
 /** Checks and cleans a mentor's list. Returns the questions or the first problem in plain words. */
 export function validateQuiz(input: unknown): { questions: QuizQuestion[] } | { error: string } {
   if (!Array.isArray(input)) return { error: "Некорректный список вопросов." };

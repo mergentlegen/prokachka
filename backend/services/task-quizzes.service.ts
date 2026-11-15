@@ -140,7 +140,9 @@ export async function submitQuiz(user: AuthUser, taskId: string, input: unknown)
   if (result.error) return { error: result.error };
   const payload = result.data as { data?: Record<string, unknown>; validationError?: string };
   if (payload.validationError) return { validationError: payload.validationError };
-  return { data: { submission: payload.data!, score: graded.score, total: graded.total } };
+  // A test without a single mistake is accepted by the database at once; anything else waits for a mentor.
+  const accepted = payload.data?.status === "accepted";
+  return { data: { submission: payload.data!, score: graded.score, total: graded.total, accepted, points: accepted ? Number(payload.data?.points || 0) : 0 } };
 }
 
 /** Who watched the task video and how far; for the mentor's "who did the task" list. */

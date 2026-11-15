@@ -66,6 +66,8 @@ export type Submission = {
   source?: SubmissionSource; interactiveCompleted?: boolean; mediaType?: "text" | "photo" | "video" | "document" | "voice" | "demo"; answerText?: string; answerTruncated?: boolean;
   /** The mentor's list carries accepted works without the comment; it loads when the work is opened. */
   commentOmitted?: boolean; quizScore?: number; quizTotal?: number;
+  /** A test answered without mistakes and accepted without a mentor. */
+  autoAccepted?: boolean;
   points: number; comment: string; submittedAt: string; reviewedAt?: string;
 };
 /** A participant's review: everyone sees it; the author, their mentors above and the team leader may delete it. */

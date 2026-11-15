@@ -19,7 +19,7 @@ import { FirstYearGame } from "./FirstYearGame";
 import { SafetyWatchGame } from "./SafetyWatchGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
-import { QuizSentNotice, TaskQuiz, VoicePendingNotice } from "./TaskQuiz";
+import { QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
 import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
@@ -33,7 +33,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   // Questions on the site replace the Telegram answer for this task.
   const isQuiz = Boolean(task.quiz) && !isInteractive;
   const [videoWatched, setVideoWatched] = useState(false);
-  const [quizSent, setQuizSent] = useState<{ score: number; total: number } | null>(null);
+  const [quizSent, setQuizSent] = useState<QuizResult | null>(null);
   // A voice task with a test: the answers are saved, the voice message is still to come in Telegram.
   const [voicePending, setVoicePending] = useState<{ url: string; expiresAt: string } | null>(null);
   const surveyInProgress = isSurvey && submission?.interactiveCompleted === false;
@@ -109,7 +109,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "count-your-dream" && <CountYourDreamGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "dream-route" && <DreamRouteGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}</>}
-        {quizSent ? <QuizSentNotice score={quizSent.score} total={quizSent.total} />
+        {quizSent ? <QuizSentNotice {...quizSent} />
           : voicePending && canSubmit ? <VoicePendingNotice url={voicePending.url} expiresAt={voicePending.expiresAt} onExpired={() => setVoicePending(null)} />
           : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} voice={task.voiceAnswer} onVoicePending={setVoicePending} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
         {isQuiz && status === "accepted" && <QuizReview taskId={task.id} />}
