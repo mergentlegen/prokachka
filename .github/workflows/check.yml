@@ -192,6 +192,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/quiz-auto-accept.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261117-levels-archive.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/levels-archive.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261118-free-membership.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/free-membership.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

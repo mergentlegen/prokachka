@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { CAPTAIN_STAGES, CRUISE_CABINS, CRUISE_CARD_ROWS, CRUISE_LINES, CRUISE_PORTS } from "@/shared/domain/captain-cruise";
 import { FIRST_YEAR_MONTHS } from "@/shared/domain/first-year";
 import { SAFETY_WATCH_DECKS, SAFETY_WATCH_SOURCES, SAFETY_WATCH_SUMMARY } from "@/shared/domain/safety-watch";
+import { FREE_MEMBERSHIP_INTRO, FREE_MEMBERSHIP_MISSIONS, FREE_MEMBERSHIP_QUIZ, FREE_MEMBERSHIP_SUMMARY } from "@/shared/domain/free-membership";
 import styles from "./GameMaterial.module.css";
 
 // After a ready game is passed, its material stays open for reading: every game's result screen carries the same
@@ -29,7 +30,7 @@ export function MaterialBar({ onBack, backLabel = "К результату", arc
 }
 
 /** Text with <b>…</b> marks from the game data, shown without raw HTML. */
-function Bold({ text }: { text: string }) {
+export function Bold({ text }: { text: string }) {
   return <>{text.split(/(<b>.*?<\/b>)/g).filter(Boolean).map((part, index) => part.startsWith("<b>") ? <b key={index}>{part.slice(3, -4)}</b> : part)}</>;
 }
 
@@ -99,5 +100,29 @@ export function FirstYearMaterial({ onBack, archive }: MaterialProps) {
     {FIRST_YEAR_MONTHS.map((month) => <Section key={month.month} title={`${month.emoji} Месяц ${month.month} · ${month.title}`}>
       <ul className={styles.rows}>{month.choices.map((choice) => <li key={choice.label}><b>{choice.label}</b><span><b>{choice.head}</b> <Bold text={choice.lesson} /></span></li>)}</ul>
     </Section>)}
+  </Page>;
+}
+
+export function FreeMembershipMaterial({ onBack, archive }: MaterialProps) {
+  return <Page title="Безоплатное членство" lead="Памятка тренажёра: что такое личный месяц, где в кабинете смотреть прямой объём и кто из приглашённых уже оплатил." onBack={onBack} archive={archive}>
+    <Section title="Главное">
+      <ul className={styles.rows}>{FREE_MEMBERSHIP_INTRO.map((card) => <li key={card.title}><b>{card.icon} {card.title}</b><span><Bold text={card.text} /></span></li>)}</ul>
+      <p className={styles.note}><Bold text={FREE_MEMBERSHIP_SUMMARY} /></p>
+    </Section>
+    <Section title="Где это в кабинете: 7 миссий">
+      <ol className={styles.answers}>{FREE_MEMBERSHIP_MISSIONS.map((mission) => <li key={mission.text}>
+        <b>{mission.text}</b>
+        <span className={styles.right}>{mission.ok}</span>
+        <span>{mission.okText}</span>
+        {mission.ask && <span><b>{mission.ask.q}</b> Правильно: {mission.ask.opts[mission.ask.right]}. {mission.ask.why}</span>}
+      </li>)}</ol>
+    </Section>
+    <Section title="Итоговая проверка">
+      <ol className={styles.answers}>{FREE_MEMBERSHIP_QUIZ.map((question) => <li key={question.q}>
+        <b>{question.q}</b>
+        <span className={styles.right}>Правильно: {question.opts[question.right]}</span>
+      </li>)}</ol>
+    </Section>
+    <p className={styles.note}>Имена и цифры в тренажёре учебные.</p>
   </Page>;
 }
