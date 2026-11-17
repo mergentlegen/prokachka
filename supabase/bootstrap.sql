@@ -66,3 +66,4 @@
 \ir 20261116-quiz-auto-accept.sql
 \ir 20261117-levels-archive.sql
 \ir 20261118-free-membership.sql
+\ir 20261119-marketing-director.sql

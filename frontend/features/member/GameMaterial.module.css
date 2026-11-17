@@ -25,7 +25,7 @@
 .answers { counter-reset: answer; }
 .answers li, .rows li { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid #e6e9ef; border-radius: 12px; background: #fafbfc; font-size: 14px; line-height: 1.5; }
 .answers li b, .rows li > b { font-size: 15px; line-height: 1.4; }
-.answers li span, .rows li span { color: #3a475d; }
+.answers li span, .rows li span { color: #3a475d; white-space: pre-line; }
 .plain { gap: 6px; padding-left: 20px; list-style: disc; font-size: 14px; line-height: 1.5; }
 ol.plain { list-style: decimal; }
 .memo { gap: 6px; padding: 12px 14px; border-radius: 12px; background: #fff7e6; font-size: 14px; line-height: 1.5; }

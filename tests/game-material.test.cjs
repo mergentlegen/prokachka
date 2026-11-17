@@ -25,7 +25,7 @@ test('«Правила игры» asks the five XP questions and the server key 
 });
 
 test('every ready game offers its material again after it is passed, with the same large button', () => {
-  const games = ['DreamPlanGame', 'HeartSurvey', 'CompanyVoyageGame', 'CaptainCruiseGame', 'CountYourDreamGame', 'DreamRouteGame', 'FirstYearGame', 'SafetyWatchGame', 'FreeMembershipGame', 'ReadyProgramQuiz'];
+  const games = ['DreamPlanGame', 'HeartSurvey', 'CompanyVoyageGame', 'CaptainCruiseGame', 'CountYourDreamGame', 'DreamRouteGame', 'FirstYearGame', 'SafetyWatchGame', 'CabinetTrainer', 'ReadyProgramQuiz'];
   for (const game of games) assert.match(read(`frontend/features/member/${game}.tsx`), /<MaterialButton /, game);
   assert.match(read('frontend/features/member/StarterRulesGame.tsx'), /onMaterial=\{\(\) => setQuizOpen\(false\)\}/, '«Правила игры» goes back to its rules');
   for (const game of ['CountYourDreamGame', 'DreamRouteGame']) assert.match(read(`frontend/features/member/${game}.tsx`), /if \(completed\) \{ setForm\(nextForm\); setStep\(next\);/, `${game}: reading again saves nothing`);

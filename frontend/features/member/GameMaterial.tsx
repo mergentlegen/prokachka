@@ -4,7 +4,9 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { CAPTAIN_STAGES, CRUISE_CABINS, CRUISE_CARD_ROWS, CRUISE_LINES, CRUISE_PORTS } from "@/shared/domain/captain-cruise";
 import { FIRST_YEAR_MONTHS } from "@/shared/domain/first-year";
 import { SAFETY_WATCH_DECKS, SAFETY_WATCH_SOURCES, SAFETY_WATCH_SUMMARY } from "@/shared/domain/safety-watch";
-import { FREE_MEMBERSHIP_INTRO, FREE_MEMBERSHIP_MISSIONS, FREE_MEMBERSHIP_QUIZ, FREE_MEMBERSHIP_SUMMARY } from "@/shared/domain/free-membership";
+import type { CabinetTrainer } from "@/shared/domain/cabinet-trainer";
+import { FREE_MEMBERSHIP_TRAINER } from "@/shared/domain/free-membership";
+import { MARKETING_DIRECTOR_TRAINER } from "@/shared/domain/marketing-director";
 import styles from "./GameMaterial.module.css";
 
 // After a ready game is passed, its material stays open for reading: every game's result screen carries the same
@@ -103,14 +105,15 @@ export function FirstYearMaterial({ onBack, archive }: MaterialProps) {
   </Page>;
 }
 
-export function FreeMembershipMaterial({ onBack, archive }: MaterialProps) {
-  return <Page title="Безоплатное членство" lead="Памятка тренажёра: что такое личный месяц, где в кабинете смотреть прямой объём и кто из приглашённых уже оплатил." onBack={onBack} archive={archive}>
+/** The reading page of a cabinet trainer (shared/domain/cabinet-trainer.ts), built from its data. */
+export function TrainerMaterial({ trainer, onBack, archive }: MaterialProps & { trainer: CabinetTrainer }) {
+  return <Page title={trainer.title} lead={trainer.materialLead} onBack={onBack} archive={archive}>
     <Section title="Главное">
-      <ul className={styles.rows}>{FREE_MEMBERSHIP_INTRO.map((card) => <li key={card.title}><b>{card.icon} {card.title}</b><span><Bold text={card.text} /></span></li>)}</ul>
-      <p className={styles.note}><Bold text={FREE_MEMBERSHIP_SUMMARY} /></p>
+      <ul className={styles.rows}>{trainer.intro.cards.map((card) => <li key={card.title}><b>{card.icon ? `${card.icon} ` : ""}{card.title}</b><span><Bold text={card.text} /></span></li>)}</ul>
+      <p className={styles.note}><Bold text={trainer.summary} /></p>
     </Section>
-    <Section title="Где это в кабинете: 7 миссий">
-      <ol className={styles.answers}>{FREE_MEMBERSHIP_MISSIONS.map((mission) => <li key={mission.text}>
+    <Section title={`Где это в кабинете: ${trainer.missions.length} миссий`}>
+      <ol className={styles.answers}>{trainer.missions.map((mission) => <li key={mission.text}>
         <b>{mission.text}</b>
         <span className={styles.right}>{mission.ok}</span>
         <span>{mission.okText}</span>
@@ -118,11 +121,19 @@ export function FreeMembershipMaterial({ onBack, archive }: MaterialProps) {
       </li>)}</ol>
     </Section>
     <Section title="Итоговая проверка">
-      <ol className={styles.answers}>{FREE_MEMBERSHIP_QUIZ.map((question) => <li key={question.q}>
+      <ol className={styles.answers}>{trainer.quiz.map((question) => <li key={question.q}>
         <b>{question.q}</b>
         <span className={styles.right}>Правильно: {question.opts[question.right]}</span>
       </li>)}</ol>
     </Section>
     <p className={styles.note}>Имена и цифры в тренажёре учебные.</p>
   </Page>;
+}
+
+export function FreeMembershipMaterial(props: MaterialProps) {
+  return <TrainerMaterial trainer={FREE_MEMBERSHIP_TRAINER} {...props} />;
+}
+
+export function MarketingDirectorMaterial(props: MaterialProps) {
+  return <TrainerMaterial trainer={MARKETING_DIRECTOR_TRAINER} {...props} />;
 }

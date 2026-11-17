@@ -1,4 +1,4 @@
-/* «Безоплатное членство»: the colours of the author's trainer (navy, orange, the red task bar, the green mission card). */
+/* Cabinet trainers: the colours of the author's trainers (navy, orange, the red task bar, the green mission card). */
 .game { --navy:#101828; --orange:#FF8A1F; --orange-soft:#FFF1E4; --bg:#F2F4F8; --card:#fff; --text:#101828; --muted:#667085; --line:#E4E7EC; --green:#22C55E; --red:#E5484D; --task:#B5473F;
   max-width:420px; min-height:100%; margin:0 auto; background:var(--bg); color:var(--text); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; -webkit-tap-highlight-color:transparent; }
 .game h3, .game h4 { font-family:inherit; letter-spacing:normal; }
@@ -15,7 +15,7 @@
 .mcard { background:var(--card); border-radius:20px; padding:18px; margin-bottom:12px; border:1px solid var(--line); text-align:left; }
 .ico { font-size:28px; }
 .mcard h4 { margin:6px 0; font-size:18px; color:var(--text); }
-.mcard p { margin:0; font-size:15px; line-height:1.45; color:#475467; }
+.mcard p { margin:0; font-size:15px; line-height:1.45; color:#475467; white-space:pre-line; }
 .mcard b { color:var(--text); }
 .btn { display:block; width:100%; border:0; border-radius:16px; padding:16px; font-size:17px !important; font-weight:700 !important; background:var(--orange); color:#fff; margin-top:16px; }
 .btn:disabled { opacity:.6; cursor:default; }
@@ -30,7 +30,7 @@
 @media (max-width:760px) { .sim { min-height:calc(100dvh - 55px - max(10px, env(safe-area-inset-top))); } }
 .cab { flex:1; padding:12px 12px 24px; position:relative; }
 .hdr { background:var(--navy); color:#fff; border-radius:22px; display:flex; align-items:center; padding:14px; gap:10px; }
-.burger { width:40px; height:40px; display:flex; flex-direction:column; justify-content:center; gap:5px; padding:8px; }
+.burger { flex:none; cursor:pointer; border-radius:12px; width:40px; height:40px; display:flex; flex-direction:column; justify-content:center; gap:5px; padding:8px; }
 .burger i { display:block; height:2.5px; background:#fff; border-radius:2px; }
 .burger i:nth-child(1) { width:24px; } .burger i:nth-child(2) { width:20px; } .burger i:nth-child(3) { width:14px; }
 .hdrTitle { flex:1; text-align:center; font-weight:800; font-size:17px; line-height:1.2; }
@@ -65,6 +65,57 @@
 .ini { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px; flex:none; }
 .cell { border-radius:10px; cursor:pointer; }
 .swipe { font-size:13px; color:var(--muted); text-align:right; margin:8px 6px 0; }
+
+
+/* the menu (☰): it opens over the cabinet, under the task bar, so the task stays visible */
+.drawer { position:absolute; inset:0; z-index:3; background:rgba(16,24,40,.45); padding:8px 8px 0; cursor:default; }
+.panel { background:#121829; border-radius:22px 22px 0 0; padding:16px 14px 24px; color:#C9D1E1; min-height:100%; }
+.mtop { display:flex; align-items:center; gap:18px; margin-bottom:8px; }
+.mtop span { font-size:20px; color:#fff; }
+.logo { width:44px; height:44px; border-radius:10px; background:#F0923F; color:#fff; font-weight:800; font-style:italic; font-size:22px; display:flex; align-items:center; justify-content:center; margin-right:auto; }
+.mi { display:flex; align-items:center; gap:14px; padding:16px 12px; border-radius:14px; font-size:18px; cursor:pointer; }
+.mIcon { width:26px; text-align:center; opacity:.85; }
+.chev { margin-left:auto; opacity:.7; }
+.miOpen { background:#1F2A3D; }
+.si { padding:14px 12px 14px 52px; border-radius:14px; font-size:17px; margin:4px 0; cursor:pointer; }
+
+/* «Компенсация» */
+.ptitle { font-size:24px; font-weight:800; margin:18px 4px 6px; }
+.psub { font-size:14px; color:var(--muted); margin:0 4px 14px; }
+.bcard { background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-bottom:12px; display:flex; align-items:center; gap:14px; min-height:120px; cursor:pointer; }
+.bi { width:52px; height:52px; border-radius:14px; background:var(--orange-soft); display:flex; align-items:center; justify-content:center; font-size:26px; flex:none; }
+.bcard b { display:block; font-size:17px; }
+.bcard small { color:var(--muted); font-size:14px; }
+.go { margin-left:auto; color:var(--muted); font-size:22px; }
+
+/* «Командный лидерский бонус» */
+.crumb { display:flex; align-items:center; gap:8px; margin:14px 4px 10px; font-size:14px; }
+.crumbA { color:var(--muted); }
+.crumbB { font-weight:700; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.qbtn { width:36px; height:36px; border-radius:50%; border:2px solid var(--orange); color:var(--orange); display:flex; align-items:center; justify-content:center; font-weight:800; flex:none; }
+.pill { background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px; font-size:15px; display:flex; justify-content:space-between; color:var(--muted); }
+.pill b { color:var(--text); font-weight:600; }
+.sect { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:18px 4px 10px; }
+.sect b { font-size:17px; }
+.month { display:flex; align-items:center; gap:10px; font-size:16px; color:var(--muted); padding:6px 10px; border-radius:12px; background:#fff; border:1px solid var(--line); cursor:pointer; flex:none; }
+.month b { color:#475467; }
+.big { font-size:26px; font-weight:800; margin-top:8px; }
+.lbl { font-size:14px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.grey { border-color:#98A2B3; color:#98A2B3; }
+.badges { display:flex; gap:8px; overflow:hidden; padding:4px 2px; }
+.badge { width:44px; height:44px; border-radius:50%; background:#EEF0F4; display:flex; align-items:center; justify-content:center; flex:none; }
+.badge i { width:24px; height:24px; clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%); display:block; }
+.badgeCur { outline:3px solid var(--orange); }
+.more { margin-top:12px; padding:12px; border-radius:16px; border:2px solid var(--orange); color:var(--orange); font-size:15px; font-weight:700; text-align:center; }
+.sub2 { border:1px solid var(--line); border-radius:18px; padding:14px; margin-top:12px; background:#fff; cursor:pointer; }
+.v { font-size:22px; font-weight:800; }
+.d { font-size:14px; margin-top:2px; display:flex; align-items:center; gap:6px; }
+.chip { display:inline-flex; align-items:center; gap:6px; background:#F2F4F7; border-radius:12px; padding:8px 10px; font-size:13px; margin-top:12px; }
+.prow { display:flex; align-items:center; gap:10px; padding:12px 0; border-top:1px solid var(--line); }
+.prow .ini { width:38px; height:38px; }
+.nm { flex:1; font-size:14px; }
+.nm small { display:block; color:var(--muted); font-size:12px; }
+.sum { font-weight:700; font-size:14px; }
 
 .pulse { animation:pulse 1.1s infinite; position:relative; z-index:2; }
 @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(255,138,31,.8); } 50% { box-shadow:0 0 0 8px rgba(255,138,31,0); } }

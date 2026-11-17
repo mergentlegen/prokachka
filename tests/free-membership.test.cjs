@@ -5,12 +5,9 @@ const path = require('node:path');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const load = require('./helpers/load-ts.cjs');
-const hookHarness = require('./helpers/hook-harness.cjs');
+const { setupTrainer, nodes, label, task } = require('./helpers/cabinet-trainer.cjs');
 
 const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-const nodes = (tree, predicate) => Array.isArray(tree) ? tree.flatMap((item) => nodes(item, predicate)) : !tree || typeof tree !== 'object' ? [] : [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
-const label = (tree) => Array.isArray(tree) ? tree.map(label).join('') : tree && typeof tree === 'object' ? label(tree.props?.children) : tree == null || typeof tree === 'boolean' ? '' : String(tree);
-const task = '44444444-4444-4444-8444-444444444444';
 const program = '55555555-5555-4555-8555-555555555555';
 
 test('«Безоплатное членство»: the trainer, the game list and the database agree on answers, miles and texts', () => {
@@ -37,15 +34,18 @@ test('«Безоплатное членство»: the trainer, the game list an
   assert.deepEqual([listed.title, listed.reward, listed.icon], ['Безоплатное членство', 2, '🎁']);
   const types = load('shared/domain/types.ts');
   assert.equal(types.isTaskInteractiveKind('free-membership'), true);
-  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261118-free-membership\.sql\s*$/);
+  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261118-free-membership\.sql\r?\n/);
   assert.match(read('.github/workflows/check.yml'), /20261118-free-membership\.sql\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/free-membership\.sql/);
 });
 
 test('«Безоплатное членство»: mistakes are written in short keys and read back as the author’s lines', () => {
-  const { freeMembershipErrorLabel } = load('shared/domain/free-membership.ts');
-  assert.equal(freeMembershipErrorLabel('m1'), 'Миссия 1: Найди, сколько дней осталось до конца твоего ЛИЧНОГО месяца.');
-  assert.equal(freeMembershipErrorLabel('q5'), 'Итоговая проверка: Что ты получаешь, когда набираешь $500?');
-  for (const key of ['m0', 'm8', 'q6', 'x', '__proto__']) assert.equal(freeMembershipErrorLabel(key), null, key);
+  const { trainerErrorLabel, trainerAskKeys } = load('shared/domain/cabinet-trainer.ts');
+  const { FREE_MEMBERSHIP_TRAINER } = load('shared/domain/free-membership.ts');
+  const errorLabel = (key) => trainerErrorLabel(FREE_MEMBERSHIP_TRAINER, key);
+  assert.equal(errorLabel('m1'), 'Миссия 1: Найди, сколько дней осталось до конца твоего ЛИЧНОГО месяца.');
+  assert.equal(errorLabel('q5'), 'Итоговая проверка: Что ты получаешь, когда набираешь $500?');
+  for (const key of ['m0', 'm8', 'q6', 'x', '__proto__', 'm10']) assert.equal(errorLabel(key), null, key);
+  assert.deepEqual(trainerAskKeys(FREE_MEMBERSHIP_TRAINER), { 2: 1, 6: 1, 7: 1 });
   // Texts speak to everyone, not only to men.
   const source = read('shared/domain/free-membership.ts');
   assert.doesNotMatch(source, /Нашёл|ты набрал|Ты открыл|ты пригласил /);
@@ -55,7 +55,7 @@ test('«Безоплатное членство» requests are checked before th
   const calls = [];
   const controller = load('backend/controllers/ready-program-attempts.controller.ts', {
     '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'm', role: 'member', teamId: 'team' }) },
-    '@/backend/services/free-membership.service': { freeMembershipAction: async (...args) => { calls.push(args); return { data: { step: 1, completed: false } }; } },
+    '@/backend/infrastructure/supabase/admin-client': { getSupabaseAdmin: () => ({ rpc: async (...args) => { calls.push(args); return { data: { step: 1, completed: false }, error: null }; } }) },
   });
   const post = (body) => controller.postReadyProgramAttempt(new Request('http://localhost/api/ready-programs/' + task + '/attempt', { method: 'POST', body: JSON.stringify(body) }), task);
   for (const body of [
@@ -65,7 +65,7 @@ test('«Безоплатное членство» requests are checked before th
   ]) assert.equal((await post({ action: 'free-membership', ...body })).status, 400, JSON.stringify(body));
   assert.equal(calls.length, 0);
   assert.equal((await post({ action: 'free-membership', operation: 'save', step: 2, payload: { answer: 1, errors: 2, hints: 1, log: { m1: 1, m2: 1 } }, userId: 'forged' })).status, 200);
-  assert.deepEqual(calls[0], ['m', task, 'save', 2, { answer: 1, errors: 2, hints: 1, log: { m1: 1, m2: 1 } }]);
+  assert.deepEqual(calls[0], ['app_free_membership', { p_user_id: 'm', p_task_id: task, p_action: 'save', p_step: 2, p_payload: { answer: 1, errors: 2, hints: 1, log: { m1: 1, m2: 1 } } }]);
 });
 
 test('a mentor can put «Безоплатное членство» into a program', async () => {
@@ -81,54 +81,7 @@ test('a mentor can put «Безоплатное членство» into a progra
 });
 
 // The game with a fake site that follows app_free_membership, and timers run by hand.
-function setup(start = {}) {
-  const harness = hookHarness();
-  const queue = [];
-  const previous = globalThis.window;
-  globalThis.window = { setTimeout: (run) => { queue.push(run); return queue.length; }, clearTimeout() {}, setInterval: () => 0, clearInterval() {}, addEventListener() {}, removeEventListener() {} };
-  const { FREE_MEMBERSHIP_MISSIONS, FREE_MEMBERSHIP_QUIZ } = load('shared/domain/free-membership.ts');
-  const server = { missions: start.missions || 0, completed: Boolean(start.completed), stats: start.stats || { errors: 0, hints: 0, log: {} }, calls: [] };
-  const api = { freeMembershipAction: async (_id, operation, step, payload) => {
-    server.calls.push([operation, step, payload]);
-    if (server.completed) return { missions: 7, stats: server.stats, completed: true, earnedPoints: 2 };
-    if (operation === 'save') {
-      const mission = FREE_MEMBERSHIP_MISSIONS[step - 1];
-      if (step > server.missions + 1 || (mission.ask && payload.answer !== mission.ask.right)) throw new Error('Пройди миссию, чтобы перейти к следующей.');
-      server.missions = Math.max(server.missions, step); server.stats = { errors: payload.errors, hints: payload.hints, log: payload.log };
-    }
-    if (operation === 'complete') {
-      assert.equal(server.missions, 7);
-      assert.deepEqual(payload.answers, FREE_MEMBERSHIP_QUIZ.map((question) => question.right));
-      server.completed = true; server.stats = { errors: payload.errors, hints: payload.hints, log: payload.log };
-      return { missions: 7, stats: server.stats, completed: true, earnedPoints: 2, submission: { id: 'done', points: 2 } };
-    }
-    return { missions: server.missions, stats: server.stats, completed: false, earnedPoints: 0 };
-  } };
-  const css = { __esModule: true, default: new Proxy({}, { get: (_t, key) => key }) };
-  const { FreeMembershipGame } = load('frontend/features/member/FreeMembershipGame.tsx', { react: { ...React, ...harness.react }, '@/frontend/shared/api/free-membership-client': api, './FreeMembershipGame.module.css': css });
-  const received = [];
-  harness.mount(FreeMembershipGame, { taskId: task, onCompleted: (submission) => received.push(submission) });
-  const game = { harness, server, received, tree: null, missions: FREE_MEMBERSHIP_MISSIONS, quiz: FREE_MEMBERSHIP_QUIZ,
-    async settle() { game.tree = await harness.settle(); return game.tree; },
-    async flush() { while (queue.length) queue.shift()(); return game.settle(); },
-    text() { return label(game.tree); },
-    async press(name) {
-      const button = nodes(game.tree, (n) => n.type === 'button' && (typeof name === 'string' ? label(n) === name : name(n)))[0];
-      assert.ok(button, `button «${name}»`); assert.equal(Boolean(button.props.disabled), false, `«${name}» is disabled`);
-      await button.props.onClick(); return game.settle();
-    },
-    // A tap in the cabinet copy on the place marked `spot` (or on an empty spot).
-    async tap(spot) {
-      const cabinet = nodes(game.tree, (n) => n.props?.className === 'cab')[0];
-      assert.ok(cabinet, 'the cabinet is on screen');
-      const element = { getAttribute: () => spot, classList: { add() {}, remove() {} } };
-      cabinet.props.onClick({ target: { closest: () => spot ? element : null, classList: { add() {}, remove() {} } } });
-      return game.flush();
-    },
-    done() { harness.unmount(); globalThis.window = previous; },
-  };
-  return game;
-}
+const setup = (start) => setupTrainer({ data: 'shared/domain/free-membership.ts', trainer: 'FREE_MEMBERSHIP_TRAINER', game: 'frontend/features/member/FreeMembershipGame.tsx', screens: 'freeMembershipCabinet' }, start);
 
 test('the trainer plays from the first mission to the miles, with hints, mistakes and the step back in the check', async () => {
   const game = setup();
@@ -234,11 +187,11 @@ test('the trainer continues where it stopped, and a finished one opens on its re
 });
 
 test('the trainer keeps the author’s colours and its material is a reading page', () => {
-  const css = read('frontend/features/member/FreeMembershipGame.module.css');
+  const css = read('frontend/features/member/CabinetTrainer.module.css');
   for (const colour of ['--navy:#101828', '--orange:#FF8A1F', '--task:#B5473F', 'background:#E3F6E8', 'background:#3FA45B']) assert.ok(css.includes(colour), colour);
   assert.match(css, /\.mbar \{ position:sticky; bottom:0;/, 'the task stays at the bottom of the game window');
   assert.match(css, /\.tbl \{ width:640px; min-width:640px;/, 'the table is always wider than the 420px game');
-  assert.doesNotMatch(read('frontend/features/member/FreeMembershipGame.tsx'), /location\.reload|postMessage|onTrainerComplete/, 'the file’s own page hooks are gone');
+  for (const file of ['FreeMembershipGame.tsx', 'CabinetTrainer.tsx']) assert.doesNotMatch(read('frontend/features/member/' + file), /location\.reload|postMessage|onTrainerComplete/, 'the file’s own page hooks are gone');
   const material = load('frontend/features/member/GameMaterial.tsx');
   const html = renderToStaticMarkup(React.createElement(material.FreeMembershipMaterial, { onBack() {} })).replace(/<[^>]+>/g, ' ');
   assert.match(html, /Личный месяц/); assert.match(html, /Правильно: \$450/); assert.match(html, /Правильно: а\) до \$100 твоего взноса отменяется/);

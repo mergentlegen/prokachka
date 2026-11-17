@@ -18,17 +18,18 @@ import { DreamRouteGame } from "./DreamRouteGame";
 import { FirstYearGame } from "./FirstYearGame";
 import { SafetyWatchGame } from "./SafetyWatchGame";
 import { FreeMembershipGame } from "./FreeMembershipGame";
+import { MarketingDirectorGame } from "./MarketingDirectorGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
 import { QuizPreview, QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
-import { CaptainCruiseMaterial, FirstYearMaterial, FreeMembershipMaterial, MaterialButton, SafetyWatchMaterial } from "./GameMaterial";
+import { CaptainCruiseMaterial, FirstYearMaterial, FreeMembershipMaterial, MarketingDirectorMaterial, MaterialButton, SafetyWatchMaterial } from "./GameMaterial";
 import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
 import styles from "./TaskCard.module.css";
 
 // Games of an earlier level that were never played: the ones with a reading page open it.
 const ARCHIVE_MATERIAL: Record<string, typeof FirstYearMaterial> = {
-  "captain-cruise": CaptainCruiseMaterial, "safety-watch": SafetyWatchMaterial, "first-year": FirstYearMaterial, "free-membership": FreeMembershipMaterial,
+  "captain-cruise": CaptainCruiseMaterial, "safety-watch": SafetyWatchMaterial, "first-year": FirstYearMaterial, "free-membership": FreeMembershipMaterial, "marketing-director": MarketingDirectorMaterial,
 };
 
 export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false, readOnly = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean; /** An earlier level: materials only; only a work the mentor returned can be sent again. */ readOnly?: boolean }) {
@@ -120,6 +121,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "first-year" && <FirstYearGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "safety-watch" && <SafetyWatchGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "free-membership" && <FreeMembershipGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {task.interactiveKind === "marketing-director" && <MarketingDirectorGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "company-voyage" && <CompanyVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "captain-cruise" && <CaptainCruiseGame taskId={task.id} onCompleted={onInteractiveComplete} />}
