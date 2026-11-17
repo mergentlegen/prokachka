@@ -117,6 +117,12 @@ test('captain port keeps the cabinet screens, inline hints, practice gates, loca
   } finally { harness.unmount(); }
 });
 
+test('a finished training always reopens on the final screen, whatever step it was saved at', () => {
+  const { initialView } = load('frontend/features/member/CaptainCruiseGame.tsx', { './CaptainCruiseGame.module.css': { __esModule: true, default: {} } });
+  assert.deepEqual(initialView(15), { screen: 'cabin', quiz: null }, 'an unfinished training resumes at its step');
+  for (const index of [15, 16, 0]) assert.deepEqual(initialView(index, true), { screen: 'twist', quiz: null });
+});
+
 test('captain resumes passed practice and failed question without discarding server progress', async () => {
   for (const saved of [
     { index: 8, trainingPoints: 4, direction: 'Европа' },
@@ -124,6 +130,9 @@ test('captain resumes passed practice and failed question without discarding ser
     { index: 14, trainingPoints: 7, guests: [2,2,0] },
     { index: 10, trainingPoints: 5, failed: true, lastAnswer: 0 },
     { index: 16, trainingPoints: 9, trainingDone: true, earnedPoints: 9 },
+    // Finished in the old version (15 steps): step 15 is the cabin choice now, yet the final screen must open.
+    { index: 15, trainingPoints: 9, trainingDone: true, earnedPoints: 9, oldVersion: true },
+    { index: 15, trainingPoints: 9, trainingDone: true, screenshotSent: true, earnedPoints: 10, oldVersion: true },
   ]) {
     const harness = hookHarness();
     const css = { __esModule:true, default:new Proxy({}, { get:(_t,key) => key }) };
@@ -134,7 +143,12 @@ test('captain resumes passed practice and failed question without discarding ser
       if (saved.index === 11) assert.equal(nodes(tree, n=>n.type==='button' && classes(n).includes('catRead')).length, 4);
       if (saved.index === 14) assert.match(label(tree), /Сколько будет стоить, если взять ещё 2 детей/);
       if (saved.failed) { assert.match(nodes(tree,n=>n.props?.['aria-pressed']===true)[0].props.className,/bad/); assert.equal(nodes(tree, n=>n.type==='button' && classes(n).includes('catRead')).length, 4); }
-      if (saved.trainingDone) assert.match(label(tree),/9 ✈️ миль/);
+      if (saved.trainingDone && !saved.screenshotSent) assert.match(label(tree),/9 ✈️ миль/);
+      if (saved.oldVersion) {
+        assert.doesNotMatch(label(tree), /Выберите категорию каюты/, 'a finished training does not reopen the cabin choice');
+        assert.match(label(tree), saved.screenshotSent ? /Достижение «Капитан-разведчик»/ : /Это была тренировка![\s\S]*Отправить наставнику · \+1/);
+        assert.equal(nodes(tree, n => typeof n.type === 'function' && n.type.name === 'MaterialButton').length, 1, 'the material button is there');
+      }
     } finally { harness.unmount(); }
   }
 });

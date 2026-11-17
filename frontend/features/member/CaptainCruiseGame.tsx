@@ -15,7 +15,10 @@ const ROUTE: Screen[] = ["intro", "home", "search", "card", "cruise", "guests", 
 const CRUISE_TITLE = "7 Nights Western Mediterranean From Civitavecchia (Rome)";
 const GUEST_LABELS = [["Взрослые", "18–54 лет"], ["Дети и подростки", "0–17 лет"], ["Пожилые", "55+ лет"]] as const;
 // Where a saved attempt resumes: the screen of its next checkpoint and the question to reopen.
-function initialView(index: number): { screen: Screen; quiz: number | null } {
+// A finished training always opens on the final screen (screenshot form, material), whatever step it was saved at:
+// trainings finished in the old version (15 steps) keep step 15, which is the cabin choice now.
+export function initialView(index: number, trainingDone = false): { screen: Screen; quiz: number | null } {
+  if (trainingDone) return { screen: "twist", quiz: null };
   if (index === 0) return { screen: "intro", quiz: null };
   if (index <= 2) return { screen: "search", quiz: index === 1 ? 1 : null };
   if (index <= 5) return { screen: "lines", quiz: index };
@@ -66,8 +69,8 @@ export function CaptainCruiseGame({ taskId, onCompleted }: { taskId: string; onC
     const current = ++version.current;
     void captainAction(taskId, "start").then((saved) => {
       if (current !== version.current) return;
-      const view = initialView(saved.index);
-      setAttempt(saved); setScreen(view.screen); setQuizIndex(saved.failed ? saved.index : view.quiz);
+      const view = initialView(saved.index, saved.trainingDone);
+      setAttempt(saved); setScreen(view.screen); setQuizIndex(saved.failed && !saved.trainingDone ? saved.index : view.quiz);
       setSelected(saved.failed ? saved.lastAnswer ?? null : null); setFeedback(saved.failed ? "incorrect" : "");
       // These reading prerequisites have already been checked by the server.
       setSeenLines(saved.index >= 6 ? CRUISE_LINES.map((_, i) => i) : []);
