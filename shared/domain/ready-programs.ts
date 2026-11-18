@@ -1,3 +1,4 @@
+import { PARTICIPATION_RULES_REWARD, PARTICIPATION_RULES_TASK_DESCRIPTION, PARTICIPATION_RULES_TITLE } from "@/shared/domain/participation-rules";
 import type { ReadyProgramKey, TaskInteractiveKind, TaskPublicationType } from "./types";
 import { HEART_SURVEY } from "@/shared/domain/heart-survey";
 import { COMPANY_VOYAGE_REWARD, COMPANY_VOYAGE_TITLE } from "@/shared/domain/company-voyage";
@@ -41,15 +42,15 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
   },
   {
     key: "starter-rules",
-    title: "Правила игры",
-    eyebrow: "Старт новичка",
-    description: "Мили — за обучение, звёзды — за результат, XP — твой настоящий прогресс. Цель — 300 XP. Пять вопросов помогут закрепить правила старта.",
+    title: PARTICIPATION_RULES_TITLE,
+    eyebrow: "Прокачка",
+    description: "Как проходить платформу: 10 правил участия и 5 вопросов. За каждый верный ответ с первой попытки — 1 миля.",
     badge: "Без дедлайна",
     taskCount: 1,
     tasks: [{
-      title: "Правила игры",
-      description: "Мили, звёзды и XP: узнай, как устроен твой прогресс в «Старте новичка», и ответь на пять вопросов. Пройди тест без ошибок и получи 5 миль автоматически.",
-      maxPoints: 5,
+      title: PARTICIPATION_RULES_TITLE,
+      description: PARTICIPATION_RULES_TASK_DESCRIPTION,
+      maxPoints: PARTICIPATION_RULES_REWARD,
       publicationType: "evergreen",
       interactiveKind: "starter-rules",
     }],

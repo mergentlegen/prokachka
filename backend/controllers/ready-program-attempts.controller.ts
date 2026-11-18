@@ -8,6 +8,7 @@ import { countYourDreamAction } from "@/backend/services/count-your-dream.servic
 import { dreamRouteAction } from "@/backend/services/dream-route.service";
 import { firstYearAction } from "@/backend/services/first-year.service";
 import { safetyWatchAction, type SafetyWatchOperation } from "@/backend/services/safety-watch.service";
+import { participationRulesAction } from "@/backend/services/participation-rules.service";
 import { CABINET_TRAINERS, cabinetTrainerAction, isCabinetTrainerKind, type CabinetTrainerOperation } from "@/backend/services/cabinet-trainer.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
@@ -24,7 +25,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch" | "free-membership" | "marketing-director"; step?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch" | "free-membership" | "marketing-director" | "participation-rules"; step?: unknown; question?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete" | "answer"; index?: unknown; payload?: unknown };
     const action = body?.action;
     if (isCabinetTrainerKind(action)) {
       // A cabinet trainer: its own number of missions and questions of the check.
@@ -45,6 +46,16 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс тренажёра.", 409);
       if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить тренажёр. Попробуйте ещё раз.");
+      return ok({ attempt: result.data });
+    }
+    if (action === "participation-rules") {
+      const pick = (value: unknown, max: number) => Number.isInteger(value) && Number(value) >= 0 && Number(value) <= max;
+      if (body.operation !== "start" && body.operation !== "answer") return failure("Некорректные данные теста.", 400);
+      if (body.operation === "answer" && (!pick(body.question, 4) || !pick(body.answer, 2))) return failure("Некорректные данные теста.", 400);
+      const result = await participationRulesAction(user.id, taskId, body.operation, Number(body.question || 0), Number(body.answer || 0));
+      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Ответ не сохранился.", 409);
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить ответ. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
     if (action === "safety-watch") {

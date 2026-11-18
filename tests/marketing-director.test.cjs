@@ -43,7 +43,7 @@ test('«Путь к Маркетинг директору»: the trainer, the ga
   const listed = load('shared/domain/program-games.ts').programGame('marketing-director');
   assert.deepEqual([listed.title, listed.reward, listed.minutes, listed.icon], ['Путь к Маркетинг директору', 2, 5, '🏅']);
   assert.equal(load('shared/domain/types.ts').isTaskInteractiveKind('marketing-director'), true);
-  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261119-marketing-director\.sql\s*$/);
+  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261119-marketing-director\.sql\r?\n/);
   assert.match(read('.github/workflows/check.yml'), /20261119-marketing-director\.sql\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/marketing-director\.sql/);
 });
 

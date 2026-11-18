@@ -8,26 +8,9 @@ const loadTs = require('./helpers/load-ts.cjs');
 
 const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 
-test('«Правила игры» asks the five XP questions and the server key points at the right options', () => {
-  const { STARTER_RULES_QUESTIONS } = loadTs('frontend/features/member/StarterRulesGame.tsx');
-  const migration = read('supabase/20261110-starter-rules-xp.sql');
-  const key = JSON.parse(migration.match(/'starter-rules' then '(\{[^']+\})'/)[1]).answers;
-  assert.deepEqual(key, [0, 1, 0, 0, 0]);
-  const right = ['За обучение и задания', 'За реальный результат', 'Твой настоящий прогресс', 'Набрать 300 XP', 'Постоянно быть активным на платформе и учиться'];
-  assert.equal(STARTER_RULES_QUESTIONS.length, 5);
-  STARTER_RULES_QUESTIONS.forEach((question, index) => {
-    assert.equal(question.options.length, 3, question.title);
-    assert.equal(question.options[key[index]], right[index], question.title);
-  });
-  const source = read('frontend/features/member/StarterRulesGame.tsx');
-  for (const text of ['Мили — за обучение', 'Звёзды — за результат', 'XP — твой настоящий прогресс', 'Цель — набрать 300 XP', 'Радуйся: ты счастливчик!']) assert.ok(source.includes(text), text);
-  assert.doesNotMatch(source, /Главный приз|бонус/i, 'the old rules text is gone');
-});
-
 test('every ready game offers its material again after it is passed, with the same large button', () => {
-  const games = ['DreamPlanGame', 'HeartSurvey', 'CompanyVoyageGame', 'CaptainCruiseGame', 'CountYourDreamGame', 'DreamRouteGame', 'FirstYearGame', 'SafetyWatchGame', 'CabinetTrainer', 'ReadyProgramQuiz'];
+  const games = ['DreamPlanGame', 'HeartSurvey', 'CompanyVoyageGame', 'CaptainCruiseGame', 'CountYourDreamGame', 'DreamRouteGame', 'FirstYearGame', 'SafetyWatchGame', 'CabinetTrainer', 'ReadyProgramQuiz', 'StarterRulesGame'];
   for (const game of games) assert.match(read(`frontend/features/member/${game}.tsx`), /<MaterialButton /, game);
-  assert.match(read('frontend/features/member/StarterRulesGame.tsx'), /onMaterial=\{\(\) => setQuizOpen\(false\)\}/, '«Правила игры» goes back to its rules');
   for (const game of ['CountYourDreamGame', 'DreamRouteGame']) assert.match(read(`frontend/features/member/${game}.tsx`), /if \(completed\) \{ setForm\(nextForm\); setStep\(next\);/, `${game}: reading again saves nothing`);
   const { MaterialButton } = loadTs('frontend/features/member/GameMaterial.tsx');
   const html = renderToStaticMarkup(React.createElement(MaterialButton, { onClick() {} }));

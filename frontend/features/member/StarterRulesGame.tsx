@@ -1,89 +1,101 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { advanceReadyProgram, startReadyProgram, type ReadyAttempt } from "@/frontend/shared/api/ready-program-client";
+import { participationRulesAction, type RulesAttempt } from "@/frontend/shared/api/participation-rules-client";
+import { formatMiles } from "@/frontend/shared/lib/format";
+import { PARTICIPATION_RULES, PARTICIPATION_RULES_QUESTIONS } from "@/shared/domain/participation-rules";
 import type { Submission } from "@/shared/domain/types";
-import { MaterialBar } from "./GameMaterial";
-import { ReadyProgramQuiz, type ReadyQuizQuestion } from "./ReadyProgramQuiz";
-import quizStyles from "./DreamPlanGame.module.css";
+import { MaterialButton } from "./GameMaterial";
 import styles from "./StarterRulesGame.module.css";
 
-// The answer key lives on the server (app_ready_program_spec, migration 20261110): the right option of each
-// question by its index in `options` — [0, 1, 0, 0, 0]. The quiz shows options in a random order.
-export const STARTER_RULES_QUESTIONS: readonly ReadyQuizQuestion[] = [
-  { title: "За что ты получаешь мили?", options: ["За обучение и задания", "За результат: новых игроков в команде", "За время, проведённое на сайте"], feedback: "Мили — за обучение. В заданиях можно собрать 100 миль." },
-  { title: "За что ты получаешь звёзды?", options: ["За прохождение уроков", "За реальный результат", "За вход на платформу каждый день"], feedback: "Звёзды — за результат. Максимум 10 звёзд." },
-  { title: "Что показывает XP?", options: ["Твой настоящий прогресс", "Только сколько уроков ты прошёл", "Сколько времени ты провёл на сайте"], feedback: "XP — твой настоящий прогресс: учёба и результат вместе." },
-  { title: "Какая у тебя цель в игре?", options: ["Набрать 300 XP", "Просто пройти один урок", "Дождаться, пока наставник сделает всё за меня"], feedback: "Цель — набрать 300 XP." },
-  { title: "Что нужно, чтобы Асель лично вела твой путь и давала консультации?", options: ["Постоянно быть активным на платформе и учиться", "Один раз зайти и больше не появляться", "Ничего не делать, всё произойдёт само"], feedback: "Асель ведёт твой результат, если ты постоянно проявляешь активность и учишься." },
-];
+// «Правила участия» (kind `starter-rules`): the ten rules and five questions on one page, as in the author's file.
+// One try per question; the site keeps the first answer, says which option was right and gives 1 mile for each right
+// one when the fifth question is answered. A finished page stays readable: it is the game's material.
+function shuffled(length: number) {
+  const order = Array.from({ length }, (_, index) => index);
+  for (let index = length - 1; index > 0; index -= 1) {
+    const other = Math.floor(Math.random() * (index + 1));
+    [order[index], order[other]] = [order[other], order[index]];
+  }
+  return order;
+}
 
 export function StarterRulesGame({ taskId, onCompleted }: { taskId: string; onCompleted?: (submission: Submission) => void }) {
-  const [attempt, setAttempt] = useState<ReadyAttempt | null>(null);
-  const [quizOpen, setQuizOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState<RulesAttempt | null>(null);
   const [error, setError] = useState("");
-  const section = useRef<HTMLElement>(null);
+  const [sending, setSending] = useState<number | null>(null);
+  const [orders] = useState(() => PARTICIPATION_RULES_QUESTIONS.map((question) => shuffled(question.options.length)));
+  const root = useRef<HTMLElement>(null);
+  const done = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false);
-  const loadVersion = useRef(0);
-
-  async function load() {
-    const version = ++loadVersion.current;
-    try {
-      const saved = await startReadyProgram(taskId);
-      if (version !== loadVersion.current) return;
-      setError(""); setAttempt(saved); setQuizOpen(saved.step === 1 || saved.completed);
-    } catch (cause) { if (version === loadVersion.current) setError(cause instanceof Error ? cause.message : "Не удалось загрузить игру."); }
-  }
 
   useEffect(() => {
-    const version = ++loadVersion.current;
-    void startReadyProgram(taskId).then((saved) => {
-      if (version !== loadVersion.current) return;
-      setError(""); setAttempt(saved); setQuizOpen(saved.step === 1 || saved.completed);
-    }).catch((cause) => {
-      if (version === loadVersion.current) setError(cause instanceof Error ? cause.message : "Не удалось загрузить игру.");
-    });
-    return () => { loadVersion.current += 1; };
+    let active = true;
+    participationRulesAction(taskId, "start").then((saved) => { if (active) { setError(""); setAttempt(saved); } })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Не удалось загрузить правила."); });
+    return () => { active = false; };
   }, [taskId]);
 
-  useEffect(() => { section.current?.closest("[data-modal-scroll]")?.scrollTo({ top: 0, behavior: "instant" }); }, [quizOpen]);
+  useEffect(() => { root.current?.closest("[data-modal-scroll]")?.scrollTo({ top: 0 }); }, []);
 
-  async function beginQuiz() {
-    if (!attempt || inFlight.current) return;
-    inFlight.current = true; setBusy(true); setError("");
+  async function answer(question: number, option: number) {
+    if (!attempt || inFlight.current || attempt.answers[question] !== undefined || attempt.completed) return;
+    inFlight.current = true; setSending(question); setError("");
     try {
-      const saved = attempt.step === 1 || attempt.completed ? await startReadyProgram(taskId) : await advanceReadyProgram(taskId, 1);
-      setAttempt(saved); setQuizOpen(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось начать тест."); }
-    finally { inFlight.current = false; setBusy(false); }
+      const saved = await participationRulesAction(taskId, "answer", question, option);
+      setAttempt(saved);
+      if (saved.completed && !attempt.completed) {
+        if (saved.submission) onCompleted?.(saved.submission);
+        window.setTimeout(() => done.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Ответ не сохранился. Проверьте интернет и нажмите ещё раз."); }
+    finally { inFlight.current = false; setSending(null); }
   }
 
-  const reviewing = Boolean(attempt?.completed);
-  return <section ref={section} className={`${quizStyles.game} ${styles.game}`} aria-label="Игра Правила игры">
-    {quizOpen && attempt ? <ReadyProgramQuiz taskId={taskId} initialAttempt={attempt} questions={STARTER_RULES_QUESTIONS} onBack={() => setQuizOpen(false)} onMaterial={() => setQuizOpen(false)} onCompleted={onCompleted} /> : <div className={styles.intro}>
-      {reviewing && <MaterialBar onBack={() => setQuizOpen(true)} />}
-      <header className={styles.hero}>
-        <div className={styles.heroTop}><span>🚢 Старт новичка</span><span>Награда +5 миль</span></div>
-        <h4>Правила игры «Старт новичка»</h4><p>Учись, действуй, набирай XP.</p>
-      </header>
-      <div className={styles.rewards}>
-        <article className={`${styles.card} ${styles.miles}`}><span className={styles.icon} aria-hidden="true">✈️</span><h5>Мили — за обучение</h5><p>В заданиях можно собрать 100 миль.</p></article>
-        <article className={`${styles.card} ${styles.stars}`}><span className={styles.icon} aria-hidden="true">⭐</span><h5>Звёзды — за результат</h5><p>Максимум 10 звёзд.</p></article>
-      </div>
-      <article className={`${styles.card} ${styles.xp}`}><span className={styles.icon} aria-hidden="true">⚡️</span><h5>XP — твой настоящий прогресс</h5></article>
-      <article className={`${styles.card} ${styles.goal}`}><h5>🎯 Цель — набрать 300 XP</h5></article>
-      <article className={`${styles.card} ${styles.welcome}`}>
-        <h5>Радуйся: ты счастливчик! 🎉</h5>
-        <p>Ты в команде, у которой есть своя платформа. Её лично разработала твой исполнительный директор Асель Баялинова, чтобы учить и растить именно твою команду.</p>
-        <p>Асель лично ведёт твой путь и твой результат и даёт тебе консультации. Условие одно: ты постоянно проявляешь активность на платформе и учишься.</p>
-        <p className={styles.motto}>Учись, действуй, набирай XP. Будь крут и будь счастлив. Ты в нужном месте. 🚀</p>
-      </article>
-      <footer className={styles.start}><div><p className={styles.kicker}>Проверь себя</p><h5>5 вопросов — 5 миль</h5><p>За каждый верный ответ — 1 миля. Ответь на все вопросы верно и нажми «Завершить». Если ошибёшься, сможешь пройти тест заново.</p></div>
-        {error && <div className={quizStyles.quizFailure} role="alert"><p>{error}</p>{!attempt && <button type="button" className={quizStyles.retry} onClick={() => void load()}>Повторить загрузку</button>}</div>}
-        <button type="button" className={quizStyles.primary} disabled={!attempt || busy} onClick={() => void beginQuiz()}>{busy ? "Открываем тест…" : !attempt ? error ? "Игра пока недоступна" : "Загружаем прогресс…" : attempt.completed ? "К результату →" : attempt.step === 1 ? "Продолжить тест →" : "Перейти к тесту →"}</button>
-        <span className={styles.noDeadline}>Эта игра без дедлайна. Прогресс сохраняется автоматически.</span>
-      </footer>
-    </div>}
+  const total = PARTICIPATION_RULES_QUESTIONS.length;
+  const earned = attempt?.earnedPoints ?? 0;
+  return <section ref={root} className={styles.rules} aria-label="Правила участия">
+    <header className={styles.header}>
+      <span className={styles.badge}>🚢 Прокачка</span>
+      <h3>Правила участия в «Прокачке»</h3>
+      <p>Коротко и по делу: как проходить платформу.</p>
+    </header>
+    <div className={styles.wrap}>
+      {PARTICIPATION_RULES.map((rule, index) => <article key={rule.title} className={`${styles.card} ${styles.rule}`}>
+        <div className={styles.num} aria-hidden="true">{index + 1}</div>
+        <div><h4>{rule.title}</h4><p>{rule.text}</p></div>
+      </article>)}
+
+      <h4 className={styles.sectionTitle}>Проверь себя</h4>
+      <p className={styles.muted}>5 вопросов по правилам. За каждый верный ответ с первой попытки — 1 миля.</p>
+      <div className={styles.score} role="status"><span>Твои мили</span><span>✈️ {earned} / {total}</span></div>
+
+      {!attempt && !error && <p className={styles.muted}>Загружаем твои ответы…</p>}
+      {attempt && PARTICIPATION_RULES_QUESTIONS.map((question, index) => {
+        const picked = attempt.answers[index];
+        const right = attempt.rights[index];
+        const closed = picked !== undefined || attempt.completed;
+        return <div key={question.title} className={`${styles.card} ${styles.question}`}>
+          <p className={styles.title} id={`rules-q${index}`}>{question.title}</p>
+          <div role="group" aria-labelledby={`rules-q${index}`}>{orders[index].map((option) => <button type="button" key={option}
+            className={`${styles.opt} ${right === option ? styles.ok : ""} ${picked === option && right !== option ? styles.no : ""}`}
+            disabled={closed || sending !== null} aria-pressed={picked === option} onClick={() => void answer(index, option)}>
+            {question.options[option]}
+          </button>)}</div>
+          {sending === index && <p className={styles.fb} role="status">Проверяем ответ…</p>}
+          {picked !== undefined && right !== undefined && <p className={styles.fb} role="status">
+            {picked === right ? `Верно! +1 миля. ${question.explanation}` : `Не совсем. ${question.explanation}`}
+          </p>}
+        </div>;
+      })}
+      {error && <p className={styles.error} role="alert">{error}</p>}
+
+      {attempt?.completed && <div ref={done} className={styles.done}>
+        <div className={styles.plane} aria-hidden="true">✈️</div>
+        <b>+{formatMiles(earned)}!</b>
+        <p>{Object.keys(attempt.answers).length ? "Мили начислены автоматически — они уже в твоём рейтинге." : "Правила уже пройдены, мили начислены."}</p>
+        <MaterialButton label="Перечитать правила" onClick={() => root.current?.closest("[data-modal-scroll]")?.scrollTo({ top: 0, behavior: "smooth" })} />
+      </div>}
+    </div>
   </section>;
 }

@@ -13,7 +13,7 @@ test('rules publication and API mapping retain an independent template, no deadl
   const { readyProgramByKey } = load('shared/domain/ready-programs.ts');
   const { mapProgram, mapTask } = load('frontend/shared/api/client.ts');
   const rules = readyProgramByKey('starter-rules');
-  assert.equal(rules.title, 'Правила игры');
+  assert.equal(rules.title, 'Правила участия');
   assert.equal(rules.tasks[0].publicationType, 'evergreen');
   assert.equal(rules.tasks[0].maxPoints, 5);
   assert.equal(mapTask({ interactive_kind: 'starter-rules' }).interactiveKind, 'starter-rules');
@@ -53,10 +53,11 @@ test('server validation reaches HTTP 409 and answer requests carry their expecte
   assert.equal(calls[0].args.p_expected_question_index, 0);
 });
 
+// The shared quiz screen (used by «Мечта с планом»; «Правила участия» have their own page since 20261120).
 test('quiz keeps a wrong selection visible, restarts only on demand, and awards only after Finish', async () => {
   const harness = hookHarness();
   const react = { ...harness.react, useId: () => 'rules-quiz', useMemo: fn => fn() };
-  const { STARTER_RULES_QUESTIONS } = load('frontend/features/member/StarterRulesGame.tsx');
+  const STARTER_RULES_QUESTIONS = [0, 1, 2, 3, 4].map(n => ({ title: `Вопрос ${n + 1}`, options: ['А' + n, 'Б' + n, 'В' + n], explanation: `Пояснение ${n + 1}` }));
   let state = { attemptId: 'attempt', step: 1, status: 'active', attemptNumber: 1, earnedPoints: 0, maxPoints: 5, questionIndex: 0, completed: false };
   let retries = 0, finishes = 0, received = 0;
   const api = {

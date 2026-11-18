@@ -1,42 +1,31 @@
-.game { --game-ink:var(--navy); --game-muted:#66758b; --game-teal:var(--blue); }
-.intro { display:grid; gap:16px; }
-.hero { position:relative; overflow:hidden; padding:24px; border-radius:18px; background:linear-gradient(130deg,#1c365b,#3457a6); color:white; }
-.heroTop { display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; }
-.heroTop span { padding:5px 9px; border:1px solid #ffffff35; border-radius:7px; font-size:11px; }
-.hero h4 { max-width:440px; margin:10px 0; color:white; font-size:32px; font-weight:800; line-height:1.15; letter-spacing:-.03em; text-wrap:balance; }
-.hero p { max-width:540px; margin:0; color:#e6edff; font-size:15px; line-height:1.65; }
-.rewards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.card { min-width:0; padding:20px; border:1px solid var(--line); border-radius:16px; background:white; }
-.card h5,.start h5 { margin:6px 0 10px; font-size:20px; line-height:1.3; font-weight:750; letter-spacing:-.02em; }
-.card p,.start p { margin:0; color:var(--game-muted); font-size:14px; line-height:1.65; overflow-wrap:anywhere; }
-.card .kicker,.start .kicker { margin:0 0 7px; color:var(--blue); font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; }
-.miles { background:#f1f5ff; border-color:#dbe4fb; }
-.stars { background:#fff9e9; border-color:#f0e1b6; }
-.icon { display:grid; place-items:center; width:32px; height:32px; margin-bottom:12px; border-radius:9px; background:#dfe8ff; color:var(--blue); font-weight:800; }
-.stars .icon { background:#ffebba; color:#9b731b; }
-.rewards .card { display:flex; flex-direction:column; }
-.rewards h5 { margin-top:0; }
-.rewards strong { display:block; margin-top:auto; padding-top:14px; font-size:13px; }
-.xp { background:#f3f0ff; border-color:#ddd5fb; }
-.xp .icon { background:#e4dcff; color:#5b3fc4; }
-.xp h5, .goal h5 { margin:0; }
-.goal { border:none; background:linear-gradient(160deg,#e0a100,#b77800); color:white; text-align:center; }
-.goal h5 { color:white; font-size:22px; }
-.welcome { display:grid; gap:10px; border:2px solid var(--blue); }
-.welcome h5 { margin:0; }
-.welcome p { color:var(--navy); font-size:15px; }
-.welcome .motto { font-weight:700; }
-.start { display:grid; gap:16px; padding:20px 0 0; border-top:1px solid var(--line); }
-.noDeadline { color:var(--game-muted); text-align:center; font-size:12px; line-height:1.6; }
-@media(max-width:600px) {
-  .hero { padding:20px; border-radius:16px; }
-  .hero h4 { font-size:28px; }
-  .heroTop span { font-size:10px; }
-  .rewards { gap:10px; }
-  .card { padding:18px; }
-  .rewards .card { padding:16px 12px; }
-  .rewards p { font-size:13px; }
-  .rewards strong { font-size:12px; }
-  .rewards h5 { font-size:17px; }
-}
-@media(max-width:360px) { .hero { padding:18px; } .hero h4 { font-size:26px; } .rewards h5 { font-size:18px; } }
+/* «Правила участия»: the colours of the author's file (sea-blue header, white cards, green/red answers). */
+.rules { --bg:#f5f8fc; --card:#ffffff; --ink:#14233a; --muted:#5b6b82; --line:#dde5ef; --sea:#0b5cad; --sea-soft:#e3effb;
+  --green:#1d8a5a; --green-soft:#e2f5ec; --red:#c2453b; --red-soft:#fbe6e4;
+  background:var(--bg); color:var(--ink); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; min-height:100%; }
+/* `.rules .header` outranks the task window's own h3 style. */
+.rules h3, .rules h4 { font-family:inherit; letter-spacing:normal; color:inherit; }
+.header { background:linear-gradient(160deg,#0b5cad,#083a70); color:#fff; padding:36px 16px 40px; text-align:center; }
+.rules .header h3 { margin:8px 0 10px; font-size:28px; line-height:1.2; color:#fff; }
+.rules .header p { margin:0 auto; max-width:540px; opacity:.93; }
+.badge { display:inline-block; background:rgba(255,255,255,.16); padding:4px 12px; border-radius:99px; font-size:13px; }
+.wrap { max-width:720px; margin:0 auto; padding:0 16px 48px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; margin:14px 0; }
+.rule { display:flex; gap:14px; align-items:flex-start; }
+.rule h4 { font-size:18px; margin:2px 0 4px; }
+.rule p { margin:0; }
+.num { flex:0 0 34px; height:34px; border-radius:50%; background:var(--sea-soft); color:var(--sea); font-weight:700; display:flex; align-items:center; justify-content:center; }
+.sectionTitle { font-size:22px; margin:34px 0 4px; }
+.muted { color:var(--muted); margin:0; }
+/* the miles stay in sight while the questions are answered */
+.score { position:sticky; top:0; z-index:2; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:12px 0; display:flex; justify-content:space-between; font-weight:600; }
+.title { font-weight:600; margin:0 0 10px; }
+.opt { display:block; width:100%; text-align:left; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin:7px 0; font-size:15px !important; line-height:1.45; cursor:pointer; font-family:inherit; }
+.opt:disabled { cursor:default; opacity:1; }
+.ok { background:var(--green-soft); border-color:var(--green); }
+.no { background:var(--red-soft); border-color:var(--red); }
+.fb { font-size:14px; margin:6px 0 0; }
+.error { margin:12px 0 0; padding:10px 12px; border-radius:12px; background:var(--red-soft); color:var(--red); font-size:14px; font-weight:600; }
+.done { background:var(--green-soft); border:2px solid var(--green); border-radius:16px; padding:20px; text-align:center; margin-top:14px; }
+.done > b { font-size:24px; color:var(--green); display:block; margin:6px 0; }
+.done > p { margin:0 0 4px; }
+.plane { font-size:36px; }
