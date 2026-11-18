@@ -11,7 +11,7 @@ export type ProgramStatus = "active" | "completed";
 export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules", "heart-survey", "company-voyage", "captain-cruise", "count-your-dream", "dream-route"] as const;
 export type ReadyProgramKey = typeof READY_PROGRAM_KEYS[number];
 // Games placed as steps inside a program (not in the ready-games catalog).
-export const PROGRAM_GAME_KEYS = ["first-year", "safety-watch", "free-membership", "marketing-director"] as const;
+export const PROGRAM_GAME_KEYS = ["first-year", "safety-watch", "free-membership", "marketing-director", "final-voyage-1"] as const;
 export type ProgramGameKey = typeof PROGRAM_GAME_KEYS[number];
 export type TaskInteractiveKind = ReadyProgramKey | ProgramGameKey;
 export function isTaskInteractiveKind(value: unknown): value is TaskInteractiveKind {

@@ -19,6 +19,7 @@ import { FirstYearGame } from "./FirstYearGame";
 import { SafetyWatchGame } from "./SafetyWatchGame";
 import { FreeMembershipGame } from "./FreeMembershipGame";
 import { MarketingDirectorGame } from "./MarketingDirectorGame";
+import { FinalVoyageGame } from "./FinalVoyageGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
 import { QuizPreview, QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
@@ -122,6 +123,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "safety-watch" && <SafetyWatchGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "free-membership" && <FreeMembershipGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "marketing-director" && <MarketingDirectorGame taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {task.interactiveKind === "final-voyage-1" && <FinalVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "company-voyage" && <CompanyVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "captain-cruise" && <CaptainCruiseGame taskId={task.id} onCompleted={onInteractiveComplete} />}

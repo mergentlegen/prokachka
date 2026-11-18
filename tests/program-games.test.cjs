@@ -141,7 +141,7 @@ test('«Вахта безопасности»: the answers in the game and in th
     assert.ok(watch.SAFETY_WATCH_SOURCES[question.src], question.q);
   }
   const games = loadTs('shared/domain/program-games.ts');
-  assert.deepEqual(games.PROGRAM_GAMES.map((game) => game.kind), ['first-year', 'safety-watch', 'free-membership', 'marketing-director']);
+  assert.deepEqual(games.PROGRAM_GAMES.map((game) => game.kind), ['first-year', 'safety-watch', 'free-membership', 'marketing-director', 'final-voyage-1']);
 });
 
 test('«Вахта безопасности» requests are checked before they reach the database', async () => {

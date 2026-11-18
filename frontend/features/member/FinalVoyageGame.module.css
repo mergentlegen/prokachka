@@ -1,0 +1,61 @@
+/* «Финальный рейс уровня 1»: the colours of the author's file (night-sea gradient, white cards, orange buttons). */
+.voyage { background:linear-gradient(180deg,#0b2a4a 0%,#134e7a 55%,#1d7fb0 100%); color:#0f2238; min-height:100%; padding:16px;
+  font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
+/* on a phone the sea fills the task window under its title bar */
+@media (max-width: 760px) { .voyage { min-height:calc(100dvh - 66px - env(safe-area-inset-top)); } }
+.voyage h3 { font-family:inherit; letter-spacing:.3px; }
+.wrap { width:100%; max-width:520px; margin:0 auto; }
+.voyage .top { color:#fff; text-align:center; margin:6px 0 14px; }
+.voyage .top h3 { margin:0; font-size:clamp(17px, 5.4vw, 20px); color:#fff; line-height:1.3; }
+.voyage .top p { margin:4px 0 0; font-size:13px; opacity:.85; }
+.route { display:flex; justify-content:space-between; align-items:center; margin:0 4px 14px; padding:0; list-style:none; position:relative; }
+.route::before { content:""; position:absolute; left:14px; right:14px; top:50%; height:2px; background:rgba(255,255,255,.3); }
+.port { position:relative; z-index:1; width:30px; height:30px; border-radius:50%; background:#2a5d86; color:#cfe3f3; display:flex; align-items:center;
+  justify-content:center; font-size:13px; font-weight:700; border:2px solid rgba(255,255,255,.35); transition:.3s; }
+.portDone { background:#2fb37a; color:#fff; border-color:#2fb37a; }
+.portNow { background:#ffb648; color:#3a2500; border-color:#fff; transform:scale(1.15); }
+.card { background:#fff; border-radius:18px; padding:20px 18px; box-shadow:0 10px 30px rgba(0,0,0,.25); animation:in .35s ease; }
+.card p { margin:0 0 10px; }
+@keyframes in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .card { animation:none; } .port { transition:none; } }
+.tag { display:inline-block; background:#e8f3fb; color:#1d6aa0; font-size:12px; font-weight:700; padding:5px 10px; border-radius:20px; margin-bottom:10px; }
+.card .q { font-size:17px; font-weight:600; line-height:1.4; margin-bottom:16px; }
+.opt { display:block; width:100%; text-align:left; background:#f4f8fb; border:2px solid #dde8f1; border-radius:12px; padding:13px 14px; margin:0 0 10px;
+  font-size:15px !important; line-height:1.35; color:#0f2238; cursor:pointer; transition:.15s; font-family:inherit; }
+button.opt:hover:not(:disabled) { border-color:#7fb6dd; }
+.opt b { color:#1d6aa0; margin-right:6px; }
+.opt:disabled { cursor:default; opacity:1; }
+.right { background:#e6f7ee; border-color:#2fb37a; }
+.wrong { background:#fdecec; border-color:#e05656; }
+.fb { border-radius:12px; padding:12px 14px; margin-top:6px; font-size:14px; line-height:1.45; }
+.ok { background:#e6f7ee; color:#145c3b; }
+.no { background:#fdecec; color:#8a2323; }
+.wait { font-size:14px; color:#4b6078; }
+.btn { display:block; width:100%; border:none; border-radius:12px; padding:14px; font-size:16px; font-weight:700; cursor:pointer; margin-top:14px;
+  background:#ffb648; color:#3a2500; font-family:inherit; }
+.blue { background:#1d6aa0; color:#fff; }
+.btn:disabled { opacity:.45; cursor:default; }
+.field { display:block; margin-bottom:12px; font-size:14px; font-weight:600; }
+.field input { display:block; width:100%; margin-top:6px; padding:12px; border:2px solid #dde8f1; border-radius:10px; font-size:16px; font-family:inherit; color:#0f2238; background:#fff; }
+.field input:focus { outline:none; border-color:#7fb6dd; }
+.center { text-align:center; }
+.big { font-size:52px; margin:6px 0; line-height:1.2; }
+.stat { background:#f4f8fb; border-radius:12px; padding:14px; margin:14px 0; font-size:16px; }
+.stat b { font-size:22px; color:#1d6aa0; }
+.mistakes { text-align:left; margin:0 0 14px; }
+.card .listTitle { font-weight:700; margin-bottom:8px; }
+.mistake { background:#fdecec; border-radius:12px; padding:10px 12px; margin-bottom:8px; font-size:14px; line-height:1.45; }
+.mistake b, .mistake span { display:block; }
+.mistake span { margin-top:4px; color:#8a2323; }
+.miles { font-size:26px; font-weight:800; color:#2fb37a; margin:10px 0; }
+.note { background:#fff8ec; border:1px dashed #ffb648; border-radius:12px; padding:12px; font-size:14px; line-height:1.45; margin:16px 0 14px; text-align:left; }
+.tg { display:block; width:100%; margin:4px 0 6px; background:#229ED9; color:#fff; border:0; border-radius:10px; padding:11px 14px; font-weight:700; font-size:15px; cursor:pointer; font-family:inherit; }
+.tg:disabled { opacity:.6; cursor:default; }
+.card .small { font-size:12px; color:#6a5a3a; }
+.dream { display:grid; gap:4px; background:#e8f3fb; border-radius:12px; padding:12px 14px; margin:14px 0; }
+.read { border-top:1px solid #dde8f1; padding-top:14px; margin-top:14px; }
+.read .opt { cursor:default; }
+.card .explain { font-size:14px; color:#145c3b; }
+.notice { margin:12px 0 0; padding:10px 12px; border-radius:12px; background:#e8f3fb; color:#0f2238; font-size:14px; }
+.error { margin:12px 0 0; padding:10px 12px; border-radius:12px; background:#fdecec; color:#8a2323; font-size:14px; font-weight:600; }
+.counter { color:#fff; text-align:center; font-size:13px; opacity:.85; margin:12px 0 0; }

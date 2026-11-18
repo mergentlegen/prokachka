@@ -2,6 +2,7 @@ import { FIRST_YEAR_DESCRIPTION, FIRST_YEAR_KIND, FIRST_YEAR_REWARD, FIRST_YEAR_
 import { SAFETY_WATCH_DESCRIPTION, SAFETY_WATCH_KIND, SAFETY_WATCH_REWARD, SAFETY_WATCH_TITLE } from "@/shared/domain/safety-watch";
 import { FREE_MEMBERSHIP_DESCRIPTION, FREE_MEMBERSHIP_KIND, FREE_MEMBERSHIP_REWARD, FREE_MEMBERSHIP_TITLE } from "@/shared/domain/free-membership";
 import { MARKETING_DIRECTOR_DESCRIPTION, MARKETING_DIRECTOR_KIND, MARKETING_DIRECTOR_REWARD, MARKETING_DIRECTOR_TITLE } from "@/shared/domain/marketing-director";
+import { FINAL_VOYAGE_DESCRIPTION, FINAL_VOYAGE_KIND, FINAL_VOYAGE_REWARD, FINAL_VOYAGE_TITLE } from "@/shared/domain/final-voyage";
 import type { ProgramGameKey } from "@/shared/domain/types";
 
 // Ready games a mentor can put into a program as a step (no deadline, miles right after finishing).
@@ -11,5 +12,6 @@ export const PROGRAM_GAMES: readonly ProgramGame[] = [
   { kind: SAFETY_WATCH_KIND, title: SAFETY_WATCH_TITLE, description: SAFETY_WATCH_DESCRIPTION, reward: SAFETY_WATCH_REWARD, minutes: 10, icon: "🛡️" },
   { kind: FREE_MEMBERSHIP_KIND, title: FREE_MEMBERSHIP_TITLE, description: FREE_MEMBERSHIP_DESCRIPTION, reward: FREE_MEMBERSHIP_REWARD, minutes: 5, icon: "🎁" },
   { kind: MARKETING_DIRECTOR_KIND, title: MARKETING_DIRECTOR_TITLE, description: MARKETING_DIRECTOR_DESCRIPTION, reward: MARKETING_DIRECTOR_REWARD, minutes: 5, icon: "🏅" },
+  { kind: FINAL_VOYAGE_KIND, title: FINAL_VOYAGE_TITLE, description: FINAL_VOYAGE_DESCRIPTION, reward: FINAL_VOYAGE_REWARD, minutes: 7, icon: "🚢" },
 ];
 export function programGame(kind: unknown) { return PROGRAM_GAMES.find((game) => game.kind === kind); }

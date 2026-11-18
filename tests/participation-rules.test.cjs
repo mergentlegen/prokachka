@@ -40,7 +40,7 @@ test('«Правила участия»: the database keeps the key, renames the
   assert.match(sql, /update public\.task_programs set title = 'Правила участия' where template_key = 'starter-rules' and title = 'Правила игры';/);
   assert.match(sql, /if task\.interactive_kind = 'starter-rules' then return jsonb_build_object\('validationError'/);
   assert.match(sql, /on conflict \(user_id, task_id, question\) do nothing/);
-  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261120-participation-rules\.sql\s*$/);
+  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261120-participation-rules\.sql\r?\n/);
   assert.match(read('.github/workflows/check.yml'), /20261120-participation-rules\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/participation-rules\.sql/);
 });
 

@@ -9,6 +9,8 @@ import { dreamRouteAction } from "@/backend/services/dream-route.service";
 import { firstYearAction } from "@/backend/services/first-year.service";
 import { safetyWatchAction, type SafetyWatchOperation } from "@/backend/services/safety-watch.service";
 import { participationRulesAction } from "@/backend/services/participation-rules.service";
+import { finalVoyageAction, type FinalVoyageOperation } from "@/backend/services/final-voyage.service";
+import { FINAL_VOYAGE_DREAM_LIMIT, FINAL_VOYAGE_STEPS } from "@/shared/domain/final-voyage";
 import { CABINET_TRAINERS, cabinetTrainerAction, isCabinetTrainerKind, type CabinetTrainerOperation } from "@/backend/services/cabinet-trainer.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
@@ -25,7 +27,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch" | "free-membership" | "marketing-director" | "participation-rules"; step?: unknown; question?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete" | "answer"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch" | "free-membership" | "marketing-director" | "participation-rules" | "final-voyage"; step?: unknown; question?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete" | "answer" | "dream"; index?: unknown; payload?: unknown };
     const action = body?.action;
     if (isCabinetTrainerKind(action)) {
       // A cabinet trainer: its own number of missions and questions of the check.
@@ -56,6 +58,22 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Ответ не сохранился.", 409);
       if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить ответ. Попробуйте ещё раз.");
+      return ok({ attempt: result.data });
+    }
+    if (action === "final-voyage") {
+      // «Финальный рейс уровня 1»: the current step, an option 0–2 or the three short dream lines.
+      const payload = body.payload as { answer?: unknown; what?: unknown; price?: unknown; when?: unknown } | undefined;
+      const line = (value: unknown) => typeof value === "string" && value.trim().length > 0 && value.length <= FINAL_VOYAGE_DREAM_LIMIT;
+      if (!body.operation || !["start", "answer", "dream", "complete"].includes(body.operation)
+        || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) >= FINAL_VOYAGE_STEPS.length))
+        || (payload !== undefined && (!payload || typeof payload !== "object" || Array.isArray(payload)))
+        || (body.operation === "answer" && (!Number.isInteger(payload?.answer) || Number(payload?.answer) < 0 || Number(payload?.answer) > 2))
+        || (body.operation === "dream" && (!line(payload?.what) || !line(payload?.price) || !line(payload?.when)))
+        || JSON.stringify(payload || {}).length > 1000) return failure("Некорректные данные игры.", 400);
+      const result = await finalVoyageAction(user.id, taskId, body.operation as FinalVoyageOperation, Number(body.step || 0), payload as Record<string, unknown> | undefined);
+      if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
+      if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс игры.", 409);
+      if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить игру. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
     if (action === "safety-watch") {
