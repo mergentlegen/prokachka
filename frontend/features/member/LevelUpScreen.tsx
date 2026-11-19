@@ -15,9 +15,9 @@ export function LevelUpScreen({ level, onTeam, onClose }: { level: number; onTea
     <section className={styles.content}>
       <p className={styles.badge}><span aria-hidden="true">★</span>Уровень {level}</p>
       <h2 id="level-up-title">{message.title}</h2>
-      <p className={styles.text}>{message.text}</p>
+      {message.lines.map((line) => <p key={line} className={styles.text}>{line}</p>)}
       <button ref={button} type="button" className={styles.team} onClick={onTeam}>{message.action}</button>
-      <p className={styles.next}>Открылись задания уровня {level}. Прошлые задания — в архиве, их можно пересмотреть.</p>
+      <p className={styles.next}>{message.note}</p>
     </section>
   </div>;
 }

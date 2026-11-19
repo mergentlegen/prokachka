@@ -21,7 +21,10 @@ test('levels: names and the congratulation of level 2', () => {
   assert.deepEqual(levels.levelBadges(1), [], 'no badge before level 2');
   assert.deepEqual(levels.levelBadges(2).map((badge) => badge.title), ['Капитан']);
   assert.deepEqual(levels.levelBadges(3).map((badge) => badge.title), ['Капитан', 'Уровень 3']);
-  assert.deepEqual(levels.levelUpMessage(2), { title: 'Ты на безоплатном членстве', text: 'Теперь ты не только игрок — ты капитан своей команды', action: 'Посмотреть мою команду' });
+  assert.deepEqual(levels.levelUpMessage(2), { title: '🎉 Ты на уровне 2!', action: 'Посмотреть мою команду',
+    lines: ['Теперь ты партнёр inCruises — не только путешественник, но и предприниматель.', 'Твоя цель на этом уровне — безоплатное членство: твой клуб будет оплачиваться за счёт твоей команды.'],
+    note: 'Задания нового уровня уже открыты на сайте. Прошлые задания остались в архиве, их можно пересмотреть в любой момент.' });
+  assert.equal(levels.levelUpMessage(3).title, '🎉 Ты на уровне 3!');
 });
 
 function feedService(tables) {
@@ -84,11 +87,14 @@ test('the task card of the archive shows materials and the result, without sendi
   assert.doesNotMatch(game, /Начать игру/);
 });
 
-test('the congratulation screen: free membership, captain, and the team button', () => {
+test('the congratulation screen: partner, free membership goal, and the team button', () => {
   const { LevelUpScreen } = loadTs('frontend/features/member/LevelUpScreen.tsx');
   const html = renderToStaticMarkup(React.createElement(LevelUpScreen, { level: 2, onTeam() {}, onClose() {} }));
-  assert.match(html, /Ты на безоплатном членстве/);
-  assert.match(html, /Теперь ты не только игрок — ты капитан своей команды/);
+  assert.match(html, /Ты на уровне 2!/);
+  assert.match(html, /Теперь ты партнёр inCruises — не только путешественник, но и предприниматель\./);
+  assert.match(html, /Твоя цель на этом уровне — безоплатное членство: твой клуб будет оплачиваться за счёт твоей команды\./);
+  assert.match(html, /Задания нового уровня уже открыты на сайте\. Прошлые задания остались в архиве, их можно пересмотреть в любой момент\./);
+  assert.doesNotMatch(html, /игрок|капитан своей команды/);
   assert.match(html, />Посмотреть мою команду</);
   assert.match(html, /Уровень 2/);
 });
@@ -199,8 +205,9 @@ test('level 2 comes at 100 miles: the same number on the site and in the databas
 test('Telegram: the participant is congratulated, the mentor learns who moved up', () => {
   const { levelUpText } = loadTs('backend/services/telegram-notifications.service.ts');
   const member = levelUpText(2, null, 'https://prokachka.kz/');
-  assert.match(member, /Ты на уровне 2!/);
-  assert.match(member, /Ты на безоплатном членстве/);
+  assert.match(member, /^🎉 Ты на уровне 2!\n\nТеперь ты партнёр inCruises/);
+  assert.match(member, /безоплатное членство: твой клуб будет оплачиваться за счёт твоей команды\./);
+  assert.match(member, /Задания нового уровня уже открыты на сайте\./);
   const mentor = levelUpText(2, 'Алия Бекова', 'https://prokachka.kz/admin?section=network');
   assert.match(mentor, /Алия Бекова — новый уровень: 2 \(Капитан\)/);
   assert.match(mentor, /Теперь у него новые задания/);

@@ -22,8 +22,12 @@ export function levelLabel(level: number) {
 
 /** The congratulation shown once after moving up. */
 export function levelUpMessage(level: number) {
-  if (level === 2) return { title: "Ты на безоплатном членстве", text: "Теперь ты не только игрок — ты капитан своей команды", action: "Посмотреть мою команду" };
-  return { title: `Ты на уровне ${level}!`, text: "Новый уровень открыт: новые задания", action: "Посмотреть мою команду" };
+  const note = "Задания нового уровня уже открыты на сайте. Прошлые задания остались в архиве, их можно пересмотреть в любой момент.";
+  if (level === 2) return { title: "🎉 Ты на уровне 2!", note, action: "Посмотреть мою команду", lines: [
+    "Теперь ты партнёр inCruises — не только путешественник, но и предприниматель.",
+    "Твоя цель на этом уровне — безоплатное членство: твой клуб будет оплачиваться за счёт твоей команды.",
+  ] };
+  return { title: `🎉 Ты на уровне ${level}!`, note, action: "Посмотреть мою команду", lines: ["Новый уровень открыт: новые задания."] };
 }
 
 /** Profile badges earned by moving up: «Капитан» for level 2, then level 3. */

@@ -151,11 +151,11 @@ export function levelUpText(level: number, memberName: string | null, link: stri
   ].filter(Boolean).join("\n");
   const message = levelUpMessage(level);
   return [
-    "🎉 Ты на уровне " + level + "!",
-    message.title + ". " + message.text + ".",
-    "На сайте уже открыты задания нового уровня. Прошлые задания остались в архиве — их можно пересмотреть.",
+    message.title,
+    ...message.lines,
+    message.note,
     link ? "Открыть: " + link : "",
-  ].filter(Boolean).join("\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 /** A participant left a review: the mentor sees who, the stars and the beginning of the text. */
