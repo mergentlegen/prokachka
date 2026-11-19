@@ -47,7 +47,7 @@ export type MemberProgramProgress = {
 };
 /** A program as the participant sees it: every visible step in order. Steps not reached yet carry only the title and miles. */
 export type ProgramModuleStep = { id: string; number: number; title: string; maxPoints: number; interactiveKind?: TaskInteractiveKind; description?: string; resourceUrl?: string };
-export type ProgramModule = { id: string; title: string; isPinned: boolean; status: ProgramStatus; currentTaskId?: string; completedAt?: string; steps: ProgramModuleStep[] };
+export type ProgramModule = { id: string; title: string; isPinned: boolean; pinnedAt?: string; status: ProgramStatus; currentTaskId?: string; completedAt?: string; steps: ProgramModuleStep[] };
 export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; pinnedAt?: string; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;

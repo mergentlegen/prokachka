@@ -19,7 +19,7 @@ export function programModules(programs: Row[], tasks: Row[], progressByProgram:
     const completed = progress?.status === "completed";
     const current = completed ? steps.length : steps.findIndex((task) => String(task.id) === String(progress?.current_task_id));
     return [{
-      id: String(program.id), title: String(program.title || ""), is_pinned: Boolean(program.is_pinned), status: completed ? "completed" : "active",
+      id: String(program.id), title: String(program.title || ""), is_pinned: Boolean(program.is_pinned), pinned_at: program.is_pinned ? program.pinned_at ?? null : null, status: completed ? "completed" : "active",
       current_task_id: !completed && current >= 0 ? String(steps[current].id) : null, completed_at: completed ? progress?.completed_at ?? null : null,
       steps: steps.map((task, index) => ({
         id: String(task.id), number: index + 1, title: String(task.title || ""), max_points: Number(task.max_points || 0), interactive_kind: task.interactive_kind ?? null,

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { ProgramModule, Submission, Task } from "@/shared/domain/types";
 import { loadMemberLevelArchive } from "@/frontend/shared/api/client";
 import { levelHasOnlyPrograms, levelTitle } from "@/shared/domain/levels";
+import { compareTaskFeed } from "@/shared/domain/task-feed-order";
 import { plural } from "@/frontend/shared/lib/plural";
 import { ProgramModules } from "./ProgramModules";
 import { TaskCard } from "./TaskCard";
@@ -42,7 +43,8 @@ export function LevelArchive({ level, latest, onFeedback, onSubmit, onProgress }
     return () => { active = false; };
   }, [level]);
   const data = archive?.level === level ? archive.data : null;
-  const regular = data ? data.tasks.filter((task) => task.publicationType !== "sequential") : [];
+  // The same order as the mentor set it, like on the current level.
+  const regular = data ? data.tasks.filter((task) => task.publicationType !== "sequential").sort(compareTaskFeed) : [];
   const steps = data ? data.tasks.filter((task) => task.publicationType === "sequential") : [];
   const card = (task: Task, inModule = false): ReactNode => <TaskCard key={task.id} task={task} submission={latest.get(task.id)} onSubmit={() => onSubmit(task)} onFeedback={onFeedback} onInteractiveProgress={onProgress} readOnly inModule={inModule} />;
   return <div className={styles.archive}>

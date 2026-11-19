@@ -182,6 +182,27 @@ test('the archive passes a returned work to sending and refreshes after game pro
   assert.match(app, /onSubmit=\{\(task\) => submitTask\(task\.id, task\)\}/);
 });
 
+test('the archive shows the tasks of an earlier level in the order the mentor set, not by publication date', async () => {
+  const harness = hookHarness();
+  const row = (id, createdAt, extra = {}) => ({ ...task, id, title: 'Задание ' + id, createdAt, updatedAt: createdAt, ...extra });
+  // The server sends the tasks by publication date; the mentor's order travels in feedOrder.
+  const tasks = [row('test', '2026-09-15', { feedOrder: 1 }), row('dream', '2026-09-26', { feedOrder: 4 }), row('rules', '2026-09-27', { feedOrder: 0 }),
+    row('profit', '2026-09-30', { feedOrder: 2 }), row('new', '2026-10-01'), row('pinned', '2026-10-02', { isPinned: true, pinnedAt: '2026-10-03' }),
+    row('step', '2026-09-01', { publicationType: 'sequential', feedOrder: 0 })];
+  const shown = [];
+  const { LevelArchive } = loadTs('frontend/features/member/LevelArchive.tsx', {
+    react: { ...React, ...harness.react },
+    '@/frontend/shared/api/client': { loadMemberLevelArchive: async () => ({ tasks, programModules: [], passedTasks: [] }) },
+    './TaskCard': { TaskCard: ({ task: item }) => { shown.push(item.id); return null; } },
+    './LevelArchive.module.css': { __esModule: true, default: new Proxy({}, { get: (_t, key) => key }) },
+  });
+  harness.mount(LevelArchive, { level: 1, latest: new Map(), onFeedback() {}, onSubmit: async () => {} });
+  const tree = await harness.settle();
+  const cards = nodes(tree, (node) => typeof node.type === 'function' && node.type.name === 'TaskCard').map((node) => node.props.task.id);
+  assert.deepEqual(cards.length ? cards : shown, ['pinned', 'rules', 'test', 'profit', 'dream', 'new']);
+  harness.unmount();
+});
+
 test('mentors filter tasks and programs by level once there is more than one level', () => {
   const harness = hookHarness();
   const { TasksView, taskLevels } = loadTs('frontend/features/admin/AdminTasksView.tsx', { react: harness.react });

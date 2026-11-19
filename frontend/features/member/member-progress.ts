@@ -45,10 +45,16 @@ export function programStepStates(module: ProgramModule, latest: ReadonlyMap<str
   });
 }
 
-/** Programs in progress first (pinned ones on top), passed programs at the end; otherwise the order they were published in. */
+/**
+ * Programs exactly in the mentor's order: pinned ones on top in the order they were pinned, then the order they were published in.
+ * Passing a program never moves it — it stays in its place with its tick.
+ */
 export function orderedProgramModules(modules: ProgramModule[]) {
+  const pinTime = (module: ProgramModule) => { const time = Date.parse(module.pinnedAt || ""); return Number.isFinite(time) ? time : Infinity; };
   return modules.map((module, index) => ({ module, index }))
-    .sort((a, b) => Number(a.module.status === "completed") - Number(b.module.status === "completed") || Number(b.module.isPinned) - Number(a.module.isPinned) || a.index - b.index)
+    .sort((a, b) => Number(b.module.isPinned) - Number(a.module.isPinned)
+      || (a.module.isPinned && b.module.isPinned ? (pinTime(a.module) === pinTime(b.module) ? 0 : pinTime(a.module) < pinTime(b.module) ? -1 : 1) : 0)
+      || a.index - b.index)
     .map(({ module }) => module);
 }
 
