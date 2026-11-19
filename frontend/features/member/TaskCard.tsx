@@ -33,8 +33,13 @@ const ARCHIVE_MATERIAL: Record<string, typeof FirstYearMaterial> = {
   "captain-cruise": CaptainCruiseMaterial, "safety-watch": SafetyWatchMaterial, "first-year": FirstYearMaterial, "free-membership": FreeMembershipMaterial, "marketing-director": MarketingDirectorMaterial,
 };
 
-export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false, readOnly = false }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean; /** An earlier level: materials only; only a work the mentor returned can be sent again. */ readOnly?: boolean }) {
-  const [open, setOpen] = useState(false);
+export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractiveComplete, onInteractiveProgress, inModule = false, readOnly = false, sheetOnly = false, onClose }: { task: Task; submission?: Submission; onSubmit: (id: string) => Promise<void>; onFeedback?: (taskId: string) => void; onInteractiveComplete?: (submission: Submission) => void; onInteractiveProgress?: () => void; /** Inside a program module the step line is already shown around the card. */ inModule?: boolean; /** An earlier level: materials only; only a work the mentor returned can be sent again. */ readOnly?: boolean;
+  /** A passed program step: no card, the window with the whole material opens at once; `onClose` when it is closed. */ sheetOnly?: boolean; onClose?: () => void }) {
+  const [open, setOpenState] = useState(sheetOnly);
+  function setOpen(value: boolean) {
+    setOpenState(value);
+    if (!value && sheetOnly) onClose?.();
+  }
   const [material, setMaterial] = useState(false);
   const [sending, setSending] = useState(false);
   const [linkOpened, setLinkOpened] = useState(false);
@@ -88,7 +93,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     return <button className={styles.submit} disabled={sending} onClick={() => void send()}>{sending ? "Открываем..." : submitLabel}</button>;
   }
   return <>
-    <article className={styles.card} id={"task-" + task.id}>
+    {!sheetOnly && <article className={styles.card} id={"task-" + task.id}>
       {task.isPinned && <PinBadge />}
       <div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>
       {step && <div className={styles.program}><span>{task.programTitle ? `«${task.programTitle}» · ` : "Программа · "}шаг {step}{task.programSteps ? ` из ${task.programSteps}` : ""}</span>{task.programSteps && <i style={{ "--progress": `${Math.max(4, Math.min(100, ((step - 1) / task.programSteps) * 100))}%` } as CSSProperties} />}</div>}
@@ -104,7 +109,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
       <div className={styles.actions}>{status === "accepted" && !captainPending && !surveyInProgress && !(readOnly && isInteractive && !gameDone)
           ? <button className={`${styles.read} ${styles.readMaterial}`} onClick={() => setOpen(true)} aria-haspopup="dialog"><span className={styles.readIcon} aria-hidden="true">📖</span>{isInteractive ? "Материал игры" : "Материал задания"}</button>
           : <button className={styles.read} onClick={() => setOpen(true)} aria-haspopup="dialog">{status === "revision" ? "Комментарий наставника" : isSurvey ? "Открыть опросник" : isInteractive ? "Открыть игру" : "Подробнее"} <span aria-hidden="true">↗</span></button>}{action()}</div>
-    </article>
+    </article>}
     {open && <ModalSheet title={isInteractive ? task.title : "Задание"} variant={isInteractive ? "immersive" : "default"} onClose={() => setOpen(false)}>
       <div className={`${styles.detail} ${isInteractive ? styles.interactiveDetail : ""}`}>
         {(!isInteractive || !showGame) && <><div className={styles.top}><span className={`${styles.status} ${styles[status]}`}>{statusText}</span><span className={styles.points}>до {formatMiles(task.maxPoints)}</span></div>

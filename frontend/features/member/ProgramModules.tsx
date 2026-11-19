@@ -9,11 +9,12 @@ import styles from "./ProgramModules.module.css";
 
 type Props = {
   modules: ProgramModule[]; tasks: Task[]; latest: ReadonlyMap<string, Submission>;
-  /** Passed steps, whole: opening one shows the usual task card with its video, files and test answers. */
+  /** Passed steps, whole: one tap opens the window with all the material — text, video, files, test answers, the answer and the comment. */
   passedTasks?: Task[];
   /** The open program; null when every block is closed. */
   selectedId: string | null; onSelect: (programId: string | null) => void;
-  renderTask: (task: Task) => ReactNode; onFeedback: (taskId: string) => void;
+  /** With `sheet` the task is shown as its material window only (a passed step); `sheet.onClose` when it is closed. */
+  renderTask: (task: Task, sheet?: { onClose: () => void }) => ReactNode; onFeedback: (taskId: string) => void;
   /** An earlier level (the archive): every step opens for reading, also those never reached. */
   readAll?: boolean;
   /** Shown when there are no programs. */
@@ -75,18 +76,21 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
             const openable = state === "done" || (readAll && Boolean(readable));
             const expanded = openable && openStep === step.id;
             const note = state === "locked" ? (readAll ? " · не пройден" : " · закрыт") : state === "skipped" ? (module.status === "active" && !readAll ? " · откроется после текущего" : " · не пройден") : "";
+            // A step with its whole task opens the material window at once; the short details stay only for an older feed without it.
+            const sheet = openable && Boolean(readable);
             return <li key={step.id} className={`${styles.step} ${styles[state]} ${openable && state !== "done" ? styles.readable : ""}`} data-stagger style={staggerStyle(index)}>
-              <button type="button" className={styles.row} disabled={!openable} aria-expanded={openable ? expanded : undefined} onClick={() => setOpenStep(expanded ? null : step.id)}>
+              <button type="button" className={styles.row} disabled={!openable} aria-haspopup={sheet ? "dialog" : undefined} aria-expanded={openable && !sheet ? expanded : undefined} onClick={() => setOpenStep(expanded ? null : step.id)}>
                 <span className={styles.mark} aria-hidden="true">{state === "done" ? "✓" : state === "locked" && !readAll ? <LockIcon /> : step.number}</span>
-                <span className={styles.text}><small>Шаг {step.number}{note}</small><strong>{step.title}</strong></span>
+                <span className={styles.text}><small>Шаг {step.number}{note}</small><strong>{step.title}</strong>{sheet && <em className={styles.openMaterial}>📖 Открыть материал</em>}</span>
                 <span className={styles.miles}>{state === "done" ? `+${formatMiles(submission?.points || 0)}` : formatMiles(step.maxPoints)}</span>
               </button>
-              {openable && <Drawer open={expanded}>{readable ? <div className={styles.passedCard}>{renderTask(readable)}</div> : <div className={styles.details}>
+              {sheet && expanded && readable && renderTask(readable, { onClose: () => setOpenStep(null) })}
+              {openable && !sheet && <Drawer open={expanded}><div className={styles.details}>
                 {step.description ? <p className={styles.description}>{step.description}</p> : step.interactiveKind ? <p className={styles.description}>Игра пройдена.</p> : null}
                 {step.resourceUrl && <a className={styles.link} href={step.resourceUrl} target="_blank" rel="noopener noreferrer">Открыть материал ↗</a>}
                 {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
                 {!step.interactiveKind && <button type="button" className={styles.link} onClick={() => onFeedback(step.id)}>Открыть переписку с наставником →</button>}
-              </div>}</Drawer>}
+              </div></Drawer>}
             </li>;
           })}
         </ol></Drawer>

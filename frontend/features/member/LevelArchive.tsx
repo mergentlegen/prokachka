@@ -46,7 +46,7 @@ export function LevelArchive({ level, latest, onFeedback, onSubmit, onProgress }
   // The same order as the mentor set it, like on the current level.
   const regular = data ? data.tasks.filter((task) => task.publicationType !== "sequential").sort(compareTaskFeed) : [];
   const steps = data ? data.tasks.filter((task) => task.publicationType === "sequential") : [];
-  const card = (task: Task, inModule = false): ReactNode => <TaskCard key={task.id} task={task} submission={latest.get(task.id)} onSubmit={() => onSubmit(task)} onFeedback={onFeedback} onInteractiveProgress={onProgress} readOnly inModule={inModule} />;
+  const card = (task: Task, inModule = false, sheet?: { onClose: () => void }): ReactNode => <TaskCard key={task.id} task={task} submission={latest.get(task.id)} onSubmit={() => onSubmit(task)} onFeedback={onFeedback} onInteractiveProgress={onProgress} readOnly inModule={inModule} sheetOnly={Boolean(sheet)} onClose={sheet?.onClose} />;
   return <div className={styles.archive}>
     <p className={styles.note}><span aria-hidden="true">📚</span>Архив уровня {level}: {onlyPrograms ? "программы, видео и материалы" : "задания, программы, игры, видео и материалы"} можно пересмотреть. Новые ответы здесь не отправляются — только работы, которые наставник вернул на доработку.</p>
     <div className="section-heading"><div><p className="eyebrow">Уровень {level} · архив</p><h2>{onlyPrograms ? "Прошлые программы" : "Прошлые задания"}</h2></div>
@@ -56,7 +56,7 @@ export function LevelArchive({ level, latest, onFeedback, onSubmit, onProgress }
     {error?.level === level ? <p className={styles.empty}>{error.message}</p>
       : !data ? <p className={styles.empty}>Открываем архив…</p>
         : view === "programs" ? data.programModules.length === 0 ? <p className={styles.empty}>На этом уровне программ не было.</p>
-          : <ProgramModules modules={data.programModules} tasks={steps} passedTasks={data.passedTasks} latest={latest} selectedId={programTab} onSelect={setProgramTab} onFeedback={onFeedback} renderTask={(task) => card(task, true)} readAll />
+          : <ProgramModules modules={data.programModules} tasks={steps} passedTasks={data.passedTasks} latest={latest} selectedId={programTab} onSelect={setProgramTab} onFeedback={onFeedback} renderTask={(task, sheet) => card(task, true, sheet)} readAll />
           : regular.length === 0 ? <p className={styles.empty}>На этом уровне заданий не было.</p> : <div className="task-list">{regular.map((task) => card(task))}</div>}
   </div>;
 }

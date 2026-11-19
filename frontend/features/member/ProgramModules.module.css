@@ -46,7 +46,8 @@
 .readable .text strong { color:inherit; }
 .readable .row:hover { background:#f7f9fc; }
 
-.passedCard { padding:0 10px 10px; }
+/* A step with its material: one tap opens the whole material window. */
+.openMaterial { margin-top:4px; color:var(--blue); font-size:13px; font-style:normal; font-weight:700; }
 .details { display:grid; gap:12px; padding:2px 16px 16px 58px; }
 .description { margin:0; color:#354661; font-size:15px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
 .link { justify-self:start; padding:0; border:0; background:transparent; color:var(--blue); font:inherit; font-family:var(--program-font); font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; }

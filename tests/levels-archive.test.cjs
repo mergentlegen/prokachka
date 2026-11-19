@@ -109,7 +109,8 @@ test('archive program steps all open for reading, unreached ones marked «не �
     passedTasks: [{ id: 'a', title: 'Видео' }, { id: 'b', title: 'Звонок' }], latest: new Map([['a', accepted('a')]]), renderTask: (item) => 'КАРТОЧКА ' + item.title }));
   assert.match(html, /не пройден/);
   assert.doesNotMatch(html, /<button[^>]*disabled=""[^>]*>(?:(?!<\/button>)[\s\S])*Звонок/, 'an unreached step can be opened');
-  assert.match(html, /КАРТОЧКА Звонок/);
+  assert.doesNotMatch(html, /КАРТОЧКА/, 'the material window opens only on a tap');
+  assert.equal((html.match(/📖 Открыть материал/g) || []).length, 2, 'every archive step offers its material');
 });
 
 test('archive card: a returned work can be sent again, nothing else can', () => {

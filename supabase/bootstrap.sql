@@ -69,3 +69,4 @@
 \ir 20261119-marketing-director.sql
 \ir 20261120-participation-rules.sql
 \ir 20261121-final-voyage.sql
+\ir 20261122-program-first-open-step.sql

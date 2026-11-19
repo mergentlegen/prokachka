@@ -261,3 +261,23 @@ test('competing approval and rejection process a request once', { skip: !port },
   const state = JSON.parse(query(`select jsonb_build_object('status',r.status,'team',u.team_id) from team_join_requests r join users u on u.id=r.user_id where r.id='${request}'`));
   assert.equal(state.team, state.status === 'approved' ? team : null);
 });
+
+test('a new step order saved while the current step is accepted still opens the first step not passed', { skip: !port }, async () => {
+  for (let round = 0; round < 6; round += 1) {
+    const { team, root, alice } = fixture();
+    const program = randomUUID(), [s1, s2, s3, added] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    query(`insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${program}','${team}','Race',48,'${root}');
+      insert into tasks(id,title,description,team_id,max_points,publication_type,program_id,position,publisher_id) values
+        ('${s1}','1','1','${team}',2,'sequential','${program}',1,'${root}'),('${s2}','2','2','${team}',2,'sequential','${program}',2,'${root}'),
+        ('${s3}','3','3','${team}',2,'sequential','${program}',3,'${root}'),('${added}','New','New','${team}',2,'sequential','${program}',4,'${root}');
+      insert into member_program_progress(user_id,program_id,current_task_id,unlocked_at,due_at,status) values('${alice}','${program}','${s2}',now(),now()+interval '2 days','active');
+      insert into submissions(user_id,task_id,status,media_type,answer_text,points,reviewed_at) values('${alice}','${s1}','accepted','text','done',2,now());`);
+    const work = query(`insert into submissions(user_id,task_id,media_type,answer_text) values('${alice}','${s2}','text','Answer') returning id;`);
+    // The mentor moves the new step to the top while another mentor accepts step 2.
+    await Promise.all([
+      parallel(`select app_program_reorder('${root}','${program}',array['${added}','${s1}','${s2}','${s3}']::uuid[]);`),
+      parallel(`select tg_review_submission('${work}','${root}',false,'accepted',2,'Ok',0);`),
+    ]);
+    assert.equal(query(`select current_task_id from member_program_progress where user_id='${alice}' and program_id='${program}'`), added, `round ${round}`);
+  }
+});

@@ -101,7 +101,7 @@ test('passed steps come whole with the feed, and their materials open for the pa
   assert.equal(progress.feedShowsTask({ error: 'x' }, 'done'), false);
 });
 
-test('tapping a passed step opens its full task card', async () => {
+test('one tap on a passed step opens the window with its whole material; closing it brings the list back', async () => {
   const hookHarness = require('./helpers/hook-harness.cjs');
   const harness = hookHarness();
   const { ProgramModules: Modules } = loadTs('frontend/features/member/ProgramModules.tsx', { react: harness.react });
@@ -110,11 +110,43 @@ test('tapping a passed step opens its full task card', async () => {
   const rendered = [];
   const nodes = (tree, predicate) => Array.isArray(tree) ? tree.flatMap((item) => nodes(item, predicate)) : !tree || typeof tree !== 'object' ? [] : [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
   let tree = harness.mount(Modules, { modules: [program], tasks: [{ id: 'b', title: 'Звонок' }], passedTasks: [{ id: 'a', title: 'Тест по продукту', quiz: { questions: 3 } }],
-    latest: new Map([['a', accepted('a', 5)]]), selectedId: 'p1', onSelect() {}, onFeedback() {}, renderTask: (task) => { rendered.push(task.id); return 'card ' + task.id; } });
+    latest: new Map([['a', accepted('a', 5)]]), selectedId: 'p1', onSelect() {}, onFeedback() {},
+    renderTask: (task, sheet) => { rendered.push([task.id, Boolean(sheet)]); return sheet ? { type: 'sheet', props: { onClose: sheet.onClose } } : 'card ' + task.id; } });
   try {
-    const row = nodes(tree, (node) => node.type === 'button' && node.props['aria-expanded'] === false && !node.props['data-program'])[0];
+    assert.ok(!rendered.some(([id]) => id === 'a'), 'nothing opens before the tap');
+    const row = nodes(tree, (node) => node.type === 'button' && node.props['aria-haspopup'] === 'dialog')[0];
+    assert.ok(row, 'the passed step row opens a window');
+    assert.equal(row.props['aria-expanded'], undefined);
     row.props.onClick();
     tree = await harness.settle();
-    assert.ok(rendered.includes('a'), 'the passed step is shown as the usual task card');
+    assert.deepEqual(rendered.filter(([id]) => id === 'a').at(-1), ['a', true], 'the passed step opens as the whole material window, not as a short card');
+    nodes(tree, (node) => node.type === 'sheet')[0].props.onClose();
+    tree = await harness.settle();
+    assert.equal(nodes(tree, (node) => node.type === 'sheet').length, 0, 'closing the window brings the list back');
+  } finally { harness.unmount(); }
+});
+
+test('a passed step window shows the whole material at once: full text, files, test answers, the answer and the comment', async () => {
+  const hookHarness = require('./helpers/hook-harness.cjs');
+  const harness = hookHarness();
+  const { TaskCard } = loadTs('frontend/features/member/TaskCard.tsx', { react: { ...React, ...harness.react } });
+  const nodes = (tree, predicate) => Array.isArray(tree) ? tree.flatMap((item) => nodes(item, predicate)) : !tree || typeof tree !== 'object' ? [] : [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
+  const text = (tree) => Array.isArray(tree) ? tree.map(text).join('') : tree && typeof tree === 'object' ? text(tree.props?.children) : tree == null || typeof tree === 'boolean' ? '' : String(tree);
+  const long = 'DAB — ежедневный бонус за активацию. '.repeat(20) + 'Конец текста.';
+  const step = { id: 'a', title: 'Что такое DAB и MAB', description: long, maxPoints: 2, isActive: true, publicationType: 'sequential', createdAt: '2026-11-11', updatedAt: '2026-11-11',
+    attachments: [{ id: 'f', fileName: 'dab.pdf', sizeBytes: 1000 }] };
+  let closed = 0;
+  const tree = harness.mount(TaskCard, { task: step, submission: { ...accepted('a', 2), answerText: 'Мой ответ', comment: 'Отлично' }, onSubmit: async () => undefined, inModule: true, sheetOnly: true, onClose: () => { closed += 1; } });
+  try {
+    assert.equal(nodes(tree, (node) => node.type === 'article').length, 0, 'no short card');
+    const sheet = nodes(tree, (node) => typeof node.type === 'function' && node.type.name === 'ModalSheet')[0];
+    assert.ok(sheet, 'the material window is open at once');
+    const shown = text(sheet.props.children);
+    assert.match(shown, /Конец текста\./, 'the whole text');
+    assert.match(shown, /Мой ответ/);
+    assert.match(shown, /Отлично/);
+    assert.ok(nodes(sheet.props.children, (node) => typeof node.type === 'function' && node.type.name === 'TaskAttachments').length, 'the files');
+    sheet.props.onClose();
+    assert.equal(closed, 1, 'closing the window tells the program list');
   } finally { harness.unmount(); }
 });
