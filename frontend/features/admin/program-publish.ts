@@ -2,13 +2,14 @@ import { addProgramGame, createAdminProgram, reorderProgramSteps, updateAdminTas
 import { uploadTaskAttachment } from "@/frontend/shared/api/client";
 import { uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
 import { saveTaskQuiz } from "@/frontend/shared/api/task-quiz-client";
-import { validateQuiz, type QuizQuestion } from "@/shared/domain/task-quiz";
+import { validateQuiz, validateQuizMessages, type QuizMessages, type QuizQuestion } from "@/shared/domain/task-quiz";
 import type { ProgramGameKey, Task, TaskProgram } from "@/shared/domain/types";
 
 /** A step as the builder hands it over: a normal task, or a ready game. */
 export type PublishStep = {
   game?: ProgramGameKey; title: string; description: string; resourceUrl: string; maxPoints: number; voiceAnswer: boolean;
   files: File[]; video: File | null; questions: QuizQuestion[];
+  /** The texts after a test-only step: shown at once, a mistake sends the step back by itself. */ messages?: QuizMessages;
 };
 const defaultApi = { createAdminProgram, uploadTaskAttachment, updateAdminTask, saveTaskQuiz, uploadTaskVideo, addProgramGame, reorderProgramSteps };
 export type PublishApi = typeof defaultApi;
@@ -45,7 +46,9 @@ export async function publishProgram(input: { title: string; deadlineHours: numb
       try {
         const checked = validateQuiz(step.questions);
         if ("error" in checked) throw new Error(checked.error);
-        const stored = await api.saveTaskQuiz(task.id, checked.questions);
+        const texts = validateQuizMessages(step.messages);
+        if ("error" in texts) throw new Error(texts.error);
+        const stored = await api.saveTaskQuiz(task.id, checked.questions, texts.messages);
         task = { ...task, quiz: { questions: stored.length } };
       } catch { failed.push(`вопросы шага ${number}`); }
     }

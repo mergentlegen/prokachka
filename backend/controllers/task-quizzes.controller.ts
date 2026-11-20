@@ -21,7 +21,7 @@ export async function readTaskQuiz(request: Request, taskId: string) {
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("forbidden" in result) return failure("Изменять вопросы может автор задания или руководитель команды.", 403);
     if ("error" in result) return failure("Не удалось загрузить вопросы.", 503);
-    return ok({ questions: result.data });
+    return ok({ questions: result.data.questions, messages: result.data.messages });
   }
   if (new URL(request.url).searchParams.get("review") === "1") {
     const review = await getQuizReview(user, taskId);
@@ -44,7 +44,8 @@ export async function writeTaskQuiz(request: Request, taskId: string) {
   if (!user) return response;
   try {
     const body = await readLimitedJson(request);
-    const result = await saveQuiz(user, taskId, body.questions);
+    // The mentor's texts after the test travel with the questions; an older page sends no `messages` and keeps them.
+    const result = await saveQuiz(user, taskId, body.questions, body.messages);
     if ("unavailable" in result) return failure("База данных не настроена.", 503);
     if ("validationError" in result) return failure(result.validationError || "Проверьте вопросы.", 400);
     if ("forbidden" in result) return failure("Изменять вопросы может автор задания или руководитель команды.", 403);
@@ -80,7 +81,8 @@ export async function sendTaskQuiz(request: Request, taskId: string) {
     if ("voice" in result.data) return ok({ voice: result.data.voice, score: result.data.score, total: result.data.total });
     // Mentors were queued for a "new work" message by the database (a test accepted at once may queue a level-up instead); deliver it now.
     scheduleTelegramDelivery();
-    return ok({ submission: result.data.submission, score: result.data.score, total: result.data.total, accepted: result.data.accepted, points: result.data.points }, 201);
+    return ok({ submission: result.data.submission, score: result.data.score, total: result.data.total, accepted: result.data.accepted,
+      returned: result.data.returned, points: result.data.points, message: result.data.message }, 201);
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 

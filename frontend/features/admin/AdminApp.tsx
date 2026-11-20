@@ -46,7 +46,7 @@ import { PullToRefresh } from "@/frontend/shared/PullToRefresh";
 import { TaskResultsSheet } from "./TaskResultsSheet";
 import { removeTaskVideo, uploadTaskVideo } from "@/frontend/shared/api/task-video-client";
 import { loadQuizForEditing, saveTaskQuiz } from "@/frontend/shared/api/task-quiz-client";
-import { validateQuiz, type QuizQuestion } from "@/shared/domain/task-quiz";
+import { EMPTY_QUIZ_MESSAGES, validateQuiz, validateQuizMessages, type QuizMessages, type QuizQuestion } from "@/shared/domain/task-quiz";
 
 import { adminSectionAllowed, adminSectionFromPage, type AdminSection } from "./admin-sections";
 import { useRestoreScroll } from "@/frontend/shared/hooks/use-restore-scroll";
@@ -100,7 +100,7 @@ export function AdminApp() {
   const copyToken = useRef(0);
   const [modalBusyLabel, setModalBusyLabel] = useState<string | undefined>(undefined);
   // Questions of the task being edited; "dirty" means they differ from what is stored.
-  const [quizEdit, setQuizEdit] = useState<{ questions: QuizQuestion[]; loading: boolean; dirty: boolean }>({ questions: [], loading: false, dirty: false });
+  const [quizEdit, setQuizEdit] = useState<{ questions: QuizQuestion[]; messages: QuizMessages; loading: boolean; dirty: boolean }>({ questions: [], messages: EMPTY_QUIZ_MESSAGES, loading: false, dirty: false });
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({ points: "0", comment: "" });
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
@@ -279,7 +279,7 @@ export function AdminApp() {
   function openTaskModal(task?: Task, program?: TaskProgram, copyFrom?: Task) {
     const source = task || copyFrom;
     const token = ++copyToken.current;
-    const saved = !source && !program && authUser ? readDraft<{ draft: TaskDraft; questions: QuizQuestion[]; savedAt: string }>(taskDraftKey(authUser.id)) : null;
+    const saved = !source && !program && authUser ? readDraft<{ draft: TaskDraft; questions: QuizQuestion[]; messages?: QuizMessages; savedAt: string }>(taskDraftKey(authUser.id)) : null;
     setTaskDraft(saved?.draft ? { ...saved.draft } : {
       title: copyFrom ? `${copyFrom.title} (копия)`.slice(0, 160) : source?.title || "",
       description: source?.description || "",
@@ -300,14 +300,15 @@ export function AdminApp() {
     setTaskNotice(saved?.draft ? <>Восстановлен черновик ({savedAtText(saved.savedAt)}). <button type="button" className="text-button" onClick={() => {
       if (authUser) clearDraft(taskDraftKey(authUser.id));
       setTaskDraft({ title: "", description: "", resourceUrl: "", maxPoints: "10", hasDeadline: false, deadline: "", level: 1, voiceAnswer: false });
-      setQuizEdit({ questions: [], loading: false, dirty: false }); setTaskNotice(null);
+      setQuizEdit({ questions: [], messages: EMPTY_QUIZ_MESSAGES, loading: false, dirty: false }); setTaskNotice(null);
     }}>Начать с чистого листа</button></>
       : copyFrom ? <>Это копия задания «{copyFrom.title}». Текст, мили, вопросы{copyFrom.attachments?.length ? " и PDF-файлы" : ""} скопированы{copyFrom.video ? ", видео — нет: при необходимости добавьте его заново" : ""}.</> : null);
-    if (saved?.draft) setQuizEdit({ questions: saved.questions || [], loading: false, dirty: Boolean(saved.questions?.length) });
-    else setQuizEdit({ questions: [], loading: Boolean(source?.quiz), dirty: false });
-    if (!saved?.draft && source?.quiz) loadQuizForEditing(source.id).then((questions) => setQuizEdit((current) => current.dirty ? current
-      : copyFrom ? { questions: freshQuestions(questions), loading: false, dirty: true } : { questions, loading: false, dirty: false }))
-      .catch(() => { setQuizEdit({ questions: [], loading: false, dirty: false }); setToast("Не удалось загрузить вопросы задания."); });
+    if (saved?.draft) setQuizEdit({ questions: saved.questions || [], messages: saved.messages || EMPTY_QUIZ_MESSAGES, loading: false, dirty: Boolean(saved.questions?.length) });
+    else setQuizEdit({ questions: [], messages: EMPTY_QUIZ_MESSAGES, loading: Boolean(source?.quiz), dirty: false });
+    // A copy takes the questions and the texts after the test too.
+    if (!saved?.draft && source?.quiz) loadQuizForEditing(source.id).then(({ questions, messages }) => setQuizEdit((current) => current.dirty ? current
+      : copyFrom ? { questions: freshQuestions(questions), messages, loading: false, dirty: true } : { questions, messages, loading: false, dirty: false }))
+      .catch(() => { setQuizEdit({ questions: [], messages: EMPTY_QUIZ_MESSAGES, loading: false, dirty: false }); setToast("Не удалось загрузить вопросы задания."); });
     // The copy gets the same PDF files: they are downloaded here and uploaded with the new task.
     if (copyFrom?.attachments?.length) void Promise.all(copyFrom.attachments.map(async (file) => {
       const response = await authFetch(taskAttachmentUrl(copyFrom.id, file, { download: true }));
@@ -329,10 +330,10 @@ export function AdminApp() {
     const timer = window.setTimeout(() => {
       const empty = !taskDraft.title.trim() && !taskDraft.description.trim() && !taskDraft.resourceUrl.trim() && !quizEdit.questions.length;
       if (empty) clearDraft(taskDraftKey(authUser.id));
-      else writeDraft(taskDraftKey(authUser.id), { draft: taskDraft, questions: quizEdit.questions, savedAt: new Date().toISOString() });
+      else writeDraft(taskDraftKey(authUser.id), { draft: taskDraft, questions: quizEdit.questions, messages: quizEdit.messages, savedAt: new Date().toISOString() });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [taskAutosave, authUser, modal, taskDraft, quizEdit.questions]);
+  }, [taskAutosave, authUser, modal, taskDraft, quizEdit.questions, quizEdit.messages]);
 
   const openCompletionModal = useCallback((task: Task, member: User) => {
     setReviewDraft({ points: String(task.maxPoints), comment: "" });
@@ -494,10 +495,14 @@ export function AdminApp() {
     }
     // Questions are checked before anything is saved, so a typo never leaves a half-saved task.
     let quizQuestions: QuizQuestion[] | null = null;
+    let quizMessages: QuizMessages = EMPTY_QUIZ_MESSAGES;
     if (quizEdit.dirty) {
       const checked = validateQuiz(quizEdit.questions);
       if ("error" in checked) { setToast(checked.error); return; }
+      const texts = validateQuizMessages(quizEdit.messages);
+      if ("error" in texts) { setToast(texts.error); return; }
       quizQuestions = checked.questions;
+      quizMessages = texts.messages;
     }
     setModalBusy(true);
     try {
@@ -525,9 +530,9 @@ export function AdminApp() {
       }
       if (quizQuestions) {
         try {
-          const stored = await saveTaskQuiz(saved.id, quizQuestions);
+          const stored = await saveTaskQuiz(saved.id, quizQuestions, quizMessages);
           saved = { ...saved, quiz: stored.length ? { questions: stored.length } : undefined };
-          setQuizEdit({ questions: stored, loading: false, dirty: false });
+          setQuizEdit({ questions: stored, messages: quizMessages, loading: false, dirty: false });
         } catch (error) {
           setStore((current) => ({ ...current, tasks: modal.task ? current.tasks.map((item) => item.id === modal.task?.id ? { ...saved, feedOrder: item.feedOrder } : item) : [...current.tasks.filter((item) => item.id !== saved.id), saved] }));
           setModal({ type: "task", task: saved });
@@ -701,7 +706,8 @@ export function AdminApp() {
       canNudge={authUser.role === "admin" || authUser.canReview || authUser.canPublishTasks} onNotice={setToast}
       onReview={openReviewModal} onComplete={authUser.role === "admin" || authUser.canReview ? openCompletionModal : undefined} onClose={() => setResultsTaskId("")} />}
     {templatesEditorOpen && <ReviewTemplatesEditor initial={templates.list} onSave={storeTemplates} onClose={() => setTemplatesEditorOpen(false)} />}
-    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} program={modal.program} programDeadlineHours={store.programs.find((item) => item.id === modal.task?.programId)?.deadlineHours} notice={taskNotice} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit({ questions, loading: false, dirty: true }) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
+    {modal?.type === "task" && <TaskEditorModal taskId={modal.task?.id} task={modal.task} program={modal.program} programDeadlineHours={store.programs.find((item) => item.id === modal.task?.programId)?.deadlineHours} notice={taskNotice} draft={taskDraft} editing={Boolean(modal.task)} busy={modalBusy} busyLabel={modalBusyLabel} video={{ file: taskVideoFile, removing: taskVideoRemoving, onFile: setTaskVideoFile, onRemove: setTaskVideoRemoving, onError: setToast }} quiz={{ questions: quizEdit.questions, loading: quizEdit.loading, onChange: (questions) => setQuizEdit((current) => ({ ...current, questions, loading: false, dirty: true })),
+      messages: quizEdit.messages, onMessages: (messages) => setQuizEdit((current) => ({ ...current, messages, dirty: true })) }} attachments={taskAttachments} files={taskFiles} onFilesChange={setTaskFiles} onRemoveAttachment={(attachment) => void removeTaskFile(attachment)} onChange={(key, value) => setTaskDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={saveTask} />}
     {modal?.type === "review" && <ReviewModal draft={reviewDraft} status={modal.status} maxPoints={store.tasks.find((task) => task.id === modal.submission.taskId)?.maxPoints ?? modal.submission.taskMaxPoints ?? 0} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitReview(); }} />}
     {modal?.type === "complete" && <CompletionModal task={modal.task} memberName={modal.member.name} draft={reviewDraft} busy={modalBusy} onChange={(key, value) => setReviewDraft((current) => ({ ...current, [key]: value }))} onClose={closeModal} onSubmit={(event) => { event.preventDefault(); void submitCompletion(); }} />}
     {modal?.type === "delete" && <DeleteModal task={modal.task} busy={modalBusy} onClose={closeModal} onConfirm={() => { void confirmDeleteTask(); }} />}

@@ -281,3 +281,18 @@ test('a new step order saved while the current step is accepted still opens the 
     assert.equal(query(`select current_task_id from member_program_progress where user_id='${alice}' and program_id='${program}'`), added, `round ${round}`);
   }
 });
+
+test('parallel taps on a test with a mistake return the work once with the mentor’s text', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  const task = randomUUID();
+  const questions = JSON.stringify([{ id: 'q1', kind: 'single', prompt: 'How many?', options: ['1', '2'], correct: [1] }]);
+  query(`update users set parent_user_id='${root}' where id='${alice}';
+    insert into tasks(id,title,description,team_id,max_points,publisher_id,level) values('${task}','Test','Answer','${team}',10,'${root}',1);
+    select app_task_quiz_save('${root}','${task}','${questions}'::jsonb,'Well done','Rewatch the video');`);
+  const results = await Promise.all(Array.from({ length: 8 }, () =>
+    parallel(`select app_task_quiz_submit('${alice}','${task}','Test: 0 of 1',0,1,'{"q1":{"choice":[0]}}'::jsonb);`)));
+  assert.ok(results.every((result) => JSON.parse(result).returned === true && JSON.parse(result).message === 'Rewatch the video'), results.join('\n'));
+  assert.equal(query(`select count(*)||':'||max(status::text) from submissions where user_id='${alice}' and task_id='${task}'`), '1:revision');
+  assert.equal(query(`select count(*) from feedback_events e join submissions s on s.id=e.submission_id where s.user_id='${alice}' and s.task_id='${task}' and e.kind='review'`), '1');
+  assert.equal(query(`select count(*) from telegram_notification_jobs j join submissions s on s.id=j.submission_id where s.user_id='${alice}' and s.task_id='${task}' and j.kind='submission'`), '0');
+});

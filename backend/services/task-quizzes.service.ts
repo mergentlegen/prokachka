@@ -1,27 +1,30 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 import { canOpenTaskMaterials } from "@/backend/services/task-access.service";
 import { canManageTaskMaterials } from "@/backend/services/task-videos.service";
-import { cleanAnswers, firstUnanswered, gradeQuiz, publicQuiz, validateQuiz, type PublicQuizQuestion, type QuizAnswers, type QuizQuestion } from "@/shared/domain/task-quiz";
+import { cleanAnswers, firstUnanswered, gradeQuiz, publicQuiz, validateQuiz, validateQuizMessages, type PublicQuizQuestion, type QuizAnswers, type QuizMessages, type QuizQuestion } from "@/shared/domain/task-quiz";
 import type { AuthUser } from "@/shared/domain/types";
 import { prepareTelegramSubmission } from "@/backend/services/telegram-submission.service";
 
 export type MemberQuiz = {
   questions: PublicQuizQuestion[]; answers: QuizAnswers;
   videoRequired: boolean; videoCompleted: boolean;
+  /** A test with a mistake goes back for revision by itself (the mentor wrote a text for it); the text itself stays on the server. */
+  autoReturn: boolean;
 };
 
-type LoadedQuiz = { unavailable: true } | { notFound: true } | { error: unknown } | { data: { questions: QuizQuestion[]; teamId: string; voiceAnswer: boolean } };
+type LoadedQuiz = { unavailable: true } | { notFound: true } | { error: unknown } | { data: { questions: QuizQuestion[]; messages: QuizMessages; teamId: string; voiceAnswer: boolean } };
 async function loadQuiz(taskId: string): Promise<LoadedQuiz> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  const found = await supabase.from("task_quizzes").select("questions,tasks(team_id,voice_answer)").eq("task_id", taskId).maybeSingle();
+  const found = await supabase.from("task_quizzes").select("questions,pass_text,fail_text,tasks(team_id,voice_answer)").eq("task_id", taskId).maybeSingle();
   if (found.error) return { error: found.error };
   if (!found.data) return { notFound: true as const };
   const task = (Array.isArray(found.data.tasks) ? found.data.tasks[0] : found.data.tasks) as { team_id?: string; voice_answer?: boolean } | undefined;
   // Stored questions were validated on save; validate again so a damaged row can never break a page.
   const checked = validateQuiz(found.data.questions);
   if ("error" in checked) return { error: new Error("task_quiz_invalid") };
-  return { data: { questions: checked.questions, teamId: String(task?.team_id || ""), voiceAnswer: task?.voice_answer === true } };
+  const messages = { passText: String(found.data.pass_text || ""), failText: String(found.data.fail_text || "") };
+  return { data: { questions: checked.questions, messages, teamId: String(task?.team_id || ""), voiceAnswer: task?.voice_answer === true } };
 }
 
 /** How many questions each task has; the card shows it and the answer button changes. */
@@ -33,25 +36,31 @@ export async function taskQuizSummaries(taskIds: string[]) {
   return new Map((result.data || []).map((row) => [String(row.task_id), { questions: Array.isArray(row.questions) ? row.questions.length : 0 }]));
 }
 
-/** The editor's copy, with the correct choices: only for those who may change the task. */
+/** The editor's copy, with the correct choices and the mentor's texts: only for those who may change the task. */
 export async function getQuizForEditing(user: AuthUser, taskId: string) {
   const allowed = await canManageTaskMaterials(user, taskId);
   if (allowed === null) return { unavailable: true as const };
   if (!allowed) return { forbidden: true as const };
   const quiz = await loadQuiz(taskId);
-  if ("notFound" in quiz) return { data: [] as QuizQuestion[] };
+  if ("notFound" in quiz) return { data: { questions: [] as QuizQuestion[], messages: { passText: "", failText: "" } } };
   if (!("data" in quiz)) return quiz;
-  return { data: quiz.data.questions };
+  return { data: { questions: quiz.data.questions, messages: quiz.data.messages } };
 }
 
-export async function saveQuiz(user: AuthUser, taskId: string, input: unknown) {
+/** `messagesInput` left out keeps the texts already saved (an older page sends only the questions). */
+export async function saveQuiz(user: AuthUser, taskId: string, input: unknown, messagesInput?: unknown) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const checked = validateQuiz(input);
   if ("error" in checked) return { validationError: checked.error };
-  const result = await supabase.rpc("app_task_quiz_save", { p_actor: user.id, p_task: taskId, p_questions: checked.questions });
+  const texts = messagesInput === undefined ? null : validateQuizMessages(messagesInput);
+  if (texts && "error" in texts) return { validationError: texts.error };
+  const result = await supabase.rpc("app_task_quiz_save", { p_actor: user.id, p_task: taskId, p_questions: checked.questions,
+    p_pass_text: texts ? texts.messages.passText : null, p_fail_text: texts ? texts.messages.failText : null });
   if (result.error) return { error: result.error };
-  if ((result.data as { forbidden?: boolean })?.forbidden) return { forbidden: true as const };
+  const outcome = result.data as { forbidden?: boolean; validationError?: string };
+  if (outcome?.forbidden) return { forbidden: true as const };
+  if (outcome?.validationError) return { validationError: outcome.validationError };
   return { data: checked.questions };
 }
 
@@ -75,6 +84,7 @@ export async function getQuizForMember(user: AuthUser, taskId: string) {
     answers: cleanAnswers(questions, draft.data?.answers ?? last.data?.quiz_answers ?? {}),
     videoRequired: Boolean(video.data?.video_path),
     videoCompleted: Boolean(watched.data?.completed_at),
+    autoReturn: !quiz.data.voiceAnswer && Boolean(quiz.data.messages.failText.trim()),
   } satisfies MemberQuiz };
 }
 
@@ -138,11 +148,14 @@ export async function submitQuiz(user: AuthUser, taskId: string, input: unknown)
   }
   const result = await supabase.rpc("app_task_quiz_submit", { p_user: user.id, p_task: taskId, p_answer_text: graded.text, p_score: graded.score, p_total: graded.total, p_answers: answers });
   if (result.error) return { error: result.error };
-  const payload = result.data as { data?: Record<string, unknown>; validationError?: string };
+  const payload = result.data as { data?: Record<string, unknown>; validationError?: string; message?: string | null; returned?: boolean };
   if (payload.validationError) return { validationError: payload.validationError };
-  // A test without a single mistake is accepted by the database at once; anything else waits for a mentor.
+  // A test without a single mistake is accepted by the database at once; with a mistake and the mentor's text it goes back
+  // for revision at once; anything else waits for a mentor. `message` is the mentor's own text, empty when none was written.
   const accepted = payload.data?.status === "accepted";
-  return { data: { submission: payload.data!, score: graded.score, total: graded.total, accepted, points: accepted ? Number(payload.data?.points || 0) : 0 } };
+  const returned = payload.returned === true;
+  return { data: { submission: payload.data!, score: graded.score, total: graded.total, accepted, returned, points: accepted ? Number(payload.data?.points || 0) : 0,
+    message: accepted || returned ? String(payload.data?.comment || "") : "" } };
 }
 
 /** Who watched the task video and how far; for the mentor's "who did the task" list. */

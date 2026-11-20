@@ -1,18 +1,22 @@
 "use client";
 
 import { request } from "@/frontend/shared/api/client";
-import type { PublicQuizQuestion, QuizAnswers, QuizQuestion } from "@/shared/domain/task-quiz";
+import type { PublicQuizQuestion, QuizAnswers, QuizMessages, QuizQuestion } from "@/shared/domain/task-quiz";
 
 type Api<T> = { ok: boolean; message?: string } & T;
 const base = (taskId: string) => `/api/tasks/${encodeURIComponent(taskId)}/quiz`;
-export type MemberQuiz = { questions: PublicQuizQuestion[]; answers: QuizAnswers; videoRequired: boolean; videoCompleted: boolean };
+export type MemberQuiz = { questions: PublicQuizQuestion[]; answers: QuizAnswers; videoRequired: boolean; videoCompleted: boolean;
+  /** A mistake sends the task back for revision by itself, with the mentor's text. */ autoReturn?: boolean };
 export type VideoView = { userId: string; completed: boolean; percent: number };
 
-export async function loadQuizForEditing(taskId: string): Promise<QuizQuestion[]> {
-  return (await request<Api<{ questions: QuizQuestion[] }>>(`${base(taskId)}?edit=1`, { cache: "no-store" })).questions;
+/** The questions with the correct choices and the mentor's texts after the test. */
+export async function loadQuizForEditing(taskId: string): Promise<{ questions: QuizQuestion[]; messages: QuizMessages }> {
+  const result = await request<Api<{ questions: QuizQuestion[]; messages?: QuizMessages }>>(`${base(taskId)}?edit=1`, { cache: "no-store" });
+  return { questions: result.questions, messages: result.messages || { passText: "", failText: "" } };
 }
-export async function saveTaskQuiz(taskId: string, questions: QuizQuestion[]): Promise<QuizQuestion[]> {
-  return (await request<Api<{ questions: QuizQuestion[] }>>(base(taskId), { method: "PUT", body: JSON.stringify({ questions }) })).questions;
+/** `messages` left out keeps the texts already saved. */
+export async function saveTaskQuiz(taskId: string, questions: QuizQuestion[], messages?: QuizMessages): Promise<QuizQuestion[]> {
+  return (await request<Api<{ questions: QuizQuestion[] }>>(base(taskId), { method: "PUT", body: JSON.stringify(messages ? { questions, messages } : { questions }) })).questions;
 }
 export async function loadMemberQuiz(taskId: string): Promise<MemberQuiz> {
   return (await request<Api<{ quiz: MemberQuiz }>>(base(taskId), { cache: "no-store" })).quiz;
@@ -26,9 +30,10 @@ export async function saveQuizDraft(taskId: string, answers: QuizAnswers) {
   await request<Api<{ saved: boolean }>>(`${base(taskId)}/draft`, { method: "PUT", body: JSON.stringify({ answers }) });
 }
 /** For a voice task the answers wait for the voice message: `voice.url` opens the bot. */
-/** `accepted`: a test without mistakes counted at once, with `points` miles; otherwise a mentor checks it. */
+/** `accepted`: a test without mistakes counted at once, with `points` miles; `returned`: a mistake sent it back for revision at once.
+ * `message`: the mentor's text (or the usual words) to show after either; otherwise a mentor checks the answers. */
 export async function submitTaskQuiz(taskId: string, answers: QuizAnswers) {
-  return request<Api<{ score: number; total: number; accepted?: boolean; points?: number; voice?: { url: string; expiresAt: string } }>>(`${base(taskId)}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
+  return request<Api<{ score: number; total: number; accepted?: boolean; returned?: boolean; points?: number; message?: string; voice?: { url: string; expiresAt: string } }>>(`${base(taskId)}/submit`, { method: "POST", body: JSON.stringify({ answers }) });
 }
 export async function loadTaskVideoViews(taskId: string): Promise<VideoView[]> {
   return (await request<Api<{ views: VideoView[] }>>(`/api/tasks/${encodeURIComponent(taskId)}/video/views`, { cache: "no-store" })).views;

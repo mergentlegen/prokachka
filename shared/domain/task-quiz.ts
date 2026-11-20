@@ -6,7 +6,22 @@ export type PublicQuizQuestion = Omit<QuizQuestion, "correct">;
 export type QuizAnswer = { choice?: number[]; text?: string };
 export type QuizAnswers = Record<string, QuizAnswer>;
 
-export const QUIZ_LIMITS = { questions: 30, prompt: 500, options: 8, option: 200, text: 3000 } as const;
+export const QUIZ_LIMITS = { questions: 30, prompt: 500, options: 8, option: 200, text: 3000, message: 1000 } as const;
+
+/**
+ * The mentor's own words after a test-only task, shown to the participant at once and kept in the conversation.
+ * `failText` filled in: a test with a mistake goes back for revision by itself; empty: a mentor checks it.
+ */
+export type QuizMessages = { passText: string; failText: string };
+export const EMPTY_QUIZ_MESSAGES: QuizMessages = { passText: "", failText: "" };
+
+export function validateQuizMessages(input: unknown): { messages: QuizMessages } | { error: string } {
+  const source = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const passText = typeof source.passText === "string" ? source.passText.trim() : "";
+  const failText = typeof source.failText === "string" ? source.failText.trim() : "";
+  if (passText.length > QUIZ_LIMITS.message || failText.length > QUIZ_LIMITS.message) return { error: `Текст после теста — не длиннее ${QUIZ_LIMITS.message} символов.` };
+  return { messages: { passText, failText } };
+}
 export const QUIZ_KIND_LABELS: Record<QuizKind, string> = { single: "Один верный ответ", multiple: "Несколько верных", text: "Открытый вопрос" };
 
 const isChoice = (kind: QuizKind) => kind === "single" || kind === "multiple";

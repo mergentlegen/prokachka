@@ -60,7 +60,7 @@ export function TaskResultsSheet({ task, store, actorId, footer, canNudge, onNot
           <Avatar className={styles.avatar} name={result.user.name} src={result.user.avatarUrl} />
           <div className={styles.person}>
             <strong>{result.user.name}</strong>
-            <span className={`${styles.status} ${styles[result.status]}`}>{participantStatusText(result.status)}{result.status === "accepted" && ` · +${formatMiles(result.submission?.points || 0)}`}{result.status === "accepted" && result.submission?.autoAccepted && " · автоматически"}</span>
+            <span className={`${styles.status} ${styles[result.status]}`}>{participantStatusText(result.status)}{result.status === "accepted" && ` · +${formatMiles(result.submission?.points || 0)}`}{(result.status === "accepted" || result.status === "revision") && result.submission?.autoAccepted && " · автоматически"}</span>
             {(views || result.submission?.quizTotal) && <small className={styles.facts}>
               {views && <span>{views.get(result.user.id)?.completed ? "▶ досмотрел видео" : views.get(result.user.id) ? `▶ видео: ${views.get(result.user.id)?.percent}%` : "▶ не смотрел видео"}</span>}
               {result.submission?.quizTotal ? <span>тест {result.submission.quizScore ?? 0} из {result.submission.quizTotal}</span> : null}

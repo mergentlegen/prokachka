@@ -33,3 +33,20 @@ ul.options { margin: 0; padding: 0; }
 .pending strong { display: block; color: #3d2f6b; font-size: 15px; }
 .pending p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; }
 .telegram { display: inline-flex; align-items: center; min-height: 40px; margin-top: 8px; padding: 0 14px; border-radius: 10px; background: #2aa3de; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; }
+
+/* A test checked by itself: the mentor's text after it. */
+.returned { align-items: flex-start; border-color: #f0dcb8; background: #fff9ef; }
+.returned > span { background: #fbebcf; color: #a8741a; }
+.mentorText { display: grid; gap: 2px; margin-top: 8px !important; padding: 10px 12px; border-radius: 10px; background: #ffffffcc; color: var(--navy) !important; font-size: 14px !important; white-space: pre-line; overflow-wrap: anywhere; }
+.mentorText small { color: #8a96aa; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.retry { min-height: 44px; margin-top: 10px; padding: 8px 16px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+.popup { display: grid; justify-items: center; gap: 10px; padding: 8px 4px 4px; text-align: center; }
+.popup > strong { color: var(--navy); font-size: 18px; line-height: 1.35; }
+.popup > small { color: #8a96aa; font-size: 12px; }
+.popup > small:empty { display: none; }
+.popupIcon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #e3f4ec; font-size: 30px; }
+.popupReturned .popupIcon { background: #fbebcf; }
+.popupText { max-width: 520px; margin: 0; padding: 14px 16px; border-radius: 14px; background: #f5f8fc; color: var(--navy); font-size: 16px; line-height: 1.55; text-align: left; white-space: pre-line; overflow-wrap: anywhere; }
+.popupActions { display: grid; gap: 8px; width: 100%; max-width: 360px; margin-top: 6px; }
+.later { min-height: 44px; border: 0; background: none; color: #5b6b85; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.popupMiles { margin-top: -4px; color: #1f7a55; font-size: 15px; font-weight: 800; }

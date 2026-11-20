@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Task, TaskAttachment } from "@/shared/domain/types";
-import type { QuizQuestion } from "@/shared/domain/task-quiz";
+import { quizIsTestOnly, type QuizMessages, type QuizQuestion } from "@/shared/domain/task-quiz";
 import { MAX_MILES } from "@/shared/domain/miles";
 import { ResourceCard } from "@/frontend/shared/ResourceCard";
 import { QuizEditor } from "./QuizEditor";
@@ -17,7 +17,9 @@ export type EditorMaterials = {
   onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
   video: { file: File | null; removing: boolean; onFile: (file: File | null) => void; onRemove: (removing: boolean) => void };
 };
-export type EditorQuiz = { questions: QuizQuestion[]; loading: boolean; onChange: (questions: QuizQuestion[]) => void };
+export type EditorQuiz = { questions: QuizQuestion[]; loading: boolean; onChange: (questions: QuizQuestion[]) => void;
+  /** The mentor's texts after a test-only task (shown to the participant at once, kept in the conversation). */
+  messages?: QuizMessages; onMessages?: (messages: QuizMessages) => void };
 
 type Props = {
   /** `task` — a separate task with its own level and deadline; `step` — a program step, its time comes from the program. */
@@ -84,6 +86,8 @@ export function TaskEditorFields({ mode, value, onChange, materials, quiz, stepD
   const pdfCount = materials.attachments.length + materials.files.length;
   const showLink = linkOpen || Boolean(value.resourceUrl);
   const withQuiz = quiz.questions.length > 0;
+  // Choice questions only and no voice: the database checks the test by itself.
+  const testOnly = !interactive && quizIsTestOnly(quiz.questions, value.voiceAnswer);
 
   useEffect(() => { if (showLink && focusLink.current) { linkInput.current?.focus(); focusLink.current = false; } }, [showLink]);
 
@@ -139,8 +143,9 @@ export function TaskEditorFields({ mode, value, onChange, materials, quiz, stepD
     </section>
 
     <section className={styles.section} aria-label="Проверка знаний">
-      <SectionHead number={3} title="Проверка знаний" note={withQuiz ? "Участник ответит на вопросы прямо на сайте, после материалов. Ответы придут вам на проверку." : "Необязательно. Добавьте тест или открытый вопрос — участник ответит прямо на сайте."} />
-      <QuizEditor bare questions={quiz.questions} loading={quiz.loading} disabled={disabled} onChange={quiz.onChange} />
+      <SectionHead number={3} title="Проверка знаний" note={testOnly ? "Участник ответит на вопросы прямо на сайте, после материалов. Тест проверится сам: без ошибок — засчитано сразу." : withQuiz ? "Участник ответит на вопросы прямо на сайте, после материалов. Ответы придут вам на проверку." : "Необязательно. Добавьте тест или открытый вопрос — участник ответит прямо на сайте."} />
+      <QuizEditor bare questions={quiz.questions} loading={quiz.loading} disabled={disabled} onChange={quiz.onChange}
+        messages={quiz.messages} onMessages={quiz.onMessages} testOnly={testOnly} />
       {error("quiz")}
     </section>
 

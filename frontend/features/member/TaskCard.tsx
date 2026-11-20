@@ -22,7 +22,7 @@ import { MarketingDirectorGame } from "./MarketingDirectorGame";
 import { FinalVoyageGame } from "./FinalVoyageGame";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
-import { QuizPreview, QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
+import { QuizPreview, QuizResultPopup, QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
 import { CaptainCruiseMaterial, FirstYearMaterial, FreeMembershipMaterial, MarketingDirectorMaterial, MaterialButton, SafetyWatchMaterial } from "./GameMaterial";
 import { QuizReview } from "./QuizReview";
 import { formatVideoTime } from "@/shared/domain/task-video";
@@ -49,6 +49,9 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
   const isQuiz = Boolean(task.quiz) && !isInteractive;
   const [videoWatched, setVideoWatched] = useState(false);
   const [quizSent, setQuizSent] = useState<QuizResult | null>(null);
+  // The mentor's text after a test checked by itself pops up over the task; the list refreshes once it is closed,
+  // so a program step that opens the next one does not take the window away before it is read.
+  const [quizPopup, setQuizPopup] = useState<QuizResult | null>(null);
   // A voice task with a test: the answers are saved, the voice message is still to come in Telegram.
   const [voicePending, setVoicePending] = useState<{ url: string; expiresAt: string } | null>(null);
   const surveyInProgress = isSurvey && submission?.interactiveCompleted === false;
@@ -80,6 +83,20 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
     if (sending || !canSubmit) return;
     setOpen(false); setSending(true);
     try { await onSubmit(task.id); } finally { setSending(false); }
+  }
+  function quizSubmitted(result: QuizResult) {
+    setQuizSent(result);
+    if (result.message) setQuizPopup(result);
+    else onInteractiveProgress?.();
+  }
+  function closeQuizPopup() {
+    setQuizPopup(null);
+    onInteractiveProgress?.();
+  }
+  /** Returned with a mistake: the test opens again with the last answers filled in; which ones were wrong is not shown. */
+  function retakeQuiz() {
+    if (quizPopup) closeQuizPopup();
+    setQuizSent(null);
   }
   function action(inDetail = false) {
     if (locked && status !== "accepted" && status !== "pending") return <span className={styles.waiting}>Архив · только просмотр</span>;
@@ -135,18 +152,20 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "count-your-dream" && <CountYourDreamGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "dream-route" && <DreamRouteGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {isSurvey && <HeartSurvey taskId={task.id} onProgress={onInteractiveProgress} />}</>}
-        {quizSent ? <QuizSentNotice {...quizSent} />
+        {quizSent ? <QuizSentNotice {...quizSent} onRetry={quizSent.returned && canSubmit ? retakeQuiz : undefined} />
           : voicePending && canSubmit ? <VoicePendingNotice url={voicePending.url} expiresAt={voicePending.expiresAt} onExpired={() => setVoicePending(null)} />
-          : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} voice={task.voiceAnswer} onVoicePending={setVoicePending} onSubmitted={(result) => { setQuizSent(result); onInteractiveProgress?.(); }} />}
+          : isQuiz && canSubmit && <TaskQuiz taskId={task.id} videoWatched={videoWatched} voice={task.voiceAnswer} onVoicePending={setVoicePending} onSubmitted={quizSubmitted} />}
         {isQuiz && status === "accepted" && <QuizReview taskId={task.id} />}
         {isQuiz && readOnly && !canSubmit && !quizSent && status !== "accepted" && <QuizPreview taskId={task.id} />}
         {!isQuiz && !isInteractive && submission?.answerText && <div className={styles.answer}><strong>Ваш ответ</strong><p>{submission.answerText}</p></div>}
         {linkOpened && canSubmit && !isQuiz && <div className={styles.returnHint} role="status"><strong>Уже выполнили?</strong><p>Нажмите «{submitLabel}» ниже. Без этого наставник не увидит работу, не даст обратную связь и не начислит мили.</p></div>}
-        {submission?.comment && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
+        {submission?.comment && !quizSent?.message && <div className={styles.comment}><strong>Комментарий наставника</strong><p>{submission.comment}</p></div>}
         {submission && !isInteractive && onFeedback && <button type="button" className={styles.read} onClick={() => { setOpen(false); onFeedback(task.id); }}>Открыть переписку с наставником →</button>}
         {submission && !isInteractive && <p className={styles.waiting}>Последняя отправка: {formatDateTime(submission.submittedAt)}</p>}
         {(!isInteractive || !showGame) && !(isQuiz && (canSubmit || quizSent)) && <div className={styles.detailAction}>{action(true)}</div>}
       </div>
     </ModalSheet>}
+    {/* Beside the task window, not inside it: Escape closes this window only. */}
+    {quizPopup && <QuizResultPopup result={quizPopup} onClose={closeQuizPopup} onRetry={retakeQuiz} />}
   </>;
 }

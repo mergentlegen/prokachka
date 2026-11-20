@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import type { QuizQuestion } from "@/shared/domain/task-quiz";
+import type { QuizMessages, QuizQuestion } from "@/shared/domain/task-quiz";
 import { PROGRAM_GAMES, programGame } from "@/shared/domain/program-games";
 import type { ProgramGameKey, Task, TaskProgram } from "@/shared/domain/types";
 import { publishProgram } from "./program-publish";
@@ -20,7 +20,8 @@ import styles from "./ProgramEditorModal.module.css";
 
 type StepValue = Pick<EditorValue, "title" | "description" | "resourceUrl" | "maxPoints" | "voiceAnswer">;
 /** One step of the new program: a normal task, or a ready game (`game`). */
-type DraftStep = { id: number; game?: ProgramGameKey; value: StepValue; files: File[]; video: File | null; questions: QuizQuestion[]; missingFiles?: string[] };
+type DraftStep = { id: number; game?: ProgramGameKey; value: StepValue; files: File[]; video: File | null; questions: QuizQuestion[];
+  /** The texts after a test-only step. */ messages?: QuizMessages; missingFiles?: string[] };
 type SavedProgram = { title: string; deadlineHours: string; level: number; steps: Array<Omit<DraftStep, "files" | "video">>; savedAt: string };
 type View = { kind: "list" } | { kind: "step"; id: number } | { kind: "review" };
 
@@ -120,7 +121,7 @@ export function ProgramEditorModal({ userId, onCreated, onClose, onError }: { us
     try {
       const { program, tasks, failed } = await publishProgram({
         title: title.trim(), deadlineHours: hours, level,
-        steps: steps.map((step) => ({ game: step.game, title: step.value.title.trim(), description: step.value.description.trim(), resourceUrl: step.value.resourceUrl.trim(), maxPoints: Number(step.value.maxPoints), voiceAnswer: step.value.voiceAnswer, files: step.files, video: step.video, questions: step.questions })),
+        steps: steps.map((step) => ({ game: step.game, title: step.value.title.trim(), description: step.value.description.trim(), resourceUrl: step.value.resourceUrl.trim(), maxPoints: Number(step.value.maxPoints), voiceAnswer: step.value.voiceAnswer, files: step.files, video: step.video, questions: step.questions, messages: step.messages })),
       }, setProgress);
       clearDraft(programDraftKey(userId));
       onCreated(program, tasks);
@@ -169,7 +170,8 @@ export function ProgramEditorModal({ userId, onCreated, onClose, onError }: { us
             onChange={(key, value) => { if (key in emptyValue) updateValue(current.id, { [key]: value } as Partial<StepValue>); }}
             materials={{ attachments: [], files: current.files, onFilesChange: (files) => update(current.id, { files }), onRemoveAttachment: () => undefined,
               video: { file: current.video, removing: false, onFile: (video) => update(current.id, { video }), onRemove: () => undefined } }}
-            quiz={{ questions: current.questions, loading: false, onChange: (questions) => update(current.id, { questions }) }} />}
+            quiz={{ questions: current.questions, loading: false, onChange: (questions) => update(current.id, { questions }),
+              messages: current.messages, onMessages: (messages) => update(current.id, { messages }) }} />}
           preview={<TaskPreview mode="step" stepDeadlineHours={validHours(deadlineHours) ? hours : undefined} value={{ ...current.value, level, hasDeadline: false, deadline: "" }}
             video={current.video?.name || null} pdfs={current.files.map((file) => ({ name: file.name, size: file.size }))} questions={current.questions} />} />
       </> : view.kind === "review" ? <div className={styles.review}>

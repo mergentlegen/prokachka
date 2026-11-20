@@ -3,10 +3,9 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import type { Task, TaskAttachment, TaskProgram } from "@/shared/domain/types";
 import { FormSheet } from "@/frontend/shared/FormSheet";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
-import type { QuizQuestion } from "@/shared/domain/task-quiz";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import { EditorWithPreview } from "./EditorWithPreview";
-import { TaskEditorFields } from "./TaskEditorFields";
+import { TaskEditorFields, type EditorQuiz } from "./TaskEditorFields";
 import { TaskPreview } from "./TaskPreview";
 import { deadlineLabel, editorProblems, type EditorValue } from "./task-editor";
 export type TaskDraft = EditorValue;
@@ -28,7 +27,7 @@ export function TaskEditorModal({ taskId, task, program, programDeadlineHours, d
   programDeadlineHours?: number;
   draft: TaskDraft; editing: boolean; busy: boolean; busyLabel?: string; attachments: TaskAttachment[]; files: File[]; onFilesChange: (files: File[]) => void; onRemoveAttachment: (attachment: TaskAttachment) => void;
   video: { file: File | null; removing: boolean; onFile: (file: File | null) => void; onRemove: (removing: boolean) => void; onError: (message: string) => void };
-  quiz: { questions: QuizQuestion[]; loading: boolean; onChange: (questions: QuizQuestion[]) => void };
+  quiz: EditorQuiz;
   onChange: <K extends keyof TaskDraft>(key: K, value: TaskDraft[K]) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   /** A line above the form: a restored draft, a copy, and so on. */
   notice?: ReactNode;

@@ -5,24 +5,55 @@ import { loadMemberQuiz, saveQuizDraft, submitTaskQuiz, type MemberQuiz } from "
 import { firstUnanswered, quizIsTestOnly, type QuizAnswers } from "@/shared/domain/task-quiz";
 import { plural } from "@/frontend/shared/lib/plural";
 import { formatMiles } from "@/frontend/shared/lib/format";
+import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import styles from "./TaskQuiz.module.css";
 
 const DRAFT_DELAY_MS = 1200;
 
 // Questions answered on the site. They open after the task video.
-// A test answered without mistakes counts at once; anything else is sent to the mentor as a normal answer.
-export type QuizResult = { score: number; total: number; accepted?: boolean; points?: number };
+// A test answered without mistakes counts at once; with a mistake and the mentor's text it goes back for revision at once;
+// anything else is sent to the mentor as a normal answer.
+/** `message`: the mentor's own text after the test (empty when none was written). */
+export type QuizResult = { score: number; total: number; accepted?: boolean; returned?: boolean; points?: number; message?: string };
 
-/** Shown after sending, also once the card has refreshed to "на проверке" or "принято". */
-export function QuizSentNotice({ score, total, accepted = false, points = 0 }: QuizResult) {
+/** Shown after sending, also once the card has refreshed to "на проверке", "на доработку" or "принято". */
+export function QuizSentNotice({ score, total, accepted = false, returned = false, points = 0, message = "", onRetry }: QuizResult & { onRetry?: () => void }) {
   if (accepted) return <div className={styles.sent} role="status">
     <span aria-hidden="true">✓</span>
-    <div><strong>Без ошибок — задание засчитано</strong><p>Тест: {score} из {total} верно. {points > 0 ? `+${formatMiles(points)}. ` : ""}Наставник проверять не будет.</p></div>
+    <div><strong>Без ошибок — задание засчитано</strong><p>Тест: {score} из {total} верно. {points > 0 ? `+${formatMiles(points)}. ` : ""}Наставник проверять не будет.</p>
+      {message && <p className={styles.mentorText}><small>Наставник</small>{message}</p>}</div>
+  </div>;
+  // Which questions were wrong is not told: the test is taken again with the mentor's hint.
+  if (returned) return <div className={`${styles.sent} ${styles.returned}`} role="status">
+    <span aria-hidden="true">↩</span>
+    <div><strong>Есть ошибки — задание на доработке</strong>
+      {message && <p className={styles.mentorText}><small>Наставник</small>{message}</p>}
+      {onRetry && <button type="button" className={styles.retry} onClick={onRetry}>Пройти тест ещё раз</button>}</div>
   </div>;
   return <div className={styles.sent} role="status">
     <span aria-hidden="true">✓</span>
     <div><strong>Ответы отправлены наставнику</strong><p>{total ? `Тест: ${score} из ${total} верно. ` : ""}Наставник проверит ответы и напишет обратную связь.</p></div>
   </div>;
+}
+
+/** The window that pops up right after a test checked by itself: the mentor's text, then «Пройти ещё раз» or «Понятно». */
+export function QuizResultPopup({ result, onClose, onRetry }: { result: QuizResult; onClose: () => void; onRetry: () => void }) {
+  const passed = result.accepted === true;
+  return <ModalSheet title={passed ? "Тест пройден" : "Есть ошибки"} onClose={onClose}>
+    <div className={`${styles.popup} ${passed ? "" : styles.popupReturned}`}>
+      <span className={styles.popupIcon} aria-hidden="true">{passed ? "🎉" : "↩️"}</span>
+      <strong>{passed ? "Без ошибок — задание засчитано" : "Задание вернулось на доработку"}</strong>
+      {passed && Boolean(result.points) && <b className={styles.popupMiles}>+{formatMiles(result.points || 0)}</b>}
+      {result.message ? <p className={styles.popupText}>{result.message}</p>
+        : <p className={styles.popupText}>{passed ? "Наставник проверять не будет." : "Пройдите тест ещё раз."}</p>}
+      <small>{result.message ? "Этот текст останется в «Обратной связи»." : ""}</small>
+      <div className={styles.popupActions}>
+        {passed ? <button type="button" className={styles.send} onClick={onClose}>Понятно</button>
+          : <><button type="button" className={styles.send} onClick={onRetry}>Пройти тест ещё раз</button>
+            <button type="button" className={styles.later} onClick={onClose}>Позже</button></>}
+      </div>
+    </div>
+  </ModalSheet>;
 }
 
 /** A voice task: the test is saved, the voice message is still to be recorded in Telegram before `expiresAt`. */
@@ -121,7 +152,7 @@ export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onV
         window.location.assign(sent.voice.url);
         return;
       }
-      onSubmitted({ score: sent.score, total: sent.total, accepted: sent.accepted === true, points: sent.points || 0 });
+      onSubmitted({ score: sent.score, total: sent.total, accepted: sent.accepted === true, returned: sent.returned === true, points: sent.points || 0, message: sent.message || "" });
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось отправить ответы. Попробуйте ещё раз."); }
     finally { setSending(false); }
   }
@@ -165,6 +196,8 @@ export function TaskQuiz({ taskId, videoWatched, voice = false, onSubmitted, onV
     {error && <p className={styles.error} role="alert">{error}</p>}
     <button type="button" className={styles.send} disabled={sending} onClick={() => void send()}>{sending ? (voice ? "Открываем Telegram…" : "Отправляем…") : voice ? "🎙️ Ответить и записать голосовое" : testOnly ? "Отправить ответы" : "Отправить наставнику"}</button>
     {voice && <p className={styles.muted}>После ответов откроется Telegram: запишите голосовое в течение 30 минут — работа уйдёт наставнику вместе с ответами.</p>}
-    {testOnly && <p className={styles.muted}>Без ошибок — задание засчитается сразу. Если где-то ошибётесь, ответы проверит наставник.</p>}
+    {testOnly && <p className={styles.muted}>{quiz.autoReturn
+      ? "Без ошибок — задание засчитается сразу. Если где-то ошибётесь, задание вернётся на доработку — тест можно пройти ещё раз."
+      : "Без ошибок — задание засчитается сразу. Если где-то ошибётесь, ответы проверит наставник."}</p>}
   </section>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { QUIZ_KIND_LABELS, QUIZ_LIMITS, type QuizKind, type QuizQuestion } from "@/shared/domain/task-quiz";
+import { EMPTY_QUIZ_MESSAGES, QUIZ_KIND_LABELS, QUIZ_LIMITS, type QuizKind, type QuizMessages, type QuizQuestion } from "@/shared/domain/task-quiz";
 import styles from "./QuizEditor.module.css";
 
 const newId = () => crypto.randomUUID();
@@ -10,8 +10,10 @@ export function newQuestion(kind: QuizKind): QuizQuestion {
 
 // The mentor's question builder: tests (one or several right answers) and open questions in any order.
 /** `bare` leaves out the own heading when the form already gives the block a title. */
-export function QuizEditor({ questions, loading, disabled, onChange, bare = false }: {
+/** With `onMessages` and a test-only task (`testOnly`) the mentor writes what the participant sees after the test. */
+export function QuizEditor({ questions, loading, disabled, onChange, bare = false, messages = EMPTY_QUIZ_MESSAGES, onMessages, testOnly = false }: {
   questions: QuizQuestion[]; loading: boolean; disabled: boolean; onChange: (questions: QuizQuestion[]) => void; bare?: boolean;
+  messages?: QuizMessages; onMessages?: (messages: QuizMessages) => void; testOnly?: boolean;
 }) {
   const update = (index: number, patch: Partial<QuizQuestion>) => onChange(questions.map((question, position) => position === index ? { ...question, ...patch } : question));
   const move = (index: number, step: number) => {
@@ -81,6 +83,19 @@ export function QuizEditor({ questions, loading, disabled, onChange, bare = fals
     {questions.length < QUIZ_LIMITS.questions && !loading && <div className={styles.add}>
       <button type="button" disabled={disabled} onClick={() => onChange([...questions, newQuestion("single")])}>+ Тест</button>
       <button type="button" disabled={disabled} onClick={() => onChange([...questions, newQuestion("text")])}>+ Открытый вопрос</button>
+    </div>}
+    {onMessages && testOnly && questions.length > 0 && !loading && <div className={styles.messages}>
+      <strong>Ответ участнику после теста <span className="field-hint">необязательно</span></strong>
+      <small>Тест проверится сам. Текст всплывёт у участника сразу после отправки и останется в «Обратной связи».</small>
+      <label className={styles.message}><span>✅ Если всё верно</span>
+        <textarea value={messages.passText} disabled={disabled} rows={3} maxLength={QUIZ_LIMITS.message} placeholder="Например: Отлично! Ты разобрался в теме, переходи к следующему шагу."
+          onChange={(event) => onMessages({ ...messages, passText: event.target.value })} /></label>
+      <label className={styles.message}><span>↩️ Если есть ошибки</span>
+        <textarea value={messages.failText} disabled={disabled} rows={3} maxLength={QUIZ_LIMITS.message} placeholder="Например: Пересмотри видео ещё раз и пройди тест заново."
+          onChange={(event) => onMessages({ ...messages, failText: event.target.value })} /></label>
+      <small className={styles.muted}>{messages.failText.trim()
+        ? "С ошибкой задание само вернётся на доработку с этим текстом — участник пройдёт тест ещё раз."
+        : "Пока поле пустое, ответы с ошибкой придут вам на проверку. Напишите текст — и задание с ошибкой будет само возвращаться на доработку."}</small>
     </div>}
   </div>;
 }
