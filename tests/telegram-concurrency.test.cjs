@@ -328,6 +328,28 @@ test('parallel taps in «Ya podumayu»: one round passes once, parallel finishes
   assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${game}'`), '1:1');
 });
 
+test('parallel marks in «Dorogo»: each phrase counts once, the last one finishes once, one mile', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  const program = randomUUID();
+  query(`update users set parent_user_id='${root}' where id='${alice}';
+    insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${program}','${team}','Objections',72,'${root}');`);
+  const game = JSON.parse(query(`select app_program_add_game('${root}','${program}','dorogo');`)).data.id;
+  query(`insert into member_program_progress(user_id,program_id,current_task_id,unlocked_at,due_at,status) values('${alice}','${program}','${game}',now(),now()+interval '100 years','active');
+    insert into ready_program_attempts(user_id,task_id,current_step) values('${alice}','${game}',5);`);
+  // Every phrase tapped on both sides at once: only the first mark of each phrase counts.
+  const marks = await Promise.all([0, 1, 2, 3, 4, 5].flatMap((item) => [true, false].map((good) =>
+    parallel(`select app_dorogo('${alice}','${game}','mark',5,'{"item":${item},"good":${good}}'::jsonb);`))));
+  const state = JSON.parse(query(`select state from ready_program_attempts where user_id='${alice}' and task_id='${game}'`));
+  assert.equal(Object.keys(state.marks).length, 6, JSON.stringify(state));
+  const wrong = [true, false, true, false, true, false].filter((good, item) => state.marks[item] !== good).length;
+  assert.equal(state.mistakes, wrong, 'each phrase is counted once: ' + JSON.stringify(state));
+  assert.equal(query(`select current_step from ready_program_attempts where user_id='${alice}' and task_id='${game}'`), '6', marks.join(' '));
+  const results = (await Promise.all(Array.from({ length: 8 }, () => parallel(`select app_dorogo('${alice}','${game}','complete',0,'{}'::jsonb);`)))).map((value) => JSON.parse(value));
+  assert.ok(results.every((result) => result.completed === true), JSON.stringify(results));
+  assert.equal(new Set(results.map((result) => result.submission.id)).size, 1);
+  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${game}'`), '1:1');
+});
+
 test('programs open one at a time: parallel acceptances of the last step and a new order leave exactly one open program', { skip: !port }, async () => {
   for (let round = 0; round < 3; round += 1) {
     const { team, root, alice } = fixture();

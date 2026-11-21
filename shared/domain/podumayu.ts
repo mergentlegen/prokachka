@@ -1,24 +1,13 @@
+import { trainerOption as option, type ObjectionTrainerData, type TrainerRound } from "./objection-trainer";
+
 // «Тренажёр «Я подумаю»» (program game `podumayu`, 2026-11-21, from the user's file «podumayu-sayt.html»):
-// three dialogue rounds and one sorting round about the most frequent objection. Each pick shows its comment; the site checks
-// it (app_podumayu, migration 20261125), and the right options come back only once the trainer is passed, for its material.
+// three dialogue rounds and one sorting round about the most frequent objection (app_podumayu, migration 20261125).
 export const PODUMAYU_KIND = "podumayu" as const;
 export const PODUMAYU_TITLE = "Тренажёр «Я подумаю»";
 export const PODUMAYU_REWARD = 1;
 export const PODUMAYU_DESCRIPTION = "4 раунда о самом частом возражении: как не отпустить человека «подумать» и узнать настоящую причину. На финише 1 миля.";
 
-export const PODUMAYU_REASONS = [
-  "что-то осталось непонятным;", "хочет посоветоваться с семьёй;", "сомневается в деньгах;", "есть вопрос, который неловко задать;", "неудобно отказать в лицо.",
-] as const;
-
-export type PodumayuOption = { text: string; comment: string };
-export type PodumayuDialogue = { kind: "chat"; title: string; chat: readonly (readonly ["client" | "me", string])[]; question: string; options: readonly PodumayuOption[] };
-export type PodumayuSort = { kind: "sort"; title: string; question: string; phrases: readonly PodumayuOption[] };
-export type PodumayuRound = PodumayuDialogue | PodumayuSort;
-
-const option = (text: string, comment: string): PodumayuOption => ({ text, comment });
-
-/** The rounds in order; an option is sent as its index here, a phrase of the last round as its index and «помогает» (true) or «вредит» (false). */
-export const PODUMAYU_ROUNDS: readonly PodumayuRound[] = [
+export const PODUMAYU_ROUNDS: readonly TrainerRound[] = [
   { kind: "chat", title: "Раунд 1. Первая реакция", chat: [["client", "Всё интересно, правда. Но мне надо подумать."]], question: "Что ответишь?", options: [
     option("«Конечно, подумайте спокойно и позвоните, когда решите».",
       "Так человек уходит «в свободное плавание». Через 2–3 дня он забудет разговор, и всё начнётся сначала. Почти никто не перезванивает сам."),
@@ -60,11 +49,24 @@ export const PODUMAYU_ROUNDS: readonly PodumayuRound[] = [
 ];
 
 export const PODUMAYU_SORT_STEP = 3;
-export const PODUMAYU_MEMO = ["«Подумаю» — это не «нет».", "Это «помоги мне понять»."] as const;
-export const PODUMAYU_STEPS = [
-  ["Принять", "«Конечно, решение важное»."],
-  ["Узнать причину", "«Что ближе: непонятно, посоветоваться, сумма?»"],
-  ["Назначить следующий шаг", "звонок через 2–3 дня, не позже."],
-] as const;
-/** The right options once the trainer is passed: one per dialogue round, and «помогает» (true) / «вредит» (false) per phrase. */
-export type PodumayuKeys = { answers: number[]; sort: boolean[] };
+
+export const PODUMAYU_TRAINER: ObjectionTrainerData = {
+  kind: PODUMAYU_KIND, title: PODUMAYU_TITLE, reward: PODUMAYU_REWARD, description: PODUMAYU_DESCRIPTION,
+  intro: {
+    heading: "«Я подумаю» — самое частое возражение в нашей команде",
+    lead: "И почти всегда не настоящее. За ним прячется одно из пяти:",
+    reasons: ["что-то осталось непонятным;", "хочет посоветоваться с семьёй;", "сомневается в деньгах;", "есть вопрос, который неловко задать;", "неудобно отказать в лицо."],
+  },
+  rounds: PODUMAYU_ROUNDS,
+  sortStep: PODUMAYU_SORT_STEP,
+  memo: ["«Подумаю» — это не «нет».", "Это «помоги мне понять»."],
+  steps: [
+    ["Принять", "«Конечно, решение важное»."],
+    ["Узнать причину", "«Что ближе: непонятно, посоветоваться, сумма?»"],
+    ["Назначить следующий шаг", "звонок через 2–3 дня, не позже."],
+  ],
+  voice: {
+    task: "Представь, что клиент сказал: «Мне надо подумать». Запиши голосовое своему наставнику: как ты ответишь, своими словами, без бумажки.",
+    check: "В голосовом: принять → узнать причину → назначить следующий шаг.",
+  },
+};

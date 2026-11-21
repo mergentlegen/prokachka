@@ -210,6 +210,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/podumayu.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261126-program-queue.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/program-queue.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261127-dorogo.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/dorogo.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

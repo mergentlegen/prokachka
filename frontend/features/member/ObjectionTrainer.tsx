@@ -1,28 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { podumayuAction, type PodumayuAttempt } from "@/frontend/shared/api/podumayu-client";
+import { trainerAction, type TrainerAttempt } from "@/frontend/shared/api/objection-trainer-client";
 import { createCompanyVoiceLink } from "@/frontend/shared/api/ready-program-client";
 import { ApiError, createTelegramLink } from "@/frontend/shared/api/client";
-import { PODUMAYU_MEMO, PODUMAYU_REASONS, PODUMAYU_REWARD, PODUMAYU_ROUNDS, PODUMAYU_SORT_STEP, PODUMAYU_STEPS, type PodumayuRound } from "@/shared/domain/podumayu";
+import type { ObjectionTrainerData, TrainerRound } from "@/shared/domain/objection-trainer";
 import type { Submission } from "@/shared/domain/types";
 import { MaterialBar, MaterialButton } from "./GameMaterial";
-import styles from "./PodumayuGame.module.css";
+import styles from "./ObjectionTrainer.module.css";
 
-// «Тренажёр «Я подумаю»» (program game `podumayu`), in the colours of the author's file: three dialogue rounds and one
+// Objection trainers for programs («Я подумаю», «Дорого»), in the colours of the author's files: dialogue rounds and one
 // sorting round. Any option can be tapped — each has its comment. The site checks the first picks (a right one opens
 // «Дальше»); once a round is solved, the other options are only shown, nothing more is sent. The mile comes once.
 type View = "intro" | "round" | "finish" | "done" | "material";
-const ROUNDS = PODUMAYU_ROUNDS.length;
 
-function viewOf(attempt: PodumayuAttempt): View {
+function viewOf(attempt: TrainerAttempt, rounds: number): View {
   if (attempt.completed) return "done";
-  if (attempt.step >= ROUNDS) return "finish";
+  if (attempt.step >= rounds) return "finish";
   return attempt.step === 0 && attempt.mistakes === 0 ? "intro" : "round";
 }
 
-export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onCompleted?: (submission: Submission) => void }) {
-  const [attempt, setAttempt] = useState<PodumayuAttempt | null>(null);
+/** «раунд», «раунда», «раундов» for the intro line. */
+function roundsWord(count: number) {
+  const tail = count % 100;
+  if (tail > 10 && tail < 20) return "раундов";
+  return count % 10 === 1 ? "раунд" : count % 10 >= 2 && count % 10 <= 4 ? "раунда" : "раундов";
+}
+
+export function ObjectionTrainer({ trainer, taskId, onCompleted }: { trainer: ObjectionTrainerData; taskId: string; onCompleted?: (submission: Submission) => void }) {
+  const rounds = trainer.rounds.length;
+  const [attempt, setAttempt] = useState<TrainerAttempt | null>(null);
   const [view, setView] = useState<View>("intro");
   // The round on the screen: after a right pick the site is already one round further, the screen waits for «Дальше».
   const [shown, setShown] = useState(0);
@@ -40,19 +47,19 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
 
   useEffect(() => {
     let active = true;
-    podumayuAction(taskId, "start").then((saved) => {
+    trainerAction(trainer.kind, taskId, "start").then((saved) => {
       if (!active) return;
-      setAttempt(saved); setShown(Math.min(saved.step, ROUNDS - 1)); setMarks(saved.marks); setView(viewOf(saved)); setError("");
+      setAttempt(saved); setShown(Math.min(saved.step, rounds - 1)); setMarks(saved.marks); setView(viewOf(saved, rounds)); setError("");
     }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Не удалось загрузить тренажёр."); });
     return () => { active = false; };
-  }, [taskId]);
+  }, [taskId, trainer.kind, rounds]);
 
   useEffect(() => { root.current?.closest("[data-modal-scroll]")?.scrollTo({ top: 0 }); }, [view, shown]);
 
   async function send(operation: "answer" | "mark" | "complete", step: number, payload: { answer?: number } | { item: number; good: boolean } = {}) {
     if (inFlight.current) return null;
     inFlight.current = true; setBusy(true); setError("");
-    try { return await podumayuAction(taskId, operation, step, payload); }
+    try { return await trainerAction(trainer.kind, taskId, operation, step, payload); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Ответ не сохранился. Проверьте интернет и нажмите ещё раз."); return null; }
     finally { inFlight.current = false; setBusy(false); }
   }
@@ -76,7 +83,7 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
       setMarks((previous) => ({ ...previous, [item]: { good, right: good === helps } }));
       return;
     }
-    const saved = await send("mark", PODUMAYU_SORT_STEP, { item, good });
+    const saved = await send("mark", trainer.sortStep, { item, good });
     if (!saved) return;
     setAttempt(saved);
     setMarks((previous) => ({ ...previous, [item]: { good, right: Boolean(saved.right) } }));
@@ -85,7 +92,7 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
   function next() {
     if (!attempt) return;
     setPicked({}); setSolved(null);
-    if (attempt.step >= ROUNDS) setView("finish");
+    if (attempt.step >= rounds) setView("finish");
     else { setShown(attempt.step); setView("round"); }
   }
 
@@ -118,26 +125,28 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
     } finally { inFlight.current = false; setBusy(false); }
   }
 
-  const round = PODUMAYU_ROUNDS[shown];
+  const round = trainer.rounds[shown];
   const passed = Boolean(attempt?.completed);
-  const stage = view === "intro" ? "Старт" : view === "round" ? `Раунд ${shown + 1} из ${ROUNDS}` : view === "material" ? "Разбор" : "Финиш";
-  const progress = view === "intro" ? 0 : view === "round" ? (shown + 1) / (ROUNDS + 1) : 1;
+  const stage = view === "intro" ? "Старт" : view === "round" ? `Раунд ${shown + 1} из ${rounds}` : view === "material" ? "Разбор" : "Финиш";
+  const progress = view === "intro" ? 0 : view === "round" ? (shown + 1) / (rounds + 1) : 1;
   const allMarked = round?.kind === "sort" && round.phrases.every((_, index) => marks[index]);
+  const questionId = `${trainer.kind}-question`;
 
-  const chat = (item: PodumayuRound) => item.kind === "chat" && <div className={styles.chat}>{item.chat.map(([who, text]) =>
+  const chat = (item: TrainerRound) => item.kind === "chat" && <div className={styles.chat}>{item.chat.map(([who, text]) =>
     <div key={text} className={`${styles.msg} ${who === "client" ? styles.client : styles.me}`}><span className={styles.who}>{who === "client" ? "Клиент" : "Ты"}</span>{text}</div>)}</div>;
   const memo = <>
-    <div className={styles.memo}>{PODUMAYU_MEMO[0]}<br />{PODUMAYU_MEMO[1]}</div>
+    <div className={styles.memo}>{trainer.memo[0]}<br />{trainer.memo[1]}</div>
     <p><b>3 шага, которые нужно запомнить:</b></p>
-    <ul className={styles.list}>{PODUMAYU_STEPS.map(([name, text]) => <li key={name}><b>{name}:</b> {text}</li>)}</ul>
+    <ul className={styles.list}>{trainer.steps.map(([name, text]) => <li key={name}><b>{name}:</b> {text}</li>)}</ul>
+    {trainer.rules?.map(([name, text]) => <p key={name}><b>{name}:</b> {text}</p>)}
   </>;
 
-  return <section ref={root} className={styles.trainer} aria-label="Тренажёр «Я подумаю»">
+  return <section ref={root} className={styles.trainer} aria-label={trainer.title}>
     <div className={styles.wrap}>
       <header className={styles.head}>
         <span className={styles.kicker}>Прокачка · Возражения</span>
-        <h3>Тренажёр «Я подумаю»</h3>
-        <div className={styles.hud}><span>{stage}</span><span>✈️ {passed ? 1 : 0}/{PODUMAYU_REWARD}</span></div>
+        <h3>{trainer.title}</h3>
+        <div className={styles.hud}><span>{stage}</span><span>✈️ {passed ? trainer.reward : 0}/{trainer.reward}</span></div>
         <div className={styles.progress} role="progressbar" aria-label="Прогресс тренажёра" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
           <i style={{ width: `${progress * 100}%` }} />
         </div>
@@ -147,19 +156,21 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
 
       {attempt && view === "intro" && <div className={styles.card}>
         <span className={styles.round}>Зачем это</span>
-        <h4>«Я подумаю» — самое частое возражение в нашей команде</h4>
-        <p>И почти всегда не настоящее. За ним прячется одно из пяти:</p>
-        <ul className={styles.list}>{PODUMAYU_REASONS.map((reason) => <li key={reason}>{reason}</li>)}</ul>
-        <p>Пройди 4 раунда. Нажимай любые варианты — к каждому есть комментарий: что будет, если сказать так.</p>
-        <p className={styles.note}>Пройди до конца — и получишь <b>✈️ {PODUMAYU_REWARD} милю</b>.</p>
+        <h4>{trainer.intro.heading}</h4>
+        <p>{trainer.intro.lead}</p>
+        <ul className={styles.list}>{trainer.intro.reasons.map((reason) => typeof reason === "string"
+          ? <li key={reason}>{reason}</li> : <li key={reason[0]}><b>{reason[0]}</b> — {reason[1]}</li>)}</ul>
+        {trainer.intro.after && <p>{trainer.intro.after}</p>}
+        <p>Пройди {rounds} {roundsWord(rounds)}. Нажимай любые варианты — к каждому есть комментарий: что будет, если сказать так.</p>
+        <p className={styles.note}>Пройди до конца — и получишь <b>✈️ {trainer.reward} милю</b>.</p>
         <button type="button" className={`${styles.btn} ${styles.gold}`} onClick={() => setView("round")}>Начать тренировку</button>
       </div>}
 
       {attempt && view === "round" && round.kind === "chat" && <div className={styles.card}>
         <span className={styles.round}>{round.title}</span>
         {chat(round)}
-        <h4 id="podumayu-question">{round.question}</h4>
-        <div className={styles.opts} role="group" aria-labelledby="podumayu-question">{round.options.map((item, index) => {
+        <h4 id={questionId}>{round.question}</h4>
+        <div className={styles.opts} role="group" aria-labelledby={questionId}>{round.options.map((item, index) => {
           const state = picked[index];
           return <div key={item.text}>
             <button type="button" className={`${styles.opt} ${state === true ? styles.good : state === false ? styles.bad : ""}`}
@@ -203,21 +214,21 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
         <span className={styles.round}>Финиш</span>
         <h4 className={styles.center}>Тренажёр пройден 🎉</h4>
         {memo}
-        <button type="button" className={`${styles.btn} ${styles.gold}`} disabled={busy} onClick={() => void complete()}>{busy ? "Начисляем милю…" : `Забрать ✈️ ${PODUMAYU_REWARD} милю`}</button>
+        <button type="button" className={`${styles.btn} ${styles.gold}`} disabled={busy} onClick={() => void complete()}>{busy ? "Начисляем милю…" : `Забрать ✈️ ${trainer.reward} милю`}</button>
       </div>}
 
       {attempt && view === "done" && <>
         <div className={styles.card}>
           <span className={styles.round}>Финиш</span>
           <h4 className={styles.center}>Тренажёр пройден 🎉</h4>
-          <div className={styles.mile}>✈️ +{PODUMAYU_REWARD} миля зачислена!<small>Теперь запиши голосовое наставнику — кнопка ниже</small></div>
+          <div className={styles.mile}>✈️ +{trainer.reward} миля зачислена!<small>Теперь запиши голосовое наставнику — кнопка ниже</small></div>
           {memo}
         </div>
         <div className={styles.card}>
           <span className={styles.round}>🎙 Закрепи голосом</span>
           <h4>Голосовое на 1 минуту</h4>
-          <p>Представь, что клиент сказал: «Мне надо подумать». Запиши голосовое своему наставнику: как ты ответишь, своими словами, без бумажки.</p>
-          <p className={styles.check}>В голосовом: принять → узнать причину → назначить следующий шаг.</p>
+          <p>{trainer.voice.task}</p>
+          <p className={styles.check}>{trainer.voice.check}</p>
           <button type="button" className={styles.tg} disabled={busy} onClick={() => void voice()}>{busy ? "Открываем Telegram…" : linkRequired ? "Привязать Telegram" : "🎙️ Записать голосовое наставнику"}</button>
           <p className={styles.small}>Голосовое получат наставники твоей ветки. Мили за него не начисляются.</p>
           <p className={styles.small}>Применишь схему в реальном разговоре — напиши в чат команды, что ответил человек.</p>
@@ -227,7 +238,7 @@ export function PodumayuGame({ taskId, onCompleted }: { taskId: string; onComple
 
       {attempt && view === "material" && <div className={styles.card}>
         <MaterialBar onBack={() => setView("done")} />
-        {PODUMAYU_ROUNDS.map((item, index) => <div key={item.title} className={styles.read}>
+        {trainer.rounds.map((item, index) => <div key={item.title} className={styles.read}>
           <span className={styles.round}>{item.title}</span>
           {chat(item)}
           <h4>{item.question}</h4>

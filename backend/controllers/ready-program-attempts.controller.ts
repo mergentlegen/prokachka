@@ -11,8 +11,9 @@ import { safetyWatchAction, type SafetyWatchOperation } from "@/backend/services
 import { participationRulesAction } from "@/backend/services/participation-rules.service";
 import { finalVoyageAction, type FinalVoyageOperation } from "@/backend/services/final-voyage.service";
 import { FINAL_VOYAGE_DREAM_LIMIT, FINAL_VOYAGE_STEPS } from "@/shared/domain/final-voyage";
-import { podumayuAction, type PodumayuOperation } from "@/backend/services/podumayu.service";
-import { PODUMAYU_ROUNDS } from "@/shared/domain/podumayu";
+import { objectionTrainerAction, type TrainerKind, type TrainerOperation } from "@/backend/services/objection-trainer.service";
+import { PODUMAYU_TRAINER } from "@/shared/domain/podumayu";
+import { DOROGO_TRAINER } from "@/shared/domain/dorogo";
 import { CABINET_TRAINERS, cabinetTrainerAction, isCabinetTrainerKind, type CabinetTrainerOperation } from "@/backend/services/cabinet-trainer.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
@@ -29,7 +30,7 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
   if (user.role !== "member") return failure("Готовую программу может проходить только участник.", 403);
   if (!isUuid(taskId)) return failure("Некорректное интерактивное задание.", 400);
   try {
-    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch" | "free-membership" | "marketing-director" | "participation-rules" | "final-voyage" | "podumayu"; step?: unknown; question?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete" | "answer" | "dream" | "mark"; index?: unknown; payload?: unknown };
+    const body = await readLimitedJson(request) as { action?: ReadyAttemptAction | "captain" | "count-dream" | "dream-route" | "first-year" | "safety-watch" | "free-membership" | "marketing-director" | "participation-rules" | "final-voyage" | TrainerKind; step?: unknown; question?: unknown; answer?: unknown; restart?: unknown; questionIndex?: unknown; choices?: unknown; operation?: CaptainAction | "save" | "complete" | "answer" | "dream" | "mark"; index?: unknown; payload?: unknown };
     const action = body?.action;
     if (isCabinetTrainerKind(action)) {
       // A cabinet trainer: its own number of missions and questions of the check.
@@ -78,17 +79,20 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить игру. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
-    if (action === "podumayu") {
-      // «Тренажёр «Я подумаю»»: the current round, an option 0–3, or a phrase 0–3 of the last round with «помогает» / «вредит».
+    if (action === "podumayu" || action === "dorogo") {
+      // Objection trainers («Я подумаю», «Дорого»): the current round, an option 0–3, or a phrase of the sorting round with «помогает» / «вредит».
+      const trainer = action === "podumayu" ? PODUMAYU_TRAINER : DOROGO_TRAINER;
+      const sort = trainer.rounds[trainer.sortStep];
+      const phrases = sort?.kind === "sort" ? sort.phrases.length : 0;
       const payload = body.payload as { answer?: unknown; item?: unknown; good?: unknown } | undefined;
-      const index = (value: unknown) => Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 3;
+      const index = (value: unknown, count: number) => Number.isInteger(value) && Number(value) >= 0 && Number(value) < count;
       if (!body.operation || !["start", "answer", "mark", "complete"].includes(body.operation)
-        || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) >= PODUMAYU_ROUNDS.length))
+        || (body.step !== undefined && (!Number.isInteger(body.step) || Number(body.step) < 0 || Number(body.step) >= trainer.rounds.length))
         || (payload !== undefined && (!payload || typeof payload !== "object" || Array.isArray(payload)))
-        || (body.operation === "answer" && !index(payload?.answer))
-        || (body.operation === "mark" && (!index(payload?.item) || typeof payload?.good !== "boolean"))
+        || (body.operation === "answer" && !index(payload?.answer, 4))
+        || (body.operation === "mark" && (!index(payload?.item, phrases) || typeof payload?.good !== "boolean"))
         || JSON.stringify(payload || {}).length > 200) return failure("Некорректные данные тренажёра.", 400);
-      const result = await podumayuAction(user.id, taskId, body.operation as PodumayuOperation, Number(body.step || 0), payload as Record<string, unknown> | undefined);
+      const result = await objectionTrainerAction(action, user.id, taskId, body.operation as TrainerOperation, Number(body.step || 0), payload as Record<string, unknown> | undefined);
       if ("unavailable" in result) return failure("База данных пока недоступна.", 503);
       if ("validationError" in result) return failure(result.validationError || "Некорректный прогресс тренажёра.", 409);
       if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить тренажёр. Попробуйте ещё раз.");

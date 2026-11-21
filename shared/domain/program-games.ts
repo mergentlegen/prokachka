@@ -4,6 +4,7 @@ import { FREE_MEMBERSHIP_DESCRIPTION, FREE_MEMBERSHIP_KIND, FREE_MEMBERSHIP_REWA
 import { MARKETING_DIRECTOR_DESCRIPTION, MARKETING_DIRECTOR_KIND, MARKETING_DIRECTOR_REWARD, MARKETING_DIRECTOR_TITLE } from "@/shared/domain/marketing-director";
 import { FINAL_VOYAGE_DESCRIPTION, FINAL_VOYAGE_KIND, FINAL_VOYAGE_REWARD, FINAL_VOYAGE_TITLE } from "@/shared/domain/final-voyage";
 import { PODUMAYU_DESCRIPTION, PODUMAYU_KIND, PODUMAYU_REWARD, PODUMAYU_TITLE } from "@/shared/domain/podumayu";
+import { DOROGO_DESCRIPTION, DOROGO_KIND, DOROGO_REWARD, DOROGO_TITLE } from "@/shared/domain/dorogo";
 import type { ProgramGameKey } from "@/shared/domain/types";
 
 // Ready games a mentor can put into a program as a step (no deadline, miles right after finishing).
@@ -15,5 +16,6 @@ export const PROGRAM_GAMES: readonly ProgramGame[] = [
   { kind: MARKETING_DIRECTOR_KIND, title: MARKETING_DIRECTOR_TITLE, description: MARKETING_DIRECTOR_DESCRIPTION, reward: MARKETING_DIRECTOR_REWARD, minutes: 5, icon: "🏅" },
   { kind: FINAL_VOYAGE_KIND, title: FINAL_VOYAGE_TITLE, description: FINAL_VOYAGE_DESCRIPTION, reward: FINAL_VOYAGE_REWARD, minutes: 7, icon: "🚢" },
   { kind: PODUMAYU_KIND, title: PODUMAYU_TITLE, description: PODUMAYU_DESCRIPTION, reward: PODUMAYU_REWARD, minutes: 6, icon: "💭" },
+  { kind: DOROGO_KIND, title: DOROGO_TITLE, description: DOROGO_DESCRIPTION, reward: DOROGO_REWARD, minutes: 8, icon: "💰" },
 ];
 export function programGame(kind: unknown) { return PROGRAM_GAMES.find((game) => game.kind === kind); }

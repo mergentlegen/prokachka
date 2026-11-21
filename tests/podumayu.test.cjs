@@ -3,14 +3,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const React = require('react');
 const load = require('./helpers/load-ts.cjs');
-const hookHarness = require('./helpers/hook-harness.cjs');
+const { setupTrainer, nodes, label, taskId } = require('./helpers/objection-trainer-harness.cjs');
 
 const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-const nodes = (tree, predicate) => Array.isArray(tree) ? tree.flatMap((item) => nodes(item, predicate)) : !tree || typeof tree !== 'object' ? [] : [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
-const label = (tree) => Array.isArray(tree) ? tree.map(label).join('') : tree && typeof tree === 'object' ? label(tree.props?.children) : tree == null || typeof tree === 'boolean' ? '' : String(tree);
-const taskId = '88888888-8888-4888-8888-888888888888';
 const KEYS = { answers: [2, 2, 2], sort: [true, false, true, false] };
 
 test('«Я подумаю»: the rounds, the game list and the database agree; texts speak to everyone', () => {
@@ -35,8 +31,8 @@ test('«Я подумаю»: the rounds, the game list and the database agree; t
   assert.equal(load('shared/domain/types.ts').isTaskInteractiveKind('podumayu'), true);
   assert.match(read('supabase/bootstrap.sql'), /\\ir 20261125-podumayu\.sql\r?\n/);
   assert.match(read('.github/workflows/check.yml'), /20261125-podumayu\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/podumayu\.sql/);
-  assert.match(read('frontend/features/member/TaskCard.tsx'), /interactiveKind === "podumayu" && <PodumayuGame taskId=\{task\.id\} onCompleted=\{onInteractiveComplete\} \/>/);
-  const text = read('shared/domain/podumayu.ts') + read('frontend/features/member/PodumayuGame.tsx');
+  assert.match(read('frontend/features/member/TaskCard.tsx'), /interactiveKind === "podumayu" && <ObjectionTrainer trainer=\{PODUMAYU_TRAINER\} taskId=\{task\.id\} onCompleted=\{onInteractiveComplete\} \/>/);
+  const text = read('shared/domain/podumayu.ts') + read('frontend/features/member/ObjectionTrainer.tsx');
   assert.doesNotMatch(text, /[Оо]тпустил |[Пп]олучил |[Пп]ринял<|Узнал причину<|Назначил |объяснял час/, 'feedback is not written to a man only');
   assert.doesNotMatch(text, /t\.me\/|INCRUISES_PROKACHKA_BOT/, 'the voice goes through the site, not a bare bot link');
   assert.doesNotMatch(text, /Пройти ещё раз/, 'no replay without a mile');
@@ -48,8 +44,8 @@ test('«Я подумаю»: the server action takes the current round, an optio
   const calls = [];
   const controller = load('backend/controllers/ready-program-attempts.controller.ts', {
     '@/backend/http/current-user': { getCurrentUser: async () => ({ id: 'member', role: 'member' }) },
-    '@/backend/services/podumayu.service': { podumayuAction: async (...args) => {
-      calls.push(args); return args[2] === 'complete' ? { validationError: 'Сначала пройди все 4 раунда.' } : { data: { step: 1 } };
+    '@/backend/services/objection-trainer.service': { objectionTrainerAction: async (kind, ...args) => {
+      assert.equal(kind, 'podumayu'); calls.push(args); return args[2] === 'complete' ? { validationError: 'Сначала пройди все 4 раунда.' } : { data: { step: 1 } };
     } },
   });
   const post = (body) => controller.postReadyProgramAttempt(new Request(`http://localhost/api/ready-programs/${taskId}/attempt`, { method: 'POST', body: JSON.stringify({ action: 'podumayu', ...body }) }), taskId);
@@ -67,60 +63,7 @@ test('«Я подумаю»: the server action takes the current round, an optio
   assert.match((await refused.json()).message, /Сначала пройди все 4 раунда/);
 });
 
-// The trainer with a fake site that follows the SQL rules of app_podumayu.
-function setup(start = {}) {
-  const harness = hookHarness();
-  const queue = [];
-  const previous = globalThis.window;
-  globalThis.window = { setTimeout: (run) => { queue.push(run); return queue.length; }, clearTimeout() {}, location: { assign: (url) => server.opened.push(url) } };
-  const server = { step: start.step || 0, mistakes: start.mistakes || 0, marks: { ...(start.marks || {}) }, completed: Boolean(start.completed), calls: [], opened: [], voiceLinks: 0 };
-  const state = (extra = {}) => ({ step: server.step, mistakes: server.mistakes, completed: server.completed, earnedPoints: server.completed ? 1 : 0,
-    marks: Object.fromEntries(Object.entries(server.marks).map(([item, good]) => [Number(item), { good, right: good === KEYS.sort[item] }])),
-    keys: server.completed ? KEYS : undefined, submission: server.submission, ...extra });
-  const api = { podumayuAction: async (id, operation, step, payload) => {
-    assert.equal(id, taskId);
-    server.calls.push([operation, step, payload]);
-    if (operation === 'answer') {
-      assert.equal(step, server.step, 'the answer is for the current round');
-      const right = payload.answer === KEYS.answers[step];
-      if (right) server.step += 1; else server.mistakes += 1;
-      return state({ right });
-    }
-    if (operation === 'mark') {
-      assert.equal(step, 3); assert.equal(server.step, 3, 'marks only in the sorting round');
-      assert.equal(payload.item in server.marks, false, 'a phrase is sent once');
-      const right = payload.good === KEYS.sort[payload.item];
-      server.marks[payload.item] = payload.good;
-      if (!right) server.mistakes += 1;
-      if (Object.keys(server.marks).length === 4) server.step = 4;
-      return state({ right });
-    }
-    if (operation === 'complete') { assert.equal(server.step, 4); server.completed = true; server.submission = { id: 'result', points: 1 }; }
-    return state();
-  } };
-  const css = { __esModule: true, default: new Proxy({}, { get: (_t, key) => key }) };
-  const { PodumayuGame } = load('frontend/features/member/PodumayuGame.tsx', {
-    react: { ...React, ...harness.react }, '@/frontend/shared/api/podumayu-client': api, './PodumayuGame.module.css': css,
-    '@/frontend/shared/api/ready-program-client': { createCompanyVoiceLink: async (id) => { assert.equal(id, taskId); server.voiceLinks += 1; return { url: 'https://t.me/bot?start=company_voice_x' }; } },
-  });
-  const received = [];
-  harness.mount(PodumayuGame, { taskId, onCompleted: (submission) => received.push(submission) });
-  const game = { server, received, tree: null,
-    async settle() { game.tree = await harness.settle(); return game.tree; },
-    text() { return label(game.tree); },
-    buttons(predicate) { return nodes(game.tree, (n) => n.type === 'button' && predicate(n)); },
-    async press(name) {
-      const button = game.buttons((n) => typeof name === 'string' ? label(n).trim() === name : name(n))[0];
-      assert.ok(button, `button «${name}»`); assert.equal(Boolean(button.props.disabled), false, `«${name}» is disabled`);
-      await button.props.onClick(); while (queue.length) queue.shift()(); return game.settle();
-    },
-    option(index) { return game.buttons((n) => /\bopt\b/.test(n.props.className || ''))[index]; },
-    async pick(index) { return game.press((n) => n === game.option(index)); },
-    async mark(index, good) { return game.press((n) => n === game.buttons((b) => label(b) === (good ? '👍 Помогает' : '👎 Вредит'))[index]); },
-    done() { harness.unmount(); globalThis.window = previous; },
-  };
-  return game;
-}
+const setup = (start) => setupTrainer(load('shared/domain/podumayu.ts').PODUMAYU_TRAINER, KEYS, start);
 
 test('«Я подумаю»: wrong picks show their comment, the right one opens «Дальше», the mile comes once', async () => {
   const game = setup();
