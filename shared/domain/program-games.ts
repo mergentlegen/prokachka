@@ -6,6 +6,7 @@ import { FINAL_VOYAGE_DESCRIPTION, FINAL_VOYAGE_KIND, FINAL_VOYAGE_REWARD, FINAL
 import { PODUMAYU_DESCRIPTION, PODUMAYU_KIND, PODUMAYU_REWARD, PODUMAYU_TITLE } from "@/shared/domain/podumayu";
 import { DOROGO_DESCRIPTION, DOROGO_KIND, DOROGO_REWARD, DOROGO_TITLE } from "@/shared/domain/dorogo";
 import { PIRAMIDA_DESCRIPTION, PIRAMIDA_KIND, PIRAMIDA_REWARD, PIRAMIDA_TITLE } from "@/shared/domain/piramida";
+import { GARANTII_DESCRIPTION, GARANTII_KIND, GARANTII_REWARD, GARANTII_TITLE } from "@/shared/domain/garantii";
 import type { ProgramGameKey } from "@/shared/domain/types";
 
 // Ready games a mentor can put into a program as a step (no deadline, miles right after finishing).
@@ -19,5 +20,6 @@ export const PROGRAM_GAMES: readonly ProgramGame[] = [
   { kind: PODUMAYU_KIND, title: PODUMAYU_TITLE, description: PODUMAYU_DESCRIPTION, reward: PODUMAYU_REWARD, minutes: 6, icon: "💭" },
   { kind: DOROGO_KIND, title: DOROGO_TITLE, description: DOROGO_DESCRIPTION, reward: DOROGO_REWARD, minutes: 8, icon: "💰" },
   { kind: PIRAMIDA_KIND, title: PIRAMIDA_TITLE, description: PIRAMIDA_DESCRIPTION, reward: PIRAMIDA_REWARD, minutes: 8, icon: "🔍" },
+  { kind: GARANTII_KIND, title: GARANTII_TITLE, description: GARANTII_DESCRIPTION, reward: GARANTII_REWARD, minutes: 8, icon: "🤝" },
 ];
 export function programGame(kind: unknown) { return PROGRAM_GAMES.find((game) => game.kind === kind); }
