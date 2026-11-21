@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const fs = require('node:fs');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const loadTs = require('./helpers/load-ts.cjs');
@@ -38,24 +39,19 @@ test('steps are passed, current or closed; programs keep the mentor order whatev
   assert.deepEqual(progress.programStepStates(program, new Map()), ['skipped', 'current', 'locked'], 'a step left behind without acceptance is not shown as passed');
   const finished = { ...program, id: 'p0', status: 'completed', currentTaskId: undefined };
   assert.deepEqual(progress.programStepStates(finished, new Map(['a', 'b', 'c'].map((id) => [id, accepted(id, 2)]))), ['done', 'done', 'done']);
-  const pinned = { ...program, id: 'p2', isPinned: true };
-  assert.deepEqual(progress.orderedProgramModules([finished, program, pinned]).map((item) => item.id), ['p2', 'p0', 'p1'], 'a passed program stays in its place');
+  // The server sends the programs in the team leader's order; the page keeps it whatever is passed.
+  assert.deepEqual(progress.orderedProgramModules([finished, program, { ...program, id: 'p2' }]).map((item) => item.id), ['p0', 'p1', 'p2'], 'a passed program stays in its place');
   const later = { ...program, id: 'p3' };
   assert.deepEqual(progress.orderedProgramModules([program, { ...finished, id: 'p4' }, later]).map((item) => item.id), ['p1', 'p4', 'p3'], 'passing a program out of order moves nothing');
-  // Pinned programs in the order they were pinned, like the mentor sees them, not in the order they were created.
-  const pinnedLater = { ...program, id: 'old', isPinned: true, pinnedAt: '2026-11-10T10:00:00Z' };
-  const pinnedFirst = { ...finished, id: 'new', isPinned: true, pinnedAt: '2026-11-01T10:00:00Z' };
-  assert.deepEqual(progress.orderedProgramModules([pinnedLater, program, pinnedFirst]).map((item) => item.id), ['new', 'old', 'p1']);
 });
 
-test('the server tells the member when a program was pinned', () => {
-  const tasks = [step('a', 1)];
-  const [pinned] = programModules([{ id: 'p1', title: 'Старт', is_pinned: true, pinned_at: '2026-11-01T10:00:00Z' }], tasks, new Map());
-  assert.equal(pinned.pinned_at, '2026-11-01T10:00:00Z');
-  const [plain] = programModules([{ id: 'p1', title: 'Старт', is_pinned: false, pinned_at: '2026-11-01T10:00:00Z' }], tasks, new Map());
-  assert.equal(plain.pinned_at, null, 'an unpinned program has no pin time');
-  const client = loadTs('frontend/shared/api/client.ts');
-  assert.equal(client.mapProgramModule({ ...pinned, steps: [] }).pinnedAt, '2026-11-01T10:00:00Z');
+test('programs reach the member in the mentor’s order, without pins', () => {
+  const tasks = [step('a', 1), { ...step('b', 1), program_id: 'p2' }];
+  const modules = programModules([{ id: 'p2', title: 'Вторая', is_pinned: true }, { id: 'p1', title: 'Старт' }], tasks.map((task) => ({ ...task, program_id: task.program_id || 'p1' })), new Map());
+  assert.deepEqual(modules.map((item) => item.id), ['p2', 'p1'], 'the order the database sends is kept');
+  assert.equal('is_pinned' in modules[0], false, 'programs are no longer pinned');
+  const service = fs.readFileSync('backend/services/member-progress.service.ts', 'utf8');
+  assert.match(service, /from\("task_programs"\)\.select\("\*"\)\.eq\("team_id", teamId\)\.eq\("is_active", true\)\.order\("position"/);
 });
 
 test('programs are blocks with progress; a tap opens passed steps with miles, the current card and closed steps with titles', () => {

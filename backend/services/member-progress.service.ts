@@ -19,7 +19,7 @@ export function programModules(programs: Row[], tasks: Row[], progressByProgram:
     const completed = progress?.status === "completed";
     const current = completed ? steps.length : steps.findIndex((task) => String(task.id) === String(progress?.current_task_id));
     return [{
-      id: String(program.id), title: String(program.title || ""), is_pinned: Boolean(program.is_pinned), pinned_at: program.is_pinned ? program.pinned_at ?? null : null, status: completed ? "completed" : "active",
+      id: String(program.id), title: String(program.title || ""), status: completed ? "completed" : "active",
       current_task_id: !completed && current >= 0 ? String(steps[current].id) : null, completed_at: completed ? progress?.completed_at ?? null : null,
       steps: steps.map((task, index) => ({
         id: String(task.id), number: index + 1, title: String(task.title || ""), max_points: Number(task.max_points || 0), interactive_kind: task.interactive_kind ?? null,
@@ -60,7 +60,7 @@ export async function getMemberTaskFeed(userId: string, teamId: string, teamJoin
   // The team structure and the participant's levels are needed for every feed, so they travel together with the lists.
   const [tasksResult, programsResult, progressResult, network, levelsResult] = await Promise.all([
     readPages(supabase.from("tasks").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
-    readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).eq("is_active", true).order("created_at", { ascending: true }).order("id")),
+    readPages(supabase.from("task_programs").select("*").eq("team_id", teamId).eq("is_active", true).order("position", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true }).order("id")),
     readPages(supabase.from("member_program_progress").select("*").eq("user_id", userId).order("id")),
     findTeamNetwork(teamId),
     readPages(supabase.from("member_levels").select("level,reached_at").eq("user_id", userId).is("revoked_at", null).order("level")),

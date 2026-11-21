@@ -13,7 +13,8 @@ export type ProgramInput = { teamId: string; title: string; deadlineHours: numbe
 export async function findPrograms(teamId?: string, viewer?: ProgramViewer) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
-  let query = supabase.from("task_programs").select("*").order("is_pinned", { ascending: false }).order("pinned_at", { ascending: true }).order("created_at", { ascending: true });
+  // The mentor's order (ready games have no place and keep their own pin order on the page).
+  let query = supabase.from("task_programs").select("*").order("position", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true });
   if (teamId) query = query.eq("team_id", teamId);
   const result = await readPages(query.order("id"));
   if (result.error) return { error: result.error };
@@ -99,6 +100,12 @@ export async function updateProgram(id: string, changes: { title?: string; deadl
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };
   const { level, ...input } = changes;
+  // Programs are put in order with «↕ Порядок программ»; only ready games are still pinned.
+  if (input.isPinned !== undefined) {
+    const current = await supabase.from("task_programs").select("template_key").eq("id", id).maybeSingle();
+    if (current.error) return { error: current.error };
+    if (current.data && !current.data.template_key) return { validationError: "Программы не закрепляются: поставьте программу первой кнопкой «↕ Порядок программ»." };
+  }
   if (levelHasOnlyPrograms(level)) {
     const current = await supabase.from("task_programs").select("template_key").eq("id", id).maybeSingle();
     if (current.error) return { error: current.error };
@@ -117,6 +124,18 @@ export async function updateProgram(id: string, changes: { title?: string; deadl
   if (result.error) return { error: result.error };
   const outcome = result.data as { data?: Record<string, unknown>; forbidden?: boolean };
   return outcome.forbidden ? { forbidden: true as const } : { data: outcome.data };
+}
+
+/** The whole list of the team's programs in the new order; the database checks the leader and the list. */
+export async function saveProgramOrder(actorId: string, programIds: string[]) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unavailable: true as const };
+  const result = await supabase.rpc("app_program_order_save", { p_actor: actorId, p_program_ids: programIds });
+  if (result.error) return { error: result.error };
+  const outcome = (result.data || {}) as { data?: boolean; forbidden?: boolean; validationError?: string };
+  if (outcome.forbidden) return { forbidden: true as const };
+  if (outcome.validationError) return { validationError: outcome.validationError };
+  return { data: true };
 }
 
 export async function deleteProgram(id: string, actor?: ProgramViewer) {

@@ -94,6 +94,10 @@ export async function addProgramStep(programId: string, input: { title: string; 
 export async function reorderProgramSteps(programId: string, taskIds: string[]) {
   await request<ApiResponse<{ saved: boolean }>>(`/api/programs/${encodeURIComponent(programId)}/order`, { method: "PUT", body: JSON.stringify({ taskIds }) });
 }
+/** The team leader's order: every program of the team (hidden ones and all levels), first one first. */
+export async function saveProgramOrder(programIds: string[]) {
+  await request<ApiResponse<{ saved: boolean }>>("/api/programs/order", { method: "PUT", body: JSON.stringify({ programIds }) });
+}
 export async function deleteAdminProgram(id: string): Promise<boolean> { const response = await request<ApiResponse<{ storageCleanupWarning?: boolean }>>("/api/programs/" + id, { method: "DELETE" }); return Boolean(response.storageCleanupWarning); }
 export type ReadyProgramStatus = Omit<ReadyProgramDefinition, "tasks"> & { published: boolean; publishedProgramId?: string; publishedActive?: boolean; publishedPinned?: boolean; publishedPinnedAt?: string; publishedCreatedAt?: string; canManage?: boolean };
 export async function loadReadyPrograms(): Promise<ReadyProgramStatus[]> {

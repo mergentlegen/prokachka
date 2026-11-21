@@ -71,3 +71,4 @@
 \ir 20261121-final-voyage.sql
 \ir 20261122-program-first-open-step.sql
 \ir 20261123-quiz-messages.sql
+\ir 20261124-program-order.sql

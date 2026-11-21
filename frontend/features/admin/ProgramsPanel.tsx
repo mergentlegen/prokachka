@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { addProgramGame, deleteAdminProgram, reorderProgramSteps, updateAdminProgram } from "@/frontend/shared/api/admin-client";
+import { addProgramGame, deleteAdminProgram, reorderProgramSteps, saveProgramOrder, updateAdminProgram } from "@/frontend/shared/api/admin-client";
 import { ModalSheet } from "@/frontend/shared/ModalSheet";
 import { PROGRAM_GAMES, type ProgramGame } from "@/shared/domain/program-games";
 import { ConfirmModal } from "@/frontend/shared/ConfirmModal";
 import { FormSheet } from "@/frontend/shared/FormSheet";
 import { Drawer, staggerStyle } from "@/frontend/shared/Drawer";
-import { ActionsMenu, pinIcon, useLevelFilter, type MenuItem } from "./AdminTasksView";
+import { ActionsMenu, useLevelFilter, type MenuItem } from "./AdminTasksView";
 import { actionIcons } from "./AdminIcons";
-import { comparePublications } from "@/shared/domain/publication-order";
+import { compareProgramOrder } from "@/shared/domain/publication-order";
 import { formatMiles } from "@/frontend/shared/lib/format";
 import type { Task, TaskProgram } from "@/shared/domain/types";
 import type { ProgramHistory } from "@/shared/domain/history";
@@ -34,12 +34,15 @@ export function reopenedNotice(count: number) {
 }
 
 export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history = [], taskBusyId, onChange, onError, onEditTask, onToggleTask, onRemoveTask, onAddStep, onCopyTask }: Props) {
-  const customPrograms = programs.filter((program) => !program.templateKey).sort(comparePublications);
+  // The team leader's order: participants see their programs exactly like this.
+  const customPrograms = programs.filter((program) => !program.templateKey).sort(compareProgramOrder);
   const [busyId, setBusyId] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProgram | null>(null);
   const [gamePicker, setGamePicker] = useState<TaskProgram | null>(null);
   const [ordering, setOrdering] = useState<string | null>(null);
+  // «↕ Порядок программ»: arrows on every program instead of its ⋯ menu.
+  const [arranging, setArranging] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
   const [hiddenOpen, setHiddenOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<TaskProgram | null>(null);
@@ -73,7 +76,24 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     finally { setBusyId(""); }
   }
 
-  async function update(program: TaskProgram, patch: { title?: string; isActive?: boolean; isPinned?: boolean; level?: number }) {
+  // Swaps a program with its neighbour in the list shown (the level chosen, active or hidden), saves the whole list;
+  // on a failure the previous order comes back.
+  async function moveProgram(shown: TaskProgram[], program: TaskProgram, step: -1 | 1) {
+    const neighbour = shown[shown.findIndex((item) => item.id === program.id) + step];
+    if (busyId || !neighbour) return;
+    const ordered = [...customPrograms];
+    const from = ordered.findIndex((item) => item.id === program.id), to = ordered.findIndex((item) => item.id === neighbour.id);
+    [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
+    const places = new Map(ordered.map((item, index) => [item.id, index + 1]));
+    const previous = programs;
+    onChange(programs.map((item) => places.has(item.id) ? { ...item, position: places.get(item.id) } : item), tasks);
+    setBusyId(program.id);
+    try { await saveProgramOrder(ordered.map((item) => item.id)); }
+    catch (error) { onChange(previous, tasks); onError(error instanceof Error ? error.message : "Не удалось сохранить порядок."); }
+    finally { setBusyId(""); }
+  }
+
+  async function update(program: TaskProgram, patch: { title?: string; isActive?: boolean; level?: number }) {
     if (busyId) return false;
     setBusyId(program.id);
     try {
@@ -108,7 +128,7 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
   }
 
   // One program as a card: a short header with its own ⋯ menu, and the steps folding out below it.
-  const programCard = (program: TaskProgram, position: number) => {
+  const programCard = (program: TaskProgram, position: number, shown: TaskProgram[]) => {
     const canManage = canManageAll || program.publisherId === actorId;
     const steps = tasks.filter((task) => task.programId === program.id).sort((a, b) => (a.position || 0) - (b.position || 0) || a.id.localeCompare(b.id));
     const isExpanded = expanded === program.id;
@@ -118,7 +138,6 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     const reordering = ordering === program.id;
     const programItems: MenuItem[] = canManage ? [
       { label: "Переименовать", icon: actionIcons.edit, onSelect: () => { setRenameValue(program.title); setRenameTarget(program); } },
-      { label: program.isPinned ? "Открепить" : "Закрепить сверху", icon: pinIcon, onSelect: () => void update(program, { isPinned: !program.isPinned }) },
       { label: program.isActive ? "Скрыть от участников" : "Показать участникам", icon: program.isActive ? actionIcons.hide : actionIcons.show, onSelect: () => void update(program, { isActive: !program.isActive }) },
       ...LEVELS.filter((level) => level !== (program.level ?? 1) && !program.templateKey).map((level) => ({ label: `Перенести на уровень ${level}`, icon: actionIcons.show,
         onSelect: () => void update(program, { level }).then((done) => { if (done) onError(`Программа «${program.title}» теперь для уровня ${level}.`); }) })),
@@ -126,20 +145,23 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     ] : [];
     return <section key={program.id} className={[styles.card, program.isActive ? "" : styles.cardHidden, isExpanded ? styles.cardOpen : ""].join(" ")} data-stagger style={staggerStyle(position)}>
       <div className={styles.cardTop}>
-        <button type="button" className={styles.cardHead} aria-expanded={isExpanded} aria-controls={"program-steps-" + program.id} onClick={() => { setOrdering(null); setAdding(null); setExpanded(isExpanded ? null : program.id); }}>
+        <button type="button" className={styles.cardHead} aria-expanded={isExpanded} aria-controls={"program-steps-" + program.id} disabled={arranging} onClick={() => { setOrdering(null); setAdding(null); setExpanded(isExpanded ? null : program.id); }}>
           <span className={styles.headMain}>
             <span className={styles.badges}>
               <span className={program.isActive ? styles.badgeOn : styles.badgeOff}>{program.isActive ? "Активна" : "Скрыта"}</span>
-              {program.isPinned && <span className={styles.badgePin}>{pinIcon}Закреплена</span>}
               {(program.level ?? 1) > 1 && <span className={styles.badgeLevel}>Уровень {program.level}</span>}
             </span>
             <strong className={styles.cardTitle}>{program.title}</strong>
             <span className={styles.facts}>{steps.length} {plural(steps.length, "шаг", "шага", "шагов")} · {program.deadlineHours} ч на шаг · до {formatMiles(steps.reduce((total, task) => total + task.maxPoints, 0))}</span>
             {progress && <span className={styles.people}>{funnel.total ? `${funnel.total} ${plural(funnel.total, "участник", "участника", "участников")} в программе · ${funnel.completed} ${plural(funnel.completed, "прошёл", "прошли", "прошли")} до конца` : "Пока никто не начал"}</span>}
           </span>
-          <span className={styles.chevron} aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></span>
+          {!arranging && <span className={styles.chevron} aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></span>}
         </button>
-        {programItems.length > 0 && <div className={styles.cardMenu}><ActionsMenu title={program.title} items={programItems} disabled={busy} /></div>}
+        {arranging ? <span className={`${styles.moveGroup} ${styles.cardMove}`}>
+          <button type="button" className={styles.tool} disabled={busy || shown[0]?.id === program.id} onClick={() => void moveProgram(shown, program, -1)} aria-label={`Поднять «${program.title}» выше`}>↑</button>
+          <button type="button" className={styles.tool} disabled={busy || shown[shown.length - 1]?.id === program.id} onClick={() => void moveProgram(shown, program, 1)} aria-label={`Опустить «${program.title}» ниже`}>↓</button>
+        </span>
+          : programItems.length > 0 && <div className={styles.cardMenu}><ActionsMenu title={program.title} items={programItems} disabled={busy} /></div>}
       </div>
       <Drawer open={isExpanded} id={"program-steps-" + program.id}><div className={styles.body}>
         <div className={styles.bodyHead}>
@@ -201,10 +223,15 @@ export function ProgramsPanel({ programs, tasks, actorId, canManageAll, history 
     <p className="admin-muted">Участник проходит шаги по порядку: следующий открывается, когда предыдущий принят. Нажмите на программу, чтобы увидеть шаги и кто на каком шаге.</p>
     {customPrograms.length === 0 ? <div className="admin-panel"><div className="empty-admin"><p>Программ пока нет. Создайте первую программу.</p></div></div> : <div className={styles.list}>
       {levelFilter}
-      {activePrograms.length ? activePrograms.map(programCard) : <p className={styles.emptySteps}>Активных программ нет. Покажите скрытую или создайте новую.</p>}
+      {canManageAll && customPrograms.length > 1 && <div className={styles.listTools}>
+        <button type="button" className={`${styles.orderToggle} ${arranging ? styles.orderOn : ""}`} aria-pressed={arranging} disabled={Boolean(busyId) && !arranging}
+          onClick={() => { setExpanded(null); setOrdering(null); setAdding(null); setArranging(!arranging); }}>{arranging ? "Готово" : "↕ Порядок программ"}</button>
+        {arranging && <small>Стрелками поднимайте и опускайте программы. Участники сразу увидят этот порядок.</small>}
+      </div>}
+      {activePrograms.length ? activePrograms.map((program, index) => programCard(program, index, activePrograms)) : <p className={styles.emptySteps}>Активных программ нет. Покажите скрытую или создайте новую.</p>}
       {hiddenPrograms.length > 0 && <>
         <button type="button" className={styles.fold} aria-expanded={hiddenOpen} onClick={() => setHiddenOpen(!hiddenOpen)}>Скрытые <span>{hiddenPrograms.length}</span><i aria-hidden="true" /></button>
-        <Drawer open={hiddenOpen}><div className={styles.list}>{hiddenPrograms.map(programCard)}</div></Drawer>
+        <Drawer open={hiddenOpen}><div className={styles.list}>{hiddenPrograms.map((program, index) => programCard(program, index, hiddenPrograms))}</div></Drawer>
       </>}
     </div>}
     {gamePicker && <ModalSheet title="Готовая игра в программу" onClose={() => { if (!busyId) setGamePicker(null); }}>

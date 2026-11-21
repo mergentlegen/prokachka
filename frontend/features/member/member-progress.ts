@@ -46,16 +46,11 @@ export function programStepStates(module: ProgramModule, latest: ReadonlyMap<str
 }
 
 /**
- * Programs exactly in the mentor's order: pinned ones on top in the order they were pinned, then the order they were published in.
+ * Programs exactly in the mentor's order («↕ Порядок программ»): the server sends them in that order, nothing re-sorts them.
  * Passing a program never moves it — it stays in its place with its tick.
  */
 export function orderedProgramModules(modules: ProgramModule[]) {
-  const pinTime = (module: ProgramModule) => { const time = Date.parse(module.pinnedAt || ""); return Number.isFinite(time) ? time : Infinity; };
-  return modules.map((module, index) => ({ module, index }))
-    .sort((a, b) => Number(b.module.isPinned) - Number(a.module.isPinned)
-      || (a.module.isPinned && b.module.isPinned ? (pinTime(a.module) === pinTime(b.module) ? 0 : pinTime(a.module) < pinTime(b.module) ? -1 : 1) : 0)
-      || a.index - b.index)
-    .map(({ module }) => module);
+  return [...modules];
 }
 
 export function latestSubmissions(submissions: Submission[], userId: string) {

@@ -296,3 +296,17 @@ test('parallel taps on a test with a mistake return the work once with the mento
   assert.equal(query(`select count(*) from feedback_events e join submissions s on s.id=e.submission_id where s.user_id='${alice}' and s.task_id='${task}' and e.kind='review'`), '1');
   assert.equal(query(`select count(*) from telegram_notification_jobs j join submissions s on s.id=j.submission_id where s.user_id='${alice}' and s.task_id='${task}' and j.kind='submission'`), '0');
 });
+
+test('parallel program orders and a new program at the same moment: every program keeps one place', { skip: !port }, async () => {
+  const { team, root } = fixture();
+  const ids = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+  query(ids.map((id, index) => `insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${id}','${team}','Order ${index}',48,'${root}');`).join(''));
+  const orders = [[3, 2, 1, 0], [1, 0, 3, 2], [2, 3, 0, 1], [0, 1, 2, 3]].map((order) => order.map((index) => ids[index]));
+  await Promise.all([
+    ...orders.map((order) => parallel(`select app_program_order_save('${root}', array['${order.join("','")}']::uuid[]);`)),
+    parallel(`insert into task_programs(team_id,title,deadline_hours,publisher_id) values('${team}','Added',48,'${root}');`),
+    parallel(`insert into task_programs(team_id,title,deadline_hours,publisher_id) values('${team}','Added too',48,'${root}');`),
+  ]);
+  const places = query(`select string_agg(position::text, ',' order by position) from task_programs where team_id='${team}' and template_key is null`);
+  assert.equal(places, '1,2,3,4,5,6', 'places repeat or are lost: ' + places);
+});

@@ -4,7 +4,7 @@ import { validMiles } from "@/shared/domain/miles";
 import { getCurrentUser as currentUser } from "@/backend/http/current-user";
 import { failure, ok } from "@/backend/http/api-response";
 import { isUuid, parseExternalUrl } from "@/backend/http/security";
-import { createProgram, deleteProgram, findPrograms, updateProgram } from "@/backend/services/programs.service";
+import { createProgram, deleteProgram, findPrograms, saveProgramOrder, updateProgram } from "@/backend/services/programs.service";
 import { findProgramHistory } from "@/backend/services/program-history.service";
 import { auditRecord, recordAudit } from "@/backend/services/audit-log.service";
 
@@ -92,6 +92,24 @@ export async function patchProgram(request: Request, id: string) {
     const title = typeof result.data?.title === "string" ? result.data.title : undefined;
     if (before && title && before.label !== title) await recordAudit(user, { action: "program.rename", targetId: id, targetLabel: title, teamId: before.teamId, details: { name: [before.label, title] } });
     return ok({ program: result.data });
+  } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
+}
+
+// The team leader's order of programs: the whole list, hidden ones and every level included.
+export async function putProgramOrder(request: Request) {
+  const user = await currentUser(request);
+  if (!user) return failure("Сначала войдите в аккаунт.", 401);
+  if (user.role !== "admin" || !user.teamId) return failure("Порядок программ меняет руководитель команды.", 403);
+  try {
+    const body = await readLimitedJson(request);
+    const ids = Array.isArray(body.programIds) ? body.programIds : null;
+    if (!ids || ids.length < 1 || ids.length > 500 || !ids.every(isUuid)) return failure("Некорректный порядок программ.", 400);
+    const result = await saveProgramOrder(user.id, ids as string[]);
+    if ("unavailable" in result) return failure("База данных не настроена.", 503);
+    if ("forbidden" in result) return failure("Порядок программ меняет руководитель команды.", 403);
+    if ("validationError" in result) return failure(String(result.validationError), 409);
+    if ("error" in result) return failure("Не удалось сохранить порядок.", 503);
+    return ok({ saved: true });
   } catch (error) { return requestBodyFailure(error) || failure("Некорректные данные.", 400); }
 }
 

@@ -41,13 +41,14 @@ export type AuthUser = Pick<User, "id" | "name" | "firstName" | "lastName" | "av
 
 export type TaskProgram = {
   id: string; teamId: string; title: string; deadlineHours: number; isActive: boolean; isPinned?: boolean; pinnedAt?: string; publisherId?: string; audienceRootId?: string; templateKey?: ReadyProgramKey; createdAt: string; updatedAt: string; /** Present from level 2 on. */ level?: number;
+  /** The program's place in the team leader's order (ready games have none; only they are still pinned). */ position?: number;
 };
 export type MemberProgramProgress = {
   id: string; userId: string; programId: string; currentTaskId?: string; unlockedAt: string; dueAt: string; status: ProgramStatus; completedAt?: string;
 };
 /** A program as the participant sees it: every visible step in order. Steps not reached yet carry only the title and miles. */
 export type ProgramModuleStep = { id: string; number: number; title: string; maxPoints: number; interactiveKind?: TaskInteractiveKind; description?: string; resourceUrl?: string };
-export type ProgramModule = { id: string; title: string; isPinned: boolean; pinnedAt?: string; status: ProgramStatus; currentTaskId?: string; completedAt?: string; steps: ProgramModuleStep[] };
+export type ProgramModule = { id: string; title: string; status: ProgramStatus; currentTaskId?: string; completedAt?: string; steps: ProgramModuleStep[] };
 export type Task = {
   id: string; title: string; description: string; maxPoints: number; deadlineAt?: string | null; isActive: boolean; isPinned?: boolean; pinnedAt?: string; teamId?: string;
   publicationType?: TaskPublicationType; programId?: string; position?: number; deadlineHours?: number; unlockedAt?: string; dueAt?: string; resourceUrl?: string;

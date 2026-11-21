@@ -5,6 +5,12 @@ function compareTime(a: string, b: string) {
   return Number.isFinite(aTime) && Number.isFinite(bTime) ? aTime - bTime : a.localeCompare(b);
 }
 
+/** Programs in the team leader's order; a program without a place yet (just created on this page) goes last. */
+export function compareProgramOrder(a: { id: string; createdAt: string; position?: number }, b: { id: string; createdAt: string; position?: number }) {
+  const place = (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER);
+  return place || compareTime(a.createdAt, b.createdAt) || a.id.localeCompare(b.id);
+}
+
 // Keep the pin queue in the order items were pinned, independent of creation dates.
 export function comparePublications(a: Publication, b: Publication) {
   const pinnedOrder = Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
