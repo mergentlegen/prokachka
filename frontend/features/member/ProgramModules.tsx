@@ -27,6 +27,7 @@ function LockIcon() {
 
 // Programs as modules: a block per program with its progress; a tap opens every step in order. Passed steps stay
 // with their miles, the current one is the usual task card, the next ones show only their title until the previous step is accepted.
+// Programs open one at a time: a closed one («Откроется после …») shows its steps with a lock, none of them opens.
 export function ProgramModules({ modules, tasks, passedTasks = [], latest, selectedId, onSelect, renderTask, onFeedback, readAll = false, emptyText = "Пока нет программ." }: Props) {
   const [openStep, setOpenStep] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -43,7 +44,8 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
   }, [openId]);
   if (!ordered.length) return <div className="empty-state"><span>◌</span><p>{emptyText}</p></div>;
   return <div ref={list} className={styles.modules}>
-    {ordered.map((module) => {
+    {ordered.map((module, moduleIndex) => {
+      const closed = module.status === "locked" && !readAll;
       const states = programStepStates(module, latest);
       const done = states.filter((state) => state === "done").length;
       const earned = module.steps.reduce((sum, step, index) => states[index] === "done" ? sum + (latest.get(step.id)?.points || 0) : sum, 0);
@@ -51,12 +53,14 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
       const current = module.steps.find((_, index) => states[index] === "current");
       const waiting = current && latest.get(current.id)?.status === "pending";
       const open = module.id === openId;
-      const summary = finished ? `Пройдена · ${formatMiles(earned)}`
+      const previous = ordered[moduleIndex - 1];
+      const summary = closed ? (previous ? `Откроется после «${previous.title}»` : "Откроется позже")
+        : finished ? `Пройдена · ${formatMiles(earned)}`
         : current ? `Пройдено ${done} из ${module.steps.length} · ${waiting ? `шаг ${current.number} на проверке` : `сейчас шаг ${current.number}`}`
         : `Пройдено ${done} из ${module.steps.length}`;
-      return <section key={module.id} className={`${styles.block} ${open ? styles.open : ""} ${finished ? styles.finished : ""}`}>
+      return <section key={module.id} className={`${styles.block} ${open ? styles.open : ""} ${finished ? styles.finished : ""} ${closed ? styles.closed : ""}`}>
         <button type="button" className={styles.head} data-program={module.id} aria-expanded={open} onClick={() => { setOpenStep(null); onSelect(open ? null : module.id); }}>
-          <span className={styles.count} aria-hidden="true">{finished ? "✓" : <>{done}<small>/{module.steps.length}</small></>}</span>
+          <span className={styles.count} aria-hidden="true">{finished ? "✓" : closed ? <LockIcon /> : <>{done}<small>/{module.steps.length}</small></>}</span>
           <span className={styles.headText}>
             <strong>{module.title}</strong>
             <small>{summary}</small>
@@ -73,9 +77,9 @@ export function ProgramModules({ modules, tasks, passedTasks = [], latest, selec
             const submission = latest.get(step.id);
             const readable = passedTasks.find((item) => item.id === step.id);
             // In the archive a step not passed opens too: its text, video, files and questions, to read.
-            const openable = state === "done" || (readAll && Boolean(readable));
+            const openable = !closed && (state === "done" || (readAll && Boolean(readable)));
             const expanded = openable && openStep === step.id;
-            const note = state === "locked" ? (readAll ? " · не пройден" : " · закрыт") : state === "skipped" ? (module.status === "active" && !readAll ? " · откроется после текущего" : " · не пройден") : "";
+            const note = closed ? (state === "done" ? " · пройден" : " · закрыт") : state === "locked" ? (readAll ? " · не пройден" : " · закрыт") : state === "skipped" ? (module.status === "active" && !readAll ? " · откроется после текущего" : " · не пройден") : "";
             // A step with its whole task opens the material window at once; the short details stay only for an older feed without it.
             const sheet = openable && Boolean(readable);
             return <li key={step.id} className={`${styles.step} ${styles[state]} ${openable && state !== "done" ? styles.readable : ""}`} data-stagger style={staggerStyle(index)}>

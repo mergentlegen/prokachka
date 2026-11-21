@@ -146,3 +146,33 @@ test('a passed step window shows the whole material at once: full text, files, t
     assert.equal(closed, 1, 'closing the window tells the program list');
   } finally { harness.unmount(); }
 });
+
+test('programs open one at a time: a closed program is visible with a lock, «Откроется после …», and nothing in it opens', () => {
+  const tasks = [step('a', 1), step('b', 2), step('x', 1, { program_id: 'p2' }), step('y', 2, { program_id: 'p2' })];
+  const programs = [{ id: 'p1', title: 'Старт' }, { id: 'p2', title: 'Приглашения' }];
+  const [first, second] = programModules(programs, tasks, new Map([['p1', { status: 'active', current_task_id: 'a' }], ['p2', { status: 'locked', current_task_id: 'y' }]]));
+  assert.equal(first.status, 'active');
+  assert.equal(second.status, 'locked');
+  assert.equal(second.current_task_id, null, 'a closed program has no current step');
+  assert.equal(second.steps[0].description, 'Текст x', 'a step passed out of turn keeps its text');
+  assert.equal(second.steps[1].description, undefined);
+  const { mapProgramModule } = loadTs('frontend/shared/api/client.ts');
+  assert.equal(mapProgramModule({ ...second }).status, 'locked');
+
+  const modules = [mapProgramModule(first), mapProgramModule(second)];
+  assert.deepEqual(progress.programStepStates(modules[1], new Map([['x', accepted('x', 5)]])), ['done', 'locked']);
+  const render = (selectedId, readAll = false) => renderToStaticMarkup(React.createElement(ProgramModules, {
+    modules, tasks: [{ id: 'a', title: 'Шаг a' }], latest: new Map([['x', accepted('x', 5)]]), passedTasks: [{ id: 'x', title: 'Шаг x' }], selectedId, readAll,
+    onSelect() {}, onFeedback() {}, renderTask: (task) => React.createElement('article', null, 'КАРТОЧКА ' + task.title),
+  }));
+  const list = render(null);
+  assert.match(list, /<strong>Приглашения<\/strong><small>Откроется после «Старт»<\/small>/);
+  const opened = render('p2');
+  assert.match(opened, /Шаг 1 · пройден[\s\S]*Шаг x/, 'a step passed before the program closed shows as passed');
+  assert.match(opened, /Шаг 2 · закрыт/);
+  const closedBlock = opened.slice(opened.indexOf('data-program="p2"'));
+  assert.doesNotMatch(closedBlock, /КАРТОЧКА|Открыть материал/, 'nothing in a closed program opens');
+  assert.equal((closedBlock.match(/<button type="button" disabled="">/g) || []).length, 2, 'every step row of a closed program is disabled');
+  // The archive of an earlier level still reads whole.
+  assert.match(render('p2', true), /Открыть материал/);
+});

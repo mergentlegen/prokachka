@@ -7,7 +7,8 @@ export type SubmissionStatus = "pending" | "accepted" | "revision";
 export type SubmissionSource = "telegram" | "interactive" | "mentor" | "site";
 export type TeamRequestStatus = "pending" | "approved" | "rejected";
 export type TaskPublicationType = "evergreen" | "fixed" | "sequential";
-export type ProgramStatus = "active" | "completed";
+/** `locked`: programs open one at a time — this one waits until the programs before it are passed. */
+export type ProgramStatus = "active" | "completed" | "locked";
 export const READY_PROGRAM_KEYS = ["dream-plan", "starter-rules", "heart-survey", "company-voyage", "captain-cruise", "count-your-dream", "dream-route"] as const;
 export type ReadyProgramKey = typeof READY_PROGRAM_KEYS[number];
 // Games placed as steps inside a program (not in the ready-games catalog).

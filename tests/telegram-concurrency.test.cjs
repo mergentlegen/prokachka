@@ -327,3 +327,32 @@ test('parallel taps in «Ya podumayu»: one round passes once, parallel finishes
   assert.equal(new Set(results.map((result) => result.submission.id)).size, 1);
   assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${game}'`), '1:1');
 });
+
+test('programs open one at a time: parallel acceptances of the last step and a new order leave exactly one open program', { skip: !port }, async () => {
+  for (let round = 0; round < 3; round += 1) {
+    const { team, root, alice } = fixture();
+    const [pa, pb, pc] = [randomUUID(), randomUUID(), randomUUID()];
+    const [a1, b1, c1] = [randomUUID(), randomUUID(), randomUUID()];
+    query(`update users set parent_user_id='${root}' where id='${alice}';
+      insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${pa}','${team}','Queue A',48,'${root}');
+      insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${pb}','${team}','Queue B',48,'${root}');
+      insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${pc}','${team}','Queue C',48,'${root}');
+      insert into tasks(id,title,description,team_id,max_points,publication_type,program_id,position,publisher_id) values
+        ('${a1}','A1','Answer','${team}',2,'sequential','${pa}',1,'${root}'),('${b1}','B1','Answer','${team}',2,'sequential','${pb}',1,'${root}'),
+        ('${c1}','C1','Answer','${team}',2,'sequential','${pc}',1,'${root}');
+      insert into member_program_progress(user_id,program_id,current_task_id,unlocked_at,due_at,status) values
+        ('${alice}','${pa}','${a1}',now(),now()+interval '2 days','active'),('${alice}','${pb}','${b1}',now(),now()+interval '2 days','active'),
+        ('${alice}','${pc}','${c1}',now(),now()+interval '2 days','active');`);
+    assert.equal(query(`select string_agg(status, ',' order by p.position) from member_program_progress m join task_programs p on p.id=m.program_id where m.user_id='${alice}'`), 'active,locked,locked');
+    const work = query(`insert into submissions(user_id,task_id,media_type,answer_text) values('${alice}','${a1}','text','Answer') returning id;`);
+    // Two mentors accept the last step of A while the leader moves C above B.
+    await Promise.all([
+      parallel(`select tg_review_submission('${work}','${root}',false,'accepted',2,'Ok',0);`),
+      parallel(`select tg_review_submission('${work}','${root}',false,'accepted',2,'Ok',0);`),
+      parallel(`select app_program_order_save('${root}', array['${pa}','${pc}','${pb}']::uuid[]);`),
+    ]);
+    const states = query(`select string_agg(status, ',' order by p.position) from member_program_progress m join task_programs p on p.id=m.program_id where m.user_id='${alice}'`);
+    assert.equal(states, 'completed,active,locked', `round ${round}: ${states}`);
+    assert.equal(query(`select count(*) from submissions where user_id='${alice}' and task_id='${a1}' and status='accepted'`), '1');
+  }
+});

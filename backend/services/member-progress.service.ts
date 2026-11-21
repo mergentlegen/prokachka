@@ -17,10 +17,12 @@ export function programModules(programs: Row[], tasks: Row[], progressByProgram:
     if (!steps.length) return [];
     const progress = progressByProgram.get(String(program.id));
     const completed = progress?.status === "completed";
+    // Programs open one at a time: a closed one is shown with its steps, nothing in it can be done yet.
+    const locked = !completed && progress?.status === "locked";
     const current = completed ? steps.length : steps.findIndex((task) => String(task.id) === String(progress?.current_task_id));
     return [{
-      id: String(program.id), title: String(program.title || ""), status: completed ? "completed" : "active",
-      current_task_id: !completed && current >= 0 ? String(steps[current].id) : null, completed_at: completed ? progress?.completed_at ?? null : null,
+      id: String(program.id), title: String(program.title || ""), status: completed ? "completed" : locked ? "locked" : "active",
+      current_task_id: !completed && !locked && current >= 0 ? String(steps[current].id) : null, completed_at: completed ? progress?.completed_at ?? null : null,
       steps: steps.map((task, index) => ({
         id: String(task.id), number: index + 1, title: String(task.title || ""), max_points: Number(task.max_points || 0), interactive_kind: task.interactive_kind ?? null,
         ...(readAll || index < current ? { description: String(task.description || ""), resource_url: task.resource_url ?? null } : {}),

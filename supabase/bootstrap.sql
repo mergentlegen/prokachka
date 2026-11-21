@@ -73,3 +73,4 @@
 \ir 20261123-quiz-messages.sql
 \ir 20261124-program-order.sql
 \ir 20261125-podumayu.sql
+\ir 20261126-program-queue.sql

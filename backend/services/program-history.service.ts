@@ -93,6 +93,8 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
         const previousAccepted = previousTask ? accepted.get(userId + ":" + String(previousTask.id)) : undefined;
         // The step the participant is on now is dated by their progress (it may have been added after they finished).
         const live = progressByMember.get(userId + ":" + programId);
+        // Programs open one at a time: in a program that waits for the earlier ones nothing new is open.
+        if (live?.status === "locked" && !latest.get(userId + ":" + String(step.id))) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "locked" };
         const current = live?.status === "active" && String(live.current_task_id) === step.id ? live : undefined;
         const unlockedAt = current?.unlocked_at ? String(current.unlocked_at) : stepIndex === 0 ? start : previousAccepted ? String(previousAccepted.reviewed_at || previousAccepted.submitted_at) : undefined;
         if (!unlockedAt) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "locked" };
@@ -113,6 +115,7 @@ export async function findProgramHistory(teamId: string, viewer?: { id: string; 
         const userId = String(user.id);
         const memberProgress = progressByMember.get(userId + ":" + programId);
         if (memberProgress?.status === "completed") return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "completed" };
+        if (memberProgress?.status === "locked") return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "locked" };
         const currentIndex = Math.max(0, programTasks.findIndex((task) => String(task.id) === String(memberProgress?.current_task_id)));
         const currentTask = programTasks[currentIndex];
         if (!currentTask || !steps[currentIndex]) return { userId, name: String(user.name || ""), avatarUrl: user.avatar_url, status: "active" };

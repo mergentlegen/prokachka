@@ -110,7 +110,7 @@ function mapTaskVideo(value: unknown): TaskVideoSummary | undefined {
 export function mapProgramModule(row: ApiRow): ProgramModule {
   const steps: ApiRow[] = Array.isArray(row.steps) ? row.steps : [];
   return {
-    id: String(row.id), title: String(row.title || ""), status: row.status === "completed" ? "completed" : "active",
+    id: String(row.id), title: String(row.title || ""), status: row.status === "completed" || row.status === "locked" ? row.status : "active",
     currentTaskId: row.current_task_id ? String(row.current_task_id) : undefined, completedAt: row.completed_at ? String(row.completed_at) : undefined,
     steps: steps.map((step) => ({
       id: String(step.id), number: Number(step.number || 0), title: String(step.title || ""), maxPoints: Number(step.max_points || 0),

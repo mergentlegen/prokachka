@@ -23,6 +23,12 @@
 .bar::before { content:""; display:block; width:var(--progress); height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--blue),#5b7fd6); transition:width .3s ease; animation:bar-fill .7s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes bar-fill { from { width:0; } }
 .finished .bar::before { background:#3aa57f; }
+/* A program that waits for the ones before it: visible, quieter, with a lock instead of the counter. */
+.closed { border-style:dashed; background:#fbfcfe; box-shadow:none; }
+.closed .count { background:#f0f3f8; color:#9aa6b8; }
+.closed .headText strong { color:#6d7a90; }
+.closed .head:hover .headText strong { color:#6d7a90; }
+.closed .bar::before { background:#b7c2d4; }
 
 .steps { display:grid; gap:8px; margin:0; padding:4px 14px 16px; list-style:none; }
 .step { min-width:0; border:1px solid var(--line); border-radius:14px; background:#fff; }

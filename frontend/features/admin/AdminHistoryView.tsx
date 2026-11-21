@@ -119,7 +119,7 @@ function PersonSheet({ person, tasks, programs, store, onOpenTask, onOpenProgram
       <h3 className={styles.sheetTitle}>Программы</h3>
       {memberships.length === 0 ? <Empty text="В программах пока не участвует." /> : <div className={styles.list}>
         {memberships.map(({ program, member }) => <button key={program.id} type="button" className={styles.row} onClick={() => onOpenProgram(program)}>
-          <span className={styles.rowMain}><strong>{program.title}</strong><small>{member.status === "completed" ? "пройдена" : member.currentStep ? `сейчас шаг ${member.currentStep} из ${program.steps.length}${member.currentTaskTitle ? ` · ${member.currentTaskTitle}` : ""}` : ""}</small></span>
+          <span className={styles.rowMain}><strong>{program.title}</strong><small>{member.status === "completed" ? "пройдена" : member.status === "locked" ? "откроется после предыдущей программы" : member.currentStep ? `сейчас шаг ${member.currentStep} из ${program.steps.length}${member.currentTaskTitle ? ` · ${member.currentTaskTitle}` : ""}` : ""}</small></span>
           <span className={`${styles.chip} ${styles[programStatusTone[member.status]]}`}>{programStatusText[member.status]}</span>
           <i className={styles.arrow} aria-hidden="true">→</i>
         </button>)}
