@@ -11,7 +11,7 @@ export type TrainerKeys = { answers: number[]; sort: boolean[] };
 export type TrainerLine = readonly [string, string];
 
 export type ObjectionTrainerData = {
-  kind: "podumayu" | "dorogo";
+  kind: "podumayu" | "dorogo" | "piramida";
   title: string;
   reward: number;
   description: string;

@@ -75,3 +75,4 @@
 \ir 20261125-podumayu.sql
 \ir 20261126-program-queue.sql
 \ir 20261127-dorogo.sql
+\ir 20261128-piramida.sql

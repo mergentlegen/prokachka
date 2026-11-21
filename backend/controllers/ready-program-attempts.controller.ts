@@ -14,6 +14,7 @@ import { FINAL_VOYAGE_DREAM_LIMIT, FINAL_VOYAGE_STEPS } from "@/shared/domain/fi
 import { objectionTrainerAction, type TrainerKind, type TrainerOperation } from "@/backend/services/objection-trainer.service";
 import { PODUMAYU_TRAINER } from "@/shared/domain/podumayu";
 import { DOROGO_TRAINER } from "@/shared/domain/dorogo";
+import { PIRAMIDA_TRAINER } from "@/shared/domain/piramida";
 import { CABINET_TRAINERS, cabinetTrainerAction, isCabinetTrainerKind, type CabinetTrainerOperation } from "@/backend/services/cabinet-trainer.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
@@ -79,9 +80,9 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить игру. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
-    if (action === "podumayu" || action === "dorogo") {
-      // Objection trainers («Я подумаю», «Дорого»): the current round, an option 0–3, or a phrase of the sorting round with «помогает» / «вредит».
-      const trainer = action === "podumayu" ? PODUMAYU_TRAINER : DOROGO_TRAINER;
+    if (action === "podumayu" || action === "dorogo" || action === "piramida") {
+      // Objection trainers («Я подумаю», «Дорого», «Это пирамида»): the current round, an option 0–3, or a phrase of the sorting round with «помогает» / «вредит».
+      const trainer = { podumayu: PODUMAYU_TRAINER, dorogo: DOROGO_TRAINER, piramida: PIRAMIDA_TRAINER }[action];
       const sort = trainer.rounds[trainer.sortStep];
       const phrases = sort?.kind === "sort" ? sort.phrases.length : 0;
       const payload = body.payload as { answer?: unknown; item?: unknown; good?: unknown } | undefined;
