@@ -310,3 +310,20 @@ test('parallel program orders and a new program at the same moment: every progra
   const places = query(`select string_agg(position::text, ',' order by position) from task_programs where team_id='${team}' and template_key is null`);
   assert.equal(places, '1,2,3,4,5,6', 'places repeat or are lost: ' + places);
 });
+
+test('parallel taps in «Ya podumayu»: one round passes once, parallel finishes give one mile', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  const program = randomUUID();
+  query(`update users set parent_user_id='${root}' where id='${alice}';
+    insert into task_programs(id,team_id,title,deadline_hours,publisher_id) values('${program}','${team}','Objections',72,'${root}');`);
+  const game = JSON.parse(query(`select app_program_add_game('${root}','${program}','podumayu');`)).data.id;
+  query(`insert into member_program_progress(user_id,program_id,current_task_id,unlocked_at,due_at,status) values('${alice}','${program}','${game}',now(),now()+interval '100 years','active');`);
+  const answers = (await Promise.all(Array.from({ length: 6 }, () => parallel(`select app_podumayu('${alice}','${game}','answer',0,'{"answer":2}'::jsonb);`)))).map((value) => JSON.parse(value));
+  assert.equal(answers.filter((result) => result.right === true && result.step === 1).length, 1, JSON.stringify(answers));
+  assert.equal(answers.filter((result) => result.validationError).length, 5, 'the other taps are refused as a second window');
+  query(`update ready_program_attempts set current_step=4 where user_id='${alice}' and task_id='${game}';`);
+  const results = (await Promise.all(Array.from({ length: 8 }, () => parallel(`select app_podumayu('${alice}','${game}','complete',0,'{}'::jsonb);`)))).map((value) => JSON.parse(value));
+  assert.ok(results.every((result) => result.completed === true), JSON.stringify(results));
+  assert.equal(new Set(results.map((result) => result.submission.id)).size, 1);
+  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${game}'`), '1:1');
+});
