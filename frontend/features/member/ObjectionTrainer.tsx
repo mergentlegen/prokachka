@@ -9,7 +9,7 @@ import type { Submission } from "@/shared/domain/types";
 import { MaterialBar, MaterialButton } from "./GameMaterial";
 import styles from "./ObjectionTrainer.module.css";
 
-// Objection trainers for programs («Я подумаю», «Дорого», «Это пирамида», «Кто гарантирует?»), in the colours of the author's files: dialogue rounds and one
+// Objection trainers for programs («Я подумаю», «Дорого», «Это пирамида», «Кто гарантирует?», «Баллы»), in the colours of the author's files: dialogue rounds and one
 // sorting round. Any option can be tapped — each has its comment. The site checks the first picks (a right one opens
 // «Дальше»); once a round is solved, the other options are only shown, nothing more is sent. The mile comes once.
 type View = "intro" | "round" | "finish" | "done" | "material";

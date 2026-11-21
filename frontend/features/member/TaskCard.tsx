@@ -25,6 +25,7 @@ import { PODUMAYU_TRAINER } from "@/shared/domain/podumayu";
 import { DOROGO_TRAINER } from "@/shared/domain/dorogo";
 import { PIRAMIDA_TRAINER } from "@/shared/domain/piramida";
 import { GARANTII_TRAINER } from "@/shared/domain/garantii";
+import { BALLY_TRAINER } from "@/shared/domain/bally";
 import { deadlineInfo } from "./member-progress";
 import { ProtectedVideo } from "@/frontend/shared/ProtectedVideo";
 import { QuizPreview, QuizResultPopup, QuizSentNotice, TaskQuiz, VoicePendingNotice, type QuizResult } from "./TaskQuiz";
@@ -155,6 +156,7 @@ export function TaskCard({ task, submission, onSubmit, onFeedback, onInteractive
         {task.interactiveKind === "dorogo" && <ObjectionTrainer trainer={DOROGO_TRAINER} taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "piramida" && <ObjectionTrainer trainer={PIRAMIDA_TRAINER} taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "garantii" && <ObjectionTrainer trainer={GARANTII_TRAINER} taskId={task.id} onCompleted={onInteractiveComplete} />}
+        {task.interactiveKind === "bally" && <ObjectionTrainer trainer={BALLY_TRAINER} taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "starter-rules" && <StarterRulesGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "company-voyage" && <CompanyVoyageGame taskId={task.id} onCompleted={onInteractiveComplete} />}
         {task.interactiveKind === "captain-cruise" && <CaptainCruiseGame taskId={task.id} onCompleted={onInteractiveComplete} />}

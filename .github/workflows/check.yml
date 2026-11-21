@@ -216,6 +216,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/piramida.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261129-garantii.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/garantii.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261130-bally.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/bally.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

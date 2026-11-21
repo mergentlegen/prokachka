@@ -77,3 +77,4 @@
 \ir 20261127-dorogo.sql
 \ir 20261128-piramida.sql
 \ir 20261129-garantii.sql
+\ir 20261130-bally.sql
