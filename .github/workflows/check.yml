@@ -234,6 +234,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/nepoluchitsya.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261138-zarabotok.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/zarabotok.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261139-biznes.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/biznes.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |

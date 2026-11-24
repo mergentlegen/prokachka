@@ -24,6 +24,7 @@ import { SEMYA_TRAINER } from "@/shared/domain/semya";
 import { SETEVOY_TRAINER } from "@/shared/domain/setevoy";
 import { NEPOLUCHITSYA_TRAINER } from "@/shared/domain/nepoluchitsya";
 import { ZARABOTOK_TRAINER } from "@/shared/domain/zarabotok";
+import { BIZNES_TRAINER } from "@/shared/domain/biznes";
 import { CABINET_TRAINERS, cabinetTrainerAction, isCabinetTrainerKind, type CabinetTrainerOperation } from "@/backend/services/cabinet-trainer.service";
 import { advanceReadyProgramAttempt, answerReadyProgramAttempt, completeReadyProgramAttempt, restartReadyProgramQuizAttempt, saveCompanyStory, startReadyProgramAttempt, type ReadyAttemptAction } from "@/backend/services/ready-programs.service";
 
@@ -89,9 +90,9 @@ export async function postReadyProgramAttempt(request: Request, taskId: string) 
       if ("error" in result) return databaseFailure(result.error, "Не удалось сохранить игру. Попробуйте ещё раз.");
       return ok({ attempt: result.data });
     }
-    if (action === "podumayu" || action === "dorogo" || action === "piramida" || action === "garantii" || action === "bally" || action === "deshevle" || action === "strah" || action === "vremya" || action === "semya" || action === "setevoy" || action === "nepoluchitsya" || action === "zarabotok") {
+    if (action === "podumayu" || action === "dorogo" || action === "piramida" || action === "garantii" || action === "bally" || action === "deshevle" || action === "strah" || action === "vremya" || action === "semya" || action === "setevoy" || action === "nepoluchitsya" || action === "zarabotok" || action === "biznes") {
       // Objection trainers («Я подумаю», «Дорого», «Это пирамида», «Кто гарантирует?», «Баллы»): the current round, an option 0–3, or a phrase of the sorting round with «помогает» / «вредит».
-      const trainer = { podumayu: PODUMAYU_TRAINER, dorogo: DOROGO_TRAINER, piramida: PIRAMIDA_TRAINER, garantii: GARANTII_TRAINER, bally: BALLY_TRAINER, deshevle: DESHEVLE_TRAINER, strah: STRAH_TRAINER, vremya: VREMYA_TRAINER, semya: SEMYA_TRAINER, setevoy: SETEVOY_TRAINER, nepoluchitsya: NEPOLUCHITSYA_TRAINER, zarabotok: ZARABOTOK_TRAINER }[action];
+      const trainer = { podumayu: PODUMAYU_TRAINER, dorogo: DOROGO_TRAINER, piramida: PIRAMIDA_TRAINER, garantii: GARANTII_TRAINER, bally: BALLY_TRAINER, deshevle: DESHEVLE_TRAINER, strah: STRAH_TRAINER, vremya: VREMYA_TRAINER, semya: SEMYA_TRAINER, setevoy: SETEVOY_TRAINER, nepoluchitsya: NEPOLUCHITSYA_TRAINER, zarabotok: ZARABOTOK_TRAINER, biznes: BIZNES_TRAINER }[action];
       const sort = trainer.rounds[trainer.sortStep];
       const phrases = sort?.kind === "sort" ? sort.phrases.length : 0;
       const payload = body.payload as { answer?: unknown; item?: unknown; good?: unknown } | undefined;
