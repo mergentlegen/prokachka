@@ -226,6 +226,8 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f tests/strah.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/20261134-vremya.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/vremya.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/20261135-semya.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/semya.sql
           npm run test:concurrency
       - name: Star award migration on a separate empty database
         run: |
