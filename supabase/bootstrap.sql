@@ -79,3 +79,4 @@
 \ir 20261129-garantii.sql
 \ir 20261130-bally.sql
 \ir 20261131-participation-rules-retry.sql
+\ir 20261132-deshevle.sql

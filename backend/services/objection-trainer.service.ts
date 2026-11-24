@@ -1,10 +1,10 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 
-export type TrainerKind = "podumayu" | "dorogo" | "piramida" | "garantii" | "bally";
+export type TrainerKind = "podumayu" | "dorogo" | "piramida" | "garantii" | "bally" | "deshevle";
 export type TrainerOperation = "start" | "answer" | "mark" | "complete";
 
 // The database function of each objection trainer: it checks each pick, keeps the marks of the sorting round and gives the mile once.
-const RPC: Record<TrainerKind, string> = { podumayu: "app_podumayu", dorogo: "app_dorogo", piramida: "app_piramida", garantii: "app_garantii", bally: "app_bally" };
+const RPC: Record<TrainerKind, string> = { podumayu: "app_podumayu", dorogo: "app_dorogo", piramida: "app_piramida", garantii: "app_garantii", bally: "app_bally", deshevle: "app_deshevle" };
 
 export async function objectionTrainerAction(kind: TrainerKind, userId: string, taskId: string, operation: TrainerOperation, step = 0, payload: Record<string, unknown> = {}) {
   const supabase = getSupabaseAdmin();
