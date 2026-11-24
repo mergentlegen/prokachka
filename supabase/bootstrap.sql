@@ -88,3 +88,4 @@
 \ir 20261138-zarabotok.sql
 \ir 20261139-biznes.sql
 \ir 20261140-kompaniya.sql
+\ir 20261141-kaverznye.sql

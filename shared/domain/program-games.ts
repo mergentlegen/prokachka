@@ -17,6 +17,7 @@ import { NEPOLUCHITSYA_DESCRIPTION, NEPOLUCHITSYA_KIND, NEPOLUCHITSYA_REWARD, NE
 import { ZARABOTOK_DESCRIPTION, ZARABOTOK_KIND, ZARABOTOK_REWARD, ZARABOTOK_TITLE } from "@/shared/domain/zarabotok";
 import { BIZNES_DESCRIPTION, BIZNES_KIND, BIZNES_REWARD, BIZNES_TITLE } from "@/shared/domain/biznes";
 import { KOMPANIYA_DESCRIPTION, KOMPANIYA_KIND, KOMPANIYA_REWARD, KOMPANIYA_TITLE } from "@/shared/domain/kompaniya";
+import { KAVERZNYE_DESCRIPTION, KAVERZNYE_KIND, KAVERZNYE_REWARD, KAVERZNYE_TITLE } from "@/shared/domain/kaverznye";
 import type { ProgramGameKey } from "@/shared/domain/types";
 
 // Ready games a mentor can put into a program as a step (no deadline, miles right after finishing).
@@ -41,5 +42,6 @@ export const PROGRAM_GAMES: readonly ProgramGame[] = [
   { kind: ZARABOTOK_KIND, title: ZARABOTOK_TITLE, description: ZARABOTOK_DESCRIPTION, reward: ZARABOTOK_REWARD, minutes: 8, icon: "🧭" },
   { kind: BIZNES_KIND, title: BIZNES_TITLE, description: BIZNES_DESCRIPTION, reward: BIZNES_REWARD, minutes: 8, icon: "🗓️" },
   { kind: KOMPANIYA_KIND, title: KOMPANIYA_TITLE, description: KOMPANIYA_DESCRIPTION, reward: KOMPANIYA_REWARD, minutes: 8, icon: "🏢" },
+  { kind: KAVERZNYE_KIND, title: KAVERZNYE_TITLE, description: KAVERZNYE_DESCRIPTION, reward: KAVERZNYE_REWARD, minutes: 8, icon: "❓" },
 ];
 export function programGame(kind: unknown) { return PROGRAM_GAMES.find((game) => game.kind === kind); }
