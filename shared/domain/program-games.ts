@@ -10,6 +10,7 @@ import { GARANTII_DESCRIPTION, GARANTII_KIND, GARANTII_REWARD, GARANTII_TITLE } 
 import { BALLY_DESCRIPTION, BALLY_KIND, BALLY_REWARD, BALLY_TITLE } from "@/shared/domain/bally";
 import { DESHEVLE_DESCRIPTION, DESHEVLE_KIND, DESHEVLE_REWARD, DESHEVLE_TITLE } from "@/shared/domain/deshevle";
 import { STRAH_DESCRIPTION, STRAH_KIND, STRAH_REWARD, STRAH_TITLE } from "@/shared/domain/strah";
+import { VREMYA_DESCRIPTION, VREMYA_KIND, VREMYA_REWARD, VREMYA_TITLE } from "@/shared/domain/vremya";
 import type { ProgramGameKey } from "@/shared/domain/types";
 
 // Ready games a mentor can put into a program as a step (no deadline, miles right after finishing).
@@ -27,5 +28,6 @@ export const PROGRAM_GAMES: readonly ProgramGame[] = [
   { kind: BALLY_KIND, title: BALLY_TITLE, description: BALLY_DESCRIPTION, reward: BALLY_REWARD, minutes: 8, icon: "🪙" },
   { kind: DESHEVLE_KIND, title: DESHEVLE_TITLE, description: DESHEVLE_DESCRIPTION, reward: DESHEVLE_REWARD, minutes: 8, icon: "🏷️" },
   { kind: STRAH_KIND, title: STRAH_TITLE, description: STRAH_DESCRIPTION, reward: STRAH_REWARD, minutes: 8, icon: "🌊" },
+  { kind: VREMYA_KIND, title: VREMYA_TITLE, description: VREMYA_DESCRIPTION, reward: VREMYA_REWARD, minutes: 8, icon: "⏳" },
 ];
 export function programGame(kind: unknown) { return PROGRAM_GAMES.find((game) => game.kind === kind); }
