@@ -11,7 +11,7 @@ export type TrainerKeys = { answers: number[]; sort: boolean[] };
 export type TrainerLine = readonly [string, string];
 
 export type ObjectionTrainerData = {
-  kind: "podumayu" | "dorogo" | "piramida" | "garantii" | "bally" | "deshevle" | "strah" | "vremya" | "semya" | "setevoy" | "nepoluchitsya" | "zarabotok" | "biznes";
+  kind: "podumayu" | "dorogo" | "piramida" | "garantii" | "bally" | "deshevle" | "strah" | "vremya" | "semya" | "setevoy" | "nepoluchitsya" | "zarabotok" | "biznes" | "kompaniya";
   title: string;
   reward: number;
   description: string;
