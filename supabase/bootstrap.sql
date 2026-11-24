@@ -83,3 +83,4 @@
 \ir 20261133-strah.sql
 \ir 20261134-vremya.sql
 \ir 20261135-semya.sql
+\ir 20261136-setevoy.sql
