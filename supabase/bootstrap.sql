@@ -78,3 +78,4 @@
 \ir 20261128-piramida.sql
 \ir 20261129-garantii.sql
 \ir 20261130-bally.sql
+\ir 20261131-participation-rules-retry.sql

@@ -401,6 +401,22 @@ test('parallel answers in «Bally»: a round passes once, parallel finishes give
   assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${game}'`), '1:1');
 });
 
+test('parallel answers in «Participation rules»: wrong and right taps at once finish the game once with 5 miles', { skip: !port }, async () => {
+  const { team, root, alice } = fixture();
+  query(`update users set parent_user_id='${root}' where id='${alice}';`);
+  const published = JSON.parse(query(`select app_create_program('${JSON.stringify({ teamId: team, publisherId: root, title: 'Rules', deadlineHours: 720, templateKey: 'starter-rules', tasks: [{ title: 'Rules', description: 'Rules and five questions.', maxPoints: 5, publicationType: 'evergreen', interactiveKind: 'starter-rules' }] })}'::jsonb);`));
+  const task = published.tasks[0].id;
+  for (const question of [0, 1, 2, 3]) query(`select app_participation_rules('${alice}','${task}','answer',${question},0);`);
+  const taps = [1, 0, 2, 0, 1, 0, 2, 0];
+  const results = (await Promise.all(taps.map((answer) => parallel(`select app_participation_rules('${alice}','${task}','answer',4,${answer});`)))).map((value) => JSON.parse(value));
+  assert.ok(results.some((result) => result.completed === true), JSON.stringify(results));
+  assert.equal(new Set(results.filter((result) => result.submission).map((result) => result.submission.id)).size, 1);
+  assert.equal(query(`select count(*)||':'||sum(points) from submissions where user_id='${alice}' and task_id='${task}'`), '1:5');
+  assert.equal(query(`select status||':'||earned_points from ready_program_attempts where user_id='${alice}' and task_id='${task}'`), 'completed:5');
+  assert.equal(query(`select answer from participation_rule_answers where user_id='${alice}' and task_id='${task}' and question=4`), '0', 'the right answer stays');
+  assert.ok(Number(query(`select mistakes from participation_rule_answers where user_id='${alice}' and task_id='${task}' and question=4`)) <= 4);
+});
+
 test('programs open one at a time: parallel acceptances of the last step and a new order leave exactly one open program', { skip: !port }, async () => {
   for (let round = 0; round < 3; round += 1) {
     const { team, root, alice } = fixture();

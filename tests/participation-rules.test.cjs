@@ -35,13 +35,28 @@ test('«Правила участия»: the database keeps the key, renames the
   const spec = JSON.parse(sql.match(/when 'starter-rules' then '(\{[^']+\})'::jsonb/)[1]);
   assert.deepEqual(spec, { steps: 1, reward: 5, answers: PARTICIPATION_RULES_QUESTIONS.map(() => 0) });
   for (const kind of ['dream-plan', 'company-voyage', 'captain-cruise', 'free-membership', 'marketing-director']) assert.ok(sql.includes(`when '${kind}' then`), kind);
-  assert.ok(sql.includes(`set description = '${PARTICIPATION_RULES_TASK_DESCRIPTION}'`));
+  assert.ok(read('supabase/20261131-participation-rules-retry.sql').includes(`set description = '${PARTICIPATION_RULES_TASK_DESCRIPTION}'`));
   assert.match(sql, /update public\.tasks set title = 'Правила участия' where interactive_kind = 'starter-rules' and title = 'Правила игры';/);
   assert.match(sql, /update public\.task_programs set title = 'Правила участия' where template_key = 'starter-rules' and title = 'Правила игры';/);
   assert.match(sql, /if task\.interactive_kind = 'starter-rules' then return jsonb_build_object\('validationError'/);
   assert.match(sql, /on conflict \(user_id, task_id, question\) do nothing/);
   assert.match(read('supabase/bootstrap.sql'), /\\ir 20261120-participation-rules\.sql\r?\n/);
   assert.match(read('.github/workflows/check.yml'), /20261120-participation-rules\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/participation-rules\.sql/);
+});
+
+test('«Правила участия»: 20261131 lets a wrong answer be changed, gives all 5 miles once and keeps every text in step', () => {
+  const sql = read('supabase/20261131-participation-rules-retry.sql');
+  assert.match(sql, /on conflict \(user_id, task_id, question\) do update set answer = excluded\.answer/);
+  assert.match(sql, /where participation_rule_answers\.answer is distinct from \(key->>participation_rule_answers\.question::int\)::int/, 'a right answer stays');
+  assert.match(sql, /right_count >= total then/);
+  assert.match(sql, /'Правила участия: все ' \|\| total \|\| ' ответов верные\. Ошибок: ' \|\| mistake_count \|\| '\.', total,/);
+  assert.match(sql, /and description = 'Как проходить «Прокачку»: 10 правил участия и 5 вопросов\. За каждый верный ответ с первой попытки — 1 миля, всего до 5 миль автоматически\.';/);
+  assert.doesNotMatch(sql, /app_ready_program_spec\(p_kind/, 'the reward list is left alone');
+  assert.match(read('supabase/bootstrap.sql'), /\\ir 20261130-bally\.sql\r?\n\\ir 20261131-participation-rules-retry\.sql\r?\n/);
+  assert.match(read('.github/workflows/check.yml'), /tests\/bally\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f supabase\/20261131-participation-rules-retry\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/participation-rules-retry\.sql/);
+  const texts = JSON.stringify(load('shared/domain/participation-rules.ts')) + JSON.stringify(load('shared/domain/ready-programs.ts').readyProgramByKey('starter-rules')) + read('frontend/features/member/StarterRulesGame.tsx');
+  assert.doesNotMatch(texts, /первой попытки/, 'no text promises miles only for the first try');
+  assert.match(texts, /Ошибку можно исправить/);
 });
 
 test('«Правила участия»: the server action accepts only a start or one answer in range', async () => {
@@ -73,18 +88,17 @@ function setup(start = {}) {
   globalThis.window = { setTimeout: (run) => { queue.push(run); return queue.length; }, clearTimeout() {} };
   const server = { answers: { ...(start.answers || {}) }, completed: Boolean(start.completed), earned: start.earned || 0, calls: [] };
   const state = () => {
-    const rights = Object.fromEntries([0, 1, 2, 3, 4].filter((q) => server.completed || server.answers[q] !== undefined).map((q) => [q, 0]));
+    const rights = Object.fromEntries([0, 1, 2, 3, 4].filter((q) => server.completed || server.answers[q] === 0).map((q) => [q, 0]));
     const right = Object.values(server.answers).filter((answer) => answer === 0).length;
     return { answers: { ...server.answers }, rights, earnedPoints: server.completed ? server.earned : right, maxPoints: 5, completed: server.completed, submission: server.submission };
   };
   const api = { participationRulesAction: async (id, operation, question, answer) => {
     assert.equal(id, taskId);
     server.calls.push([operation, question, answer]);
-    if (operation === 'answer' && !server.completed && server.answers[question] === undefined) {
+    if (operation === 'answer' && !server.completed && server.answers[question] !== 0) {
       server.answers[question] = answer;
-      if (Object.keys(server.answers).length === 5) {
-        server.completed = true; server.earned = Object.values(server.answers).filter((value) => value === 0).length;
-        server.submission = { id: 'result', points: server.earned };
+      if ([0, 1, 2, 3, 4].every((q) => server.answers[q] === 0)) {
+        server.completed = true; server.earned = 5; server.submission = { id: 'result', points: 5 };
       }
     }
     return state();
@@ -112,33 +126,40 @@ function setup(start = {}) {
   return game;
 }
 
-test('«Правила участия»: one try per question, the right option is shown, the miles come once at the fifth answer', async () => {
+test('«Правила участия»: a wrong pick can be changed until it is right; all 5 miles come once, when every answer is right', async () => {
   const game = setup();
   try {
     await game.settle();
     assert.equal(nodes(game.tree, (n) => n.type === 'article').length, 10, 'ten rule cards');
     assert.match(game.text(), /Твои мили✈️ 0 \/ 5/);
+    assert.match(game.text(), /За каждый верный ответ — 1 миля\. Если ответ неверный — выбери другой вариант\./);
     for (let question = 0; question < 5; question += 1) {
       const shown = nodes(game.tree, (n) => n.type === 'button' && game.questions[question].options.includes(label(n).trim())).map((n) => label(n).trim());
       assert.deepEqual([...shown].sort(), [...game.questions[question].options].sort(), 'all three options, in any order');
     }
     await game.pick(0, 2);
     assert.match(game.option(0, 2).props.className, /\bno\b/, 'the wrong pick is red');
-    assert.match(game.option(0, 0).props.className, /\bok\b/, 'the right option is green');
-    assert.ok([0, 1, 2].every((index) => game.option(0, index).props.disabled), 'a question has one try');
-    assert.match(game.text(), /Не совсем\. Блок пройден — открывается следующий\./);
-    assert.doesNotMatch(game.option(1, 0).props.className, /\bok\b/, 'unanswered questions do not show the right option');
+    assert.ok(game.option(0, 2).props.disabled, 'the same wrong option is not sent again');
+    assert.ok(!game.option(0, 0).props.disabled && !game.option(0, 1).props.disabled, 'the other options stay open');
+    assert.ok([0, 1, 2].every((index) => !/\bok\b/.test(game.option(0, index).props.className)), 'the right option is not given away');
+    assert.match(game.text(), /Не совсем\. Попробуй ещё раз — выбери другой вариант\./);
+    assert.doesNotMatch(game.text(), /Не совсем\. Блок пройден/, 'no explanation before the right answer');
+    await game.pick(0, 1);
+    assert.match(game.option(0, 1).props.className, /\bno\b/);
+    assert.doesNotMatch(game.option(0, 2).props.className, /\bno\b/, 'only the last wrong pick is red');
     await game.pick(0, 0);
-    assert.deepEqual(game.server.calls.filter((call) => call[0] === 'answer'), [['answer', 0, 2]], 'the second click is not sent');
-    await game.pick(1, 0);
-    assert.match(game.text(), /Верно! \+1 миля\. Дедлайнов нет\./);
+    assert.match(game.option(0, 0).props.className, /\bok\b/, 'the right answer is green');
+    assert.ok([0, 1, 2].every((index) => game.option(0, index).props.disabled), 'a right answer closes the question');
+    assert.match(game.text(), /Верно! \+1 миля\. Блок пройден — открывается следующий\./);
     assert.match(game.text(), /✈️ 1 \/ 5/);
-    await game.pick(2, 0); await game.pick(3, 1);
-    assert.equal(game.received.length, 0, 'no miles before the fifth answer');
+    assert.deepEqual(game.server.calls.filter((call) => call[0] === 'answer'), [['answer', 0, 2], ['answer', 0, 1], ['answer', 0, 0]]);
+    await game.pick(1, 0); await game.pick(2, 0); await game.pick(3, 0); await game.pick(4, 1);
+    assert.equal(game.received.length, 0, 'no miles while an answer is wrong');
     assert.doesNotMatch(game.text(), /Мили начислены/);
+    assert.match(game.text(), /✈️ 4 \/ 5/);
     await game.pick(4, 0);
-    assert.deepEqual(game.received, [{ id: 'result', points: 3 }]);
-    assert.match(game.text(), /\+3 мили!/);
+    assert.deepEqual(game.received, [{ id: 'result', points: 5 }]);
+    assert.match(game.text(), /\+5 миль!/);
     assert.match(game.text(), /Мили начислены автоматически — они уже в твоём рейтинге\./);
     assert.ok(nodes(game.tree, (n) => n.props?.label === 'Перечитать правила').length, 'the rules can be read again');
   } finally { game.done(); }

@@ -44,7 +44,7 @@ export const READY_PROGRAMS: readonly ReadyProgramDefinition[] = [
     key: "starter-rules",
     title: PARTICIPATION_RULES_TITLE,
     eyebrow: "Прокачка",
-    description: "Как проходить платформу: 10 правил участия и 5 вопросов. За каждый верный ответ с первой попытки — 1 миля.",
+    description: "Как проходить платформу: 10 правил участия и 5 вопросов. За каждый верный ответ — 1 миля, ошибку можно исправить.",
     badge: "Без дедлайна",
     taskCount: 1,
     tasks: [{

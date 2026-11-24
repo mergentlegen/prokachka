@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from "@/backend/infrastructure/supabase/admin-client";
 
-// «Правила участия»: the database keeps the first answer of each question and gives 1 mile per right one, once.
+// «Правила участия»: the database lets a wrong answer be changed until it is right and gives the 5 miles once, at the finish.
 export async function participationRulesAction(userId: string, taskId: string, operation: "start" | "answer", question = 0, answer = 0) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { unavailable: true as const };

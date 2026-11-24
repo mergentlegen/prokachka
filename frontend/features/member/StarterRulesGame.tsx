@@ -9,8 +9,9 @@ import { MaterialButton } from "./GameMaterial";
 import styles from "./StarterRulesGame.module.css";
 
 // «Правила участия» (kind `starter-rules`): the ten rules and five questions on one page, as in the author's file.
-// One try per question; the site keeps the first answer, says which option was right and gives 1 mile for each right
-// one when the fifth question is answered. A finished page stays readable: it is the game's material.
+// A wrong pick turns red and the question stays open until the right option is picked (the site does not tell it
+// before); each right answer is 1 mile, and all 5 come when the fifth is right. A finished page stays readable: it is the
+// game's material.
 function shuffled(length: number) {
   const order = Array.from({ length }, (_, index) => index);
   for (let index = length - 1; index > 0; index -= 1) {
@@ -39,7 +40,7 @@ export function StarterRulesGame({ taskId, onCompleted }: { taskId: string; onCo
   useEffect(() => { root.current?.closest("[data-modal-scroll]")?.scrollTo({ top: 0 }); }, []);
 
   async function answer(question: number, option: number) {
-    if (!attempt || inFlight.current || attempt.answers[question] !== undefined || attempt.completed) return;
+    if (!attempt || inFlight.current || attempt.completed || attempt.rights[question] !== undefined || attempt.answers[question] === option) return;
     inFlight.current = true; setSending(question); setError("");
     try {
       const saved = await participationRulesAction(taskId, "answer", question, option);
@@ -67,24 +68,26 @@ export function StarterRulesGame({ taskId, onCompleted }: { taskId: string; onCo
       </article>)}
 
       <h4 className={styles.sectionTitle}>Проверь себя</h4>
-      <p className={styles.muted}>5 вопросов по правилам. За каждый верный ответ с первой попытки — 1 миля.</p>
+      <p className={styles.muted}>5 вопросов по правилам. За каждый верный ответ — 1 миля. Если ответ неверный — выбери другой вариант.</p>
       <div className={styles.score} role="status"><span>Твои мили</span><span>✈️ {earned} / {total}</span></div>
 
       {!attempt && !error && <p className={styles.muted}>Загружаем твои ответы…</p>}
       {attempt && PARTICIPATION_RULES_QUESTIONS.map((question, index) => {
         const picked = attempt.answers[index];
         const right = attempt.rights[index];
-        const closed = picked !== undefined || attempt.completed;
+        const closed = right !== undefined || attempt.completed;
+        const wrong = picked !== undefined && picked !== right;
         return <div key={question.title} className={`${styles.card} ${styles.question}`}>
           <p className={styles.title} id={`rules-q${index}`}>{question.title}</p>
           <div role="group" aria-labelledby={`rules-q${index}`}>{orders[index].map((option) => <button type="button" key={option}
             className={`${styles.opt} ${right === option ? styles.ok : ""} ${picked === option && right !== option ? styles.no : ""}`}
-            disabled={closed || sending !== null} aria-pressed={picked === option} onClick={() => void answer(index, option)}>
+            disabled={closed || sending !== null || (wrong && picked === option)} aria-pressed={picked === option} onClick={() => void answer(index, option)}>
             {question.options[option]}
           </button>)}</div>
           {sending === index && <p className={styles.fb} role="status">Проверяем ответ…</p>}
-          {picked !== undefined && right !== undefined && <p className={styles.fb} role="status">
-            {picked === right ? `Верно! +1 миля. ${question.explanation}` : `Не совсем. ${question.explanation}`}
+          {picked !== undefined && sending !== index && <p className={styles.fb} role="status">
+            {!wrong ? `Верно! +1 миля. ${question.explanation}`
+              : attempt.completed ? `Не совсем. ${question.explanation}` : "Не совсем. Попробуй ещё раз — выбери другой вариант."}
           </p>}
         </div>;
       })}
