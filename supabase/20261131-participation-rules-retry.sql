@@ -2,7 +2,8 @@
 -- collect all 5 miles. A right answer stays as it is; the right option is told only after a right answer, so a wrong
 -- pick does not give the answer away. The miles (5) come once, when all five answers are right; mistakes are counted
 -- for the mentors. Unfinished games keep their answers, and a saved wrong one can now be changed.
--- Finished games are not changed here.
+-- Those who finished earlier with fewer than 5 miles (a wrong first answer) get the missing miles up to 5 (the user's OK
+-- of 2026-11-24); their games stay finished.
 -- Apply once to an existing database after 20261130; bootstrap.sql includes it for new ones. Running it again changes nothing.
 begin;
 
@@ -57,6 +58,20 @@ begin
     'maxPoints', task.max_points, 'completed', a.status = 'completed',
     'submission', case when saved.id is null then null else to_jsonb(saved) end);
 end $$;
+
+-- Finished earlier with fewer than 5 miles: the result is raised to 5. The guard forbids changing a finished game, so it
+-- is switched off for this one update only (the table stays locked until commit, nobody else writes meanwhile).
+alter table public.submissions disable trigger submissions_interactive_immutable;
+update public.submissions s set points = 5,
+    comment = 'Зачтено автоматически: 5 миль. Недостающие мили добавлены 24.11.2026 — теперь в тесте можно исправить ошибку.'
+  from public.tasks t
+  where t.id = s.task_id and t.interactive_kind = 'starter-rules' and s.submission_source = 'interactive'
+    and s.status = 'accepted' and s.points < 5;
+alter table public.submissions enable trigger submissions_interactive_immutable;
+
+update public.ready_program_attempts a set earned_points = 5, updated_at = now()
+  from public.tasks t
+  where t.id = a.task_id and t.interactive_kind = 'starter-rules' and a.status = 'completed' and a.earned_points < 5;
 
 -- Published games get the new text, unless a mentor changed it.
 update public.tasks set description = 'Как проходить «Прокачку»: 10 правил участия и 5 вопросов. Ошибку можно исправить: за каждый верный ответ — 1 миля, всего 5 миль автоматически.'

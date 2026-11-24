@@ -52,6 +52,8 @@ test('«Правила участия»: 20261131 lets a wrong answer be changed
   assert.match(sql, /'Правила участия: все ' \|\| total \|\| ' ответов верные\. Ошибок: ' \|\| mistake_count \|\| '\.', total,/);
   assert.match(sql, /and description = 'Как проходить «Прокачку»: 10 правил участия и 5 вопросов\. За каждый верный ответ с первой попытки — 1 миля, всего до 5 миль автоматически\.';/);
   assert.doesNotMatch(sql, /app_ready_program_spec\(p_kind/, 'the reward list is left alone');
+  assert.match(sql, /disable trigger submissions_interactive_immutable;\r?\nupdate public\.submissions s set points = 5,[\s\S]+?and s\.status = 'accepted' and s\.points < 5;\r?\nalter table public\.submissions enable trigger submissions_interactive_immutable;/,
+    'those who finished with fewer miles get up to 5, the guard is off only for that update');
   assert.match(read('supabase/bootstrap.sql'), /\\ir 20261130-bally\.sql\r?\n\\ir 20261131-participation-rules-retry\.sql\r?\n/);
   assert.match(read('.github/workflows/check.yml'), /tests\/bally\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f supabase\/20261131-participation-rules-retry\.sql\r?\n\s+psql -X -v ON_ERROR_STOP=1 -f tests\/participation-rules-retry\.sql/);
   const texts = JSON.stringify(load('shared/domain/participation-rules.ts')) + JSON.stringify(load('shared/domain/ready-programs.ts').readyProgramByKey('starter-rules')) + read('frontend/features/member/StarterRulesGame.tsx');
