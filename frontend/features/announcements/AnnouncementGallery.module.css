@@ -7,14 +7,21 @@
 .tile:hover img,.tile:focus-visible img { transform:scale(1.035); }
 .tile:focus-visible { outline:3px solid #3255b3; outline-offset:2px; }
 .more { position:absolute; inset:0; display:grid; place-items:center; background:#07162e99; color:white; font-size:28px; font-weight:700; }
-.backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:#07101dee; }
+.backdrop { --fade:1; position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:rgb(7 16 29 / calc(.93 * var(--fade))); }
 .viewer { position:relative; width:100%; height:100%; outline:none; }
 .toolbar { position:absolute; z-index:2; top:0; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left)); color:#fff; font-size:15px; }
-.toolbar button { display:grid; place-items:center; width:44px; height:44px; border:1px solid #ffffff55; border-radius:50%; background:#122642cc; color:white; font-size:30px; cursor:pointer; }
+.actions { display:flex; align-items:center; gap:10px; }
+.toolbar button { display:grid; place-items:center; height:44px; border:1px solid #ffffff55; background:#122642cc; color:white; cursor:pointer; }
+.close { width:44px; border-radius:50%; font-size:30px; }
+.toolbar .save { display:flex; gap:6px; padding:0 14px; border-radius:22px; font:inherit; font-size:15px; font-weight:600; }
+.toolbar .save svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.toolbar .save:disabled { opacity:.6; cursor:progress; }
+/* The whole screen takes the fingers: the page does not scroll or zoom under an open photo. */
+.stage { position:absolute; inset:0; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
 .full { position:absolute; inset:64px 58px 35px; }
-.full img { display:block; width:100%; height:100%; object-fit:contain; }
+.full img { display:block; width:100%; height:100%; object-fit:contain; transform-origin:center; transition:transform .22s ease; will-change:transform; }
 .arrow { position:absolute; top:50%; z-index:2; display:grid; place-items:center; width:44px; height:54px; border:1px solid #ffffff55; border-radius:12px; background:#122642cc; color:white; font-size:36px; cursor:pointer; transform:translateY(-50%); }
 .previous { left:12px; }.next { right:12px; }
 .toolbar button:focus-visible,.arrow:focus-visible { outline:3px solid #fff; outline-offset:2px; }
 @media (max-width:600px) { .gallery { --gap:6px; --row-h:220px; --single-h:340px; }.tile { border-radius:10px; }.full { inset:82px 4px 90px; }.arrow { top:auto; bottom:calc(16px + env(safe-area-inset-bottom)); transform:none; }.previous { left:calc(16px + env(safe-area-inset-left)); }.next { right:calc(16px + env(safe-area-inset-right)); } }
-@media (prefers-reduced-motion:reduce) { .tile img { transition:none; } }
+@media (prefers-reduced-motion:reduce) { .tile img,.full img { transition:none; } }
